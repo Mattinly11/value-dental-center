@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Value Dental Center</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --b50:#EFF6FF;--b100:#DBEAFE;--b200:#BFDBFE;--b300:#93C5FD;--b500:#3B82F6;--b600:#2563EB;--b700:#1D4ED8;--b900:#1E3A5F;
+  --s50:#F8FAFC;--s100:#F1F5F9;--s200:#E2E8F0;--s400:#94A3B8;--s500:#64748B;--s600:#475569;--s700:#334155;--s800:#1E293B;
+  --g50:#F0FDF4;--g100:#DCFCE7;--g600:#16A34A;--g700:#15803D;
+  --r50:#FEF2F2;--r100:#FEE2E2;--r500:#EF4444;--r600:#DC2626;
+  --a50:#FFFBEB;--a600:#D97706;
+  --rad:12px;--radsm:8px;
+}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5FF;font-size:13px;min-height:100vh;}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--b900);}
+.login-card{background:white;border-radius:18px;padding:40px;width:360px;max-width:95%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.login-logo{text-align:center;margin-bottom:28px;}
+.login-mark{width:56px;height:56px;background:var(--b600);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:white;margin-bottom:12px;}
+.login-title{font-size:18px;font-weight:700;color:var(--s800);}
+.login-sub{font-size:12px;color:var(--s400);margin-top:4px;}
+.login-field{margin-bottom:14px;}
+.login-label{font-size:11px;font-weight:600;color:var(--s600);margin-bottom:5px;display:block;}
+.login-input{width:100%;padding:11px 14px;border-radius:var(--radsm);border:1.5px solid var(--s200);font-size:13px;font-family:inherit;background:var(--s50);color:var(--s800);}
+.login-input:focus{outline:none;border-color:var(--b500);background:white;}
+.login-btn{width:100%;padding:12px;border-radius:var(--radsm);border:none;background:var(--b600);color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px;}
+.login-btn:hover{background:var(--b700);}
+.login-err{color:var(--r600);font-size:12px;text-align:center;margin-top:10px;display:none;}
+.shell{display:flex;min-height:100vh;}
+.sidebar{width:200px;min-width:200px;background:var(--b900);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;}
+.slogo{padding:20px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.07);}
+.smark{width:36px;height:36px;background:var(--b500);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;margin-bottom:8px;}
+.sname{font-size:12px;font-weight:700;color:white;line-height:1.3;}
+.ssub{font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;}
+.snav{padding:8px 8px;flex:1;overflow-y:auto;}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;color:rgba(255,255,255,0.5);margin-bottom:2px;text-decoration:none;}
+.ni:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.8);}
+.ni.act{background:var(--b600);color:white;}
+.ni-ic{width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.ni.act .ni-ic{background:rgba(255,255,255,0.18);}
+.sfooter{padding:12px;border-top:1px solid rgba(255,255,255,0.07);}
+.sfooter-inner{display:flex;align-items:center;gap:8px;}
+.sfav{width:30px;height:30px;border-radius:50%;background:var(--b500);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;}
+.sfname{font-size:11px;font-weight:600;color:white;}
+.sfrole{font-size:9px;color:rgba(255,255,255,0.35);}
+.logout-btn{margin-left:auto;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.4);font-size:16px;}
+.logout-btn:hover{color:var(--r500);}
+.main{flex:1;margin-left:200px;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{background:white;padding:12px 20px;border-bottom:1px solid var(--s200);display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:50;}
+.ttitle{font-size:16px;font-weight:700;color:var(--s800);}
+.tsub{font-size:11px;color:var(--s400);margin-top:1px;}
+.btn{padding:8px 16px;border-radius:var(--radsm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--s200);background:white;color:var(--s700);font-family:inherit;transition:all 0.12s;}
+.btn:hover{background:var(--s50);}
+.btnp{background:var(--b600);color:white;border-color:var(--b600);}
+.btnp:hover{background:var(--b700);}
+.btnsm{padding:5px 12px;font-size:11px;}
+.content{padding:16px 20px;flex:1;}
+.search-bar{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;}
+.search-icon{color:var(--b600);font-size:16px;flex-shrink:0;}
+.search-input{flex:1;border:none;outline:none;font-size:14px;font-family:inherit;color:var(--s800);background:transparent;}
+.search-input::placeholder{color:var(--s400);}
+.stats-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px;}
+.stat-card{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:14px 16px;}
+.stat-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;margin-bottom:10px;}
+.stat-lbl{font-size:11px;color:var(--s400);font-weight:500;margin-bottom:3px;}
+.stat-val{font-size:20px;font-weight:700;color:var(--s800);}
+.patients-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.pt-card{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:16px;cursor:pointer;transition:all 0.12s;}
+.pt-card:hover{border-color:var(--b300);box-shadow:0 2px 12px rgba(37,99,235,0.08);}
+.pt-card-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.pt-av{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+.pt-name{font-size:13px;font-weight:700;color:var(--s800);}
+.pt-id{font-size:10px;color:var(--s400);margin-top:2px;}
+.pt-meta{font-size:11px;color:var(--s500);display:flex;flex-direction:column;gap:4px;}
+.pt-meta-row{display:flex;align-items:center;gap:6px;}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}
+.bg{background:var(--g50);color:var(--g700);border:1px solid var(--g100);}
+.bb{background:var(--b50);color:var(--b600);border:1px solid var(--b100);}
+.ba{background:var(--a50);color:var(--a600);border:1px solid #FEF3C7;}
+.dr-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;margin-right:4px;background:var(--b600);}
+.empty-state{text-align:center;padding:60px 20px;color:var(--s400);}
+.mbg{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:300;align-items:center;justify-content:center;padding:20px;}
+.mbg.open{display:flex;}
+.modal{background:white;border-radius:16px;padding:24px;width:500px;max-width:100%;box-shadow:0 16px 48px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;}
+.mtit{font-size:15px;font-weight:700;color:var(--s800);margin-bottom:3px;}
+.msub{font-size:11px;color:var(--s400);margin-bottom:18px;}
+.mac{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+.mbtn{padding:8px 16px;border-radius:var(--radsm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--s200);background:white;color:var(--s700);font-family:inherit;}
+.mbtnp{background:var(--b600);color:white;border-color:var(--b600);}
+.mbtnd{background:var(--r50);color:var(--r600);border-color:var(--r100);}
+.fg{display:flex;gap:10px;}.fg>div{flex:1;min-width:0;}
+.fgrp{margin-bottom:13px;}
+.flbl{font-size:11px;font-weight:600;color:var(--s600);margin-bottom:5px;display:block;}
+.req{color:var(--r500);}
+.finp{width:100%;padding:9px 12px;border-radius:var(--radsm);border:1.5px solid var(--s200);font-size:13px;font-family:inherit;background:var(--s50);color:var(--s700);}
+.finp:focus{outline:none;border-color:var(--b500);background:white;}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--s800);color:white;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:999;transform:translateY(80px);opacity:0;transition:all 0.3s;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.success{background:var(--g700);}
+.toast.error{background:var(--r600);}
+.loader{text-align:center;padding:40px;color:var(--s400);}
+.spinner{width:32px;height:32px;border:3px solid var(--b100);border-top-color:var(--b600);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.coming-soon{text-align:center;padding:80px 20px;}
+.coming-soon-icon{font-size:48px;margin-bottom:16px;}
+.coming-soon h2{font-size:18px;font-weight:700;color:var(--s700);margin-bottom:8px;}
+.coming-soon p{font-size:13px;color:var(--s400);}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="login-mark">VDC</div>
+        <div class="login-title">Value Dental Center</div>
+        <div class="login-sub">Clinic management system</div>
+      </div>
+      <div class="login-field">
+        <label class="login-label">Username</label>
+        <input class="login-input" type="text" id="login-user" placeholder="Enter username" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label class="login-label">Password</label>
+        <input class="login-input" type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="login-btn" onclick="doLogin()">Sign in</button>
+      <div class="login-err" id="login-err">Incorrect username or password</div>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="shell">
+    <div class="sidebar">
+      <div class="slogo">
+        <div class="smark">VDC</div>
+        <div class="sname">Value Dental Center</div>
+        <div class="ssub">Clinic management</div>
+      </div>
+      <div class="snav">
+        <a class="ni" id="nav-dashboard" onclick="showSection('dashboard')"><div class="ni-ic">⊞</div>Dashboard</a>
+        <a class="ni" id="nav-patients" onclick="showSection('patients')"><div class="ni-ic">◉</div>Patients</a>
+        <a class="ni" id="nav-appointments" onclick="showSection('appointments')"><div class="ni-ic">◷</div>Appointments</a>
+        <a class="ni" id="nav-treatments" onclick="showSection('treatments')"><div class="ni-ic">✦</div>Treatments</a>
+        <a class="ni" id="nav-billing" onclick="showSection('billing')"><div class="ni-ic">◎</div>Billing</a>
+        <a class="ni" id="nav-finance" onclick="showSection('finance')"><div class="ni-ic">💼</div>Staff & Finance</a>
+        <a class="ni" id="nav-files" onclick="showSection('files')"><div class="ni-ic">▦</div>X-rays & Files</a>
+      </div>
+      <div class="sfooter">
+        <div class="sfooter-inner">
+          <div class="sfav">AD</div>
+          <div><div class="sfname">Admin</div><div class="sfrole">Value Dental Center</div></div>
+          <button class="logout-btn" onclick="doLogout()" title="Sign out">⏻</button>
+        </div>
+      </div>
+    </div>
+    <div class="main">
+      <div class="topbar">
+        <div>
+          <div class="ttitle" id="page-title">Patients</div>
+          <div class="tsub" id="page-sub">Manage your clinic patients</div>
+        </div>
+        <div id="topbar-actions"></div>
+      </div>
+      <div class="content" id="main-content">
+        <div class="loader"><div class="spinner"></div>Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbg" id="pt-modal">
+  <div class="modal">
+    <div class="mtit" id="pt-modal-title">Add new patient</div>
+    <div class="msub">Fill in the patient details below</div>
+    <input type="hidden" id="pt-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Full name <span class="req">*</span></label><input class="finp" id="pt-name" placeholder="e.g. Ali Rashid"></div>
+      <div class="fgrp"><label class="flbl">Date of birth</label><input class="finp" type="date" id="pt-dob"></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Gender</label>
+        <select class="finp" id="pt-gender"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select>
+      </div>
+      <div class="fgrp"><label class="flbl">Phone number</label><input class="finp" id="pt-phone" placeholder="e.g. 07701234567"></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Email</label><input class="finp" type="email" id="pt-email" placeholder="optional"></div>
+      <div class="fgrp"><label class="flbl">Status</label>
+        <select class="finp" id="pt-status"><option value="active">Active</option><option value="new">New</option><option value="inactive">Inactive</option></select>
+      </div>
+    </div>
+    <div class="fgrp"><label class="flbl">Primary dentist</label>
+      <select class="finp" id="pt-dentist">
+        <option value="">Select dentist...</option>
+        <option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option>
+        <option>Dr. Mateen</option><option>Dr. Ibrahim</option><option>Dr. Mahmoud</option>
+        <option>Dr. Niwar</option><option>Dr. Dilveen</option>
+      </select>
+    </div>
+    <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Medical notes</label>
+      <textarea class="finp" id="pt-notes" rows="3" placeholder="Allergies, medical conditions, important notes..."></textarea>
+    </div>
+    <div class="mac">
+      <button class="mbtn mbtnd" id="pt-delete-btn" style="display:none;margin-right:auto;" onclick="deletePatient()">Delete patient</button>
+      <button class="mbtn" onclick="closePtModal()">Cancel</button>
+      <button class="mbtn mbtnp" onclick="savePatient()">Save patient</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://jqtvgjroaagfewuetali.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxdHZnanJvYWFnZmV3dWV0YWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzQyNTIsImV4cCI6MjA5MDU1MDI1Mn0.vdekXCu_j4v3FQIqoPNRrQqf1oLxMsyKnVhHYkWTS2c';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const USERS = { 'admin': 'vdc2026admin', 'reception': 'vdc2026desk' };
+
+function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-err');
+  if (USERS[user] && USERS[user] === pass) {
+    sessionStorage.setItem('vdc-user', user);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    showSection('patients');
+  } else {
+    err.style.display = 'block';
+    setTimeout(() => err.style.display = 'none', 3000);
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('vdc-user');
+  location.reload();
+}
+
+window.onload = () => {
+  if (sessionStorage.getItem('vdc-user')) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    showSection('patients');
+  }
+};
+
+const SECTIONS = {
+  patients:     { title: 'Patients',       sub: 'Manage your clinic patients' },
+  dashboard:    { title: 'Dashboard',      sub: 'Clinic overview' },
+  appointments: { title: 'Appointments',   sub: 'Schedule management' },
+  treatments:   { title: 'Treatments',     sub: 'Procedure records' },
+  billing:      { title: 'Billing',        sub: 'Invoices & payments' },
+  finance:      { title: 'Staff & Finance',sub: 'Payroll & partner wallets' },
+  files:        { title: 'X-rays & Files', sub: 'Patient file management' },
+};
+
+function showSection(s) {
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('act'));
+  const nav = document.getElementById('nav-' + s);
+  if (nav) nav.classList.add('act');
+  document.getElementById('page-title').textContent = SECTIONS[s]?.title || s;
+  document.getElementById('page-sub').textContent   = SECTIONS[s]?.sub   || '';
+  if (s === 'patients') renderPatients();
+  else renderComingSoon(s);
+}
+
+function renderComingSoon(s) {
+  document.getElementById('topbar-actions').innerHTML = '';
+  document.getElementById('main-content').innerHTML = `
+    <div class="coming-soon">
+      <div class="coming-soon-icon">🚧</div>
+      <h2>${SECTIONS[s]?.title || s} — Coming soon</h2>
+      <p>This section is being built. Check back soon!</p>
+    </div>`;
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+const PT_COLORS = [
+  { bg: '#DBEAFE', color: '#1D4ED8' }, { bg: '#CCFBF1', color: '#0F766E' },
+  { bg: '#FFE4E6', color: '#BE123C' }, { bg: '#EDE9FE', color: '#6D28D9' },
+  { bg: '#FEF3C7', color: '#B45309' }, { bg: '#FCE7F3', color: '#9D174D' },
+];
+
+function ptColor(name) {
+  let h = 0;
+  for (let c of name) h = (h * 31 + c.charCodeAt(0)) % PT_COLORS.length;
+  return PT_COLORS[h];
+}
+
+function ptInitials(name) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function calcAge(dob) {
+  if (!dob) return null;
+  return Math.floor((Date.now() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+}
+
+function statusBadge(s) {
+  const m = { active: 'bg', new: 'bb', inactive: 'ba' };
+  return '<span class="badge ' + (m[s] || 'bb') + '">' + s + '</span>';
+}
+
+let allPatients = [];
+let searchQuery = '';
+
+async function renderPatients() {
+  document.getElementById('topbar-actions').innerHTML =
+    '<button class="btn btnp" onclick="openAddPtModal()">+ Add patient</button>';
+  document.getElementById('main-content').innerHTML =
+    '<div class="loader"><div class="spinner"></div>Loading patients...</div>';
+  const { data, error } = await db.from('patients').select('*').order('created_at', { ascending: false });
+  if (error) { showToast('Failed to load patients', 'error'); return; }
+  allPatients = data || [];
+  renderPatientList();
+}
+
+function renderPatientList() {
+  const q = searchQuery.toLowerCase();
+  const list = q ? allPatients.filter(p =>
+    (p.name || '').toLowerCase().includes(q) ||
+    (p.phone || '').includes(q) ||
+    (p.primary_dentist || '').toLowerCase().includes(q)
+  ) : allPatients;
+
+  const active  = allPatients.filter(p => p.status === 'active').length;
+  const newPts  = allPatients.filter(p => p.status === 'new').length;
+
+  let html = '<div class="search-bar">' +
+    '<span class="search-icon">🔍</span>' +
+    '<input class="search-input" id="search-inp" placeholder="Search by name, phone, or dentist..." ' +
+    'value="' + searchQuery + '" oninput="onSearch(this.value)">' +
+    '</div>' +
+    '<div class="stats-row">' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">👥</div><div class="stat-lbl">Total patients</div><div class="stat-val">' + allPatients.length + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">✅</div><div class="stat-lbl">Active</div><div class="stat-val">' + active + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">🆕</div><div class="stat-lbl">New patients</div><div class="stat-val">' + newPts + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--a50);">🔍</div><div class="stat-lbl">Showing</div><div class="stat-val">' + list.length + '</div></div>' +
+    '</div>';
+
+  if (list.length) {
+    html += '<div class="patients-grid">' + list.map(ptCard).join('') + '</div>';
+  } else {
+    html += '<div class="empty-state"><div style="font-size:36px;margin-bottom:12px;">👤</div>' +
+      '<div style="font-size:14px;font-weight:600;color:var(--s600);margin-bottom:6px;">' +
+      (q ? 'No patients found' : 'No patients yet') + '</div>' +
+      '<div style="font-size:12px;">' +
+      (q ? 'Try a different search term' : 'Click &quot;Add patient&quot; to register your first patient') +
+      '</div></div>';
+  }
+
+  document.getElementById('main-content').innerHTML = html;
+
+  if (searchQuery) {
+    setTimeout(() => {
+      const inp = document.getElementById('search-inp');
+      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    }, 10);
+  }
+}
+
+function ptCard(p) {
+  const c = ptColor(p.name || '');
+  const age = calcAge(p.dob);
+  const initials = ptInitials(p.name || '?');
+  let meta = '';
+  if (p.phone)           meta += '<div class="pt-meta-row"><span style="color:var(--s400);">📞</span> ' + p.phone + '</div>';
+  if (p.primary_dentist) meta += '<div class="pt-meta-row"><span class="dr-dot"></span>' + p.primary_dentist + '</div>';
+  if (p.medical_notes)   meta += '<div class="pt-meta-row" style="color:var(--s400);font-style:italic;font-size:10px;">"' +
+    p.medical_notes.slice(0, 60) + (p.medical_notes.length > 60 ? '...' : '') + '"</div>';
+
+  return '<div class="pt-card" onclick="openEditPtModal(\'' + p.id + '\')">' +
+    '<div class="pt-card-header">' +
+    '<div class="pt-av" style="background:' + c.bg + ';color:' + c.color + ';">' + initials + '</div>' +
+    '<div><div class="pt-name">' + p.name + '</div>' +
+    '<div class="pt-id">' + (age ? age + ' years old' : '') + (p.gender ? ' · ' + p.gender : '') + '</div></div>' +
+    '<div style="margin-left:auto;">' + statusBadge(p.status || 'active') + '</div>' +
+    '</div><div class="pt-meta">' + meta + '</div></div>';
+}
+
+function onSearch(v) {
+  searchQuery = v;
+  renderPatientList();
+}
+
+function openAddPtModal() {
+  document.getElementById('pt-modal-title').textContent = 'Add new patient';
+  document.getElementById('pt-id').value       = '';
+  document.getElementById('pt-name').value     = '';
+  document.getElementById('pt-dob').value      = '';
+  document.getElementById('pt-gender').value   = '';
+  document.getElementById('pt-phone').value    = '';
+  document.getElementById('pt-email').value    = '';
+  document.getElementById('pt-status').value   = 'new';
+  document.getElementById('pt-dentist').value  = '';
+  document.getElementById('pt-notes').value    = '';
+  document.getElementById('pt-delete-btn').style.display = 'none';
+  document.getElementById('pt-modal').classList.add('open');
+}
+
+function openEditPtModal(id) {
+  const p = allPatients.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('pt-modal-title').textContent = 'Edit patient';
+  document.getElementById('pt-id').value       = p.id;
+  document.getElementById('pt-name').value     = p.name || '';
+  document.getElementById('pt-dob').value      = p.dob  || '';
+  document.getElementById('pt-gender').value   = p.gender || '';
+  document.getElementById('pt-phone').value    = p.phone  || '';
+  document.getElementById('pt-email').value    = p.email  || '';
+  document.getElementById('pt-status').value   = p.status || 'active';
+  document.getElementById('pt-dentist').value  = p.primary_dentist || '';
+  document.getElementById('pt-notes').value    = p.medical_notes   || '';
+  document.getElementById('pt-delete-btn').style.display = 'inline-flex';
+  document.getElementById('pt-modal').classList.add('open');
+}
+
+function closePtModal() {
+  document.getElementById('pt-modal').classList.remove('open');
+}
+
+async function savePatient() {
+  const name = document.getElementById('pt-name').value.trim();
+  if (!name) { showToast('Please enter patient name', 'error'); return; }
+  const id = document.getElementById('pt-id').value;
+  const payload = {
+    name,
+    dob:             document.getElementById('pt-dob').value    || null,
+    gender:          document.getElementById('pt-gender').value || null,
+    phone:           document.getElementById('pt-phone').value.trim()  || null,
+    email:           document.getElementById('pt-email').value.trim()  || null,
+    status:          document.getElementById('pt-status').value,
+    primary_dentist: document.getElementById('pt-dentist').value || null,
+    medical_notes:   document.getElementById('pt-notes').value.trim()  || null,
+  };
+  let error;
+  if (id) {
+    ({ error } = await db.from('patients').update(payload).eq('id', id));
+  } else {
+    ({ error } = await db.from('patients').insert([payload]));
+  }
+  if (error) { showToast('Failed to save patient', 'error'); console.error(error); return; }
+  showToast(id ? 'Patient updated successfully' : 'Patient added successfully');
+  closePtModal();
+  renderPatients();
+}
+
+async function deletePatient() {
+  const id   = document.getElementById('pt-id').value;
+  const name = document.getElementById('pt-name').value;
+  if (!id) return;
+  if (!confirm('Are you sure you want to delete ' + name + '? This cannot be undone.')) return;
+  const { error } = await db.from('patients').delete().eq('id', id);
+  if (error) { showToast('Failed to delete patient', 'error'); return; }
+  showToast('Patient deleted');
+  closePtModal();
+  renderPatients();
+}
+
+document.getElementById('pt-modal').addEventListener('click', function(e) {
+  if (e.target === this) closePtModal();
+});
+</script>
+</body>
+</html>
