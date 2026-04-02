@@ -56,12 +56,15 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .btn:hover{background:var(--s50);}
 .btnp{background:var(--b600);color:white;border-color:var(--b600);}
 .btnp:hover{background:var(--b700);}
-.btnsm{padding:5px 12px;font-size:11px;}
 .content{padding:16px 20px;flex:1;}
-.search-bar{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;}
-.search-icon{color:var(--b600);font-size:16px;flex-shrink:0;}
-.search-input{flex:1;border:none;outline:none;font-size:14px;font-family:inherit;color:var(--s800);background:transparent;}
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.search-bar{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:10px 16px;display:flex;align-items:center;gap:10px;flex:1;min-width:200px;}
+.search-icon{color:var(--b600);font-size:15px;flex-shrink:0;}
+.search-input{flex:1;border:none;outline:none;font-size:13px;font-family:inherit;color:var(--s800);background:transparent;}
 .search-input::placeholder{color:var(--s400);}
+.view-toggle{display:flex;background:var(--s100);border-radius:var(--radsm);padding:3px;gap:2px;}
+.vt-btn{width:34px;height:34px;border-radius:6px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--s500);font-family:inherit;}
+.vt-btn.on{background:white;color:var(--b600);box-shadow:0 1px 3px rgba(0,0,0,0.1);}
 .stats-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px;}
 .stat-card{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:14px 16px;}
 .stat-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;margin-bottom:10px;}
@@ -76,6 +79,16 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .pt-id{font-size:10px;color:var(--s400);margin-top:2px;}
 .pt-meta{font-size:11px;color:var(--s500);display:flex;flex-direction:column;gap:4px;}
 .pt-meta-row{display:flex;align-items:center;gap:6px;}
+.patients-list{background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:hidden;}
+.list-header{display:grid;grid-template-columns:2fr 1.2fr 1.2fr 90px 70px;gap:12px;padding:10px 16px;background:var(--s50);border-bottom:1px solid var(--s200);font-size:10px;font-weight:700;color:var(--s400);text-transform:uppercase;letter-spacing:0.4px;}
+.list-row{display:grid;grid-template-columns:2fr 1.2fr 1.2fr 90px 70px;gap:12px;padding:13px 16px;border-bottom:1px solid var(--s100);cursor:pointer;align-items:center;transition:background 0.1s;}
+.list-row:last-child{border:none;}
+.list-row:hover{background:var(--b50);}
+.list-pt-info{display:flex;align-items:center;gap:10px;}
+.list-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.list-name{font-size:12px;font-weight:700;color:var(--s800);}
+.list-sub{font-size:10px;color:var(--s400);margin-top:2px;}
+.list-cell{font-size:12px;color:var(--s600);}
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}
 .bg{background:var(--g50);color:var(--g700);border:1px solid var(--g100);}
 .bb{background:var(--b50);color:var(--b600);border:1px solid var(--b100);}
@@ -223,11 +236,12 @@ const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const USERS = { 'admin': 'vdc2026admin', 'reception': 'vdc2026desk' };
+let viewMode = localStorage.getItem('vdc-view') || 'grid';
 
 function doLogin() {
   const user = document.getElementById('login-user').value.trim();
   const pass = document.getElementById('login-pass').value;
-  const err = document.getElementById('login-err');
+  const err  = document.getElementById('login-err');
   if (USERS[user] && USERS[user] === pass) {
     sessionStorage.setItem('vdc-user', user);
     document.getElementById('login-screen').style.display = 'none';
@@ -235,7 +249,7 @@ function doLogin() {
     showSection('patients');
   } else {
     err.style.display = 'block';
-    setTimeout(() => err.style.display = 'none', 3000);
+    setTimeout(function(){err.style.display='none';}, 3000);
   }
 }
 
@@ -244,7 +258,7 @@ function doLogout() {
   location.reload();
 }
 
-window.onload = () => {
+window.onload = function() {
   if (sessionStorage.getItem('vdc-user')) {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
@@ -253,143 +267,171 @@ window.onload = () => {
 };
 
 const SECTIONS = {
-  patients:     { title: 'Patients',       sub: 'Manage your clinic patients' },
-  dashboard:    { title: 'Dashboard',      sub: 'Clinic overview' },
-  appointments: { title: 'Appointments',   sub: 'Schedule management' },
-  treatments:   { title: 'Treatments',     sub: 'Procedure records' },
-  billing:      { title: 'Billing',        sub: 'Invoices & payments' },
-  finance:      { title: 'Staff & Finance',sub: 'Payroll & partner wallets' },
-  files:        { title: 'X-rays & Files', sub: 'Patient file management' },
+  patients:     { title: 'Patients',        sub: 'Manage your clinic patients' },
+  dashboard:    { title: 'Dashboard',       sub: 'Clinic overview' },
+  appointments: { title: 'Appointments',    sub: 'Schedule management' },
+  treatments:   { title: 'Treatments',      sub: 'Procedure records' },
+  billing:      { title: 'Billing',         sub: 'Invoices & payments' },
+  finance:      { title: 'Staff & Finance', sub: 'Payroll & partner wallets' },
+  files:        { title: 'X-rays & Files',  sub: 'Patient file management' },
 };
 
 function showSection(s) {
-  document.querySelectorAll('.ni').forEach(n => n.classList.remove('act'));
-  const nav = document.getElementById('nav-' + s);
+  document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('act');});
+  var nav = document.getElementById('nav-' + s);
   if (nav) nav.classList.add('act');
-  document.getElementById('page-title').textContent = SECTIONS[s]?.title || s;
-  document.getElementById('page-sub').textContent   = SECTIONS[s]?.sub   || '';
+  document.getElementById('page-title').textContent = SECTIONS[s] ? SECTIONS[s].title : s;
+  document.getElementById('page-sub').textContent   = SECTIONS[s] ? SECTIONS[s].sub   : '';
   if (s === 'patients') renderPatients();
   else renderComingSoon(s);
 }
 
 function renderComingSoon(s) {
   document.getElementById('topbar-actions').innerHTML = '';
-  document.getElementById('main-content').innerHTML = `
-    <div class="coming-soon">
-      <div class="coming-soon-icon">🚧</div>
-      <h2>${SECTIONS[s]?.title || s} — Coming soon</h2>
-      <p>This section is being built. Check back soon!</p>
-    </div>`;
+  document.getElementById('main-content').innerHTML =
+    '<div class="coming-soon"><div class="coming-soon-icon">🚧</div>' +
+    '<h2>' + (SECTIONS[s] ? SECTIONS[s].title : s) + ' — Coming soon</h2>' +
+    '<p>This section is being built. Check back soon!</p></div>';
 }
 
-function showToast(msg, type = 'success') {
-  const t = document.getElementById('toast');
+function showToast(msg, type) {
+  type = type || 'success';
+  var t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast ' + type + ' show';
-  setTimeout(() => t.classList.remove('show'), 3000);
+  setTimeout(function(){t.classList.remove('show');}, 3000);
 }
 
-const PT_COLORS = [
-  { bg: '#DBEAFE', color: '#1D4ED8' }, { bg: '#CCFBF1', color: '#0F766E' },
-  { bg: '#FFE4E6', color: '#BE123C' }, { bg: '#EDE9FE', color: '#6D28D9' },
-  { bg: '#FEF3C7', color: '#B45309' }, { bg: '#FCE7F3', color: '#9D174D' },
+var PT_COLORS = [
+  {bg:'#DBEAFE',color:'#1D4ED8'},{bg:'#CCFBF1',color:'#0F766E'},
+  {bg:'#FFE4E6',color:'#BE123C'},{bg:'#EDE9FE',color:'#6D28D9'},
+  {bg:'#FEF3C7',color:'#B45309'},{bg:'#FCE7F3',color:'#9D174D'},
 ];
 
 function ptColor(name) {
-  let h = 0;
-  for (let c of name) h = (h * 31 + c.charCodeAt(0)) % PT_COLORS.length;
+  var h = 0;
+  for (var i=0;i<name.length;i++) h = (h * 31 + name.charCodeAt(i)) % PT_COLORS.length;
   return PT_COLORS[h];
 }
 
 function ptInitials(name) {
-  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  return name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
 }
 
 function calcAge(dob) {
   if (!dob) return null;
-  return Math.floor((Date.now() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+  return Math.floor((Date.now() - new Date(dob).getTime()) / (1000*60*60*24*365.25));
 }
 
 function statusBadge(s) {
-  const m = { active: 'bg', new: 'bb', inactive: 'ba' };
-  return '<span class="badge ' + (m[s] || 'bb') + '">' + s + '</span>';
+  var m = {active:'bg', new:'bb', inactive:'ba'};
+  return '<span class="badge ' + (m[s]||'bb') + '">' + (s||'active') + '</span>';
 }
 
-let allPatients = [];
-let searchQuery = '';
+var allPatients = [];
+var searchQuery = '';
 
 async function renderPatients() {
   document.getElementById('topbar-actions').innerHTML =
     '<button class="btn btnp" onclick="openAddPtModal()">+ Add patient</button>';
   document.getElementById('main-content').innerHTML =
     '<div class="loader"><div class="spinner"></div>Loading patients...</div>';
-  const { data, error } = await db.from('patients').select('*').order('created_at', { ascending: false });
-  if (error) { showToast('Failed to load patients', 'error'); return; }
-  allPatients = data || [];
+  var res = await db.from('patients').select('*').order('created_at', {ascending: false});
+  if (res.error) { showToast('Failed to load patients', 'error'); return; }
+  allPatients = res.data || [];
   renderPatientList();
 }
 
 function renderPatientList() {
-  const q = searchQuery.toLowerCase();
-  const list = q ? allPatients.filter(p =>
-    (p.name || '').toLowerCase().includes(q) ||
-    (p.phone || '').includes(q) ||
-    (p.primary_dentist || '').toLowerCase().includes(q)
-  ) : allPatients;
+  var q = searchQuery.toLowerCase();
+  var list = q ? allPatients.filter(function(p) {
+    return (p.name||'').toLowerCase().includes(q) ||
+           (p.phone||'').includes(q) ||
+           (p.primary_dentist||'').toLowerCase().includes(q);
+  }) : allPatients;
 
-  const active  = allPatients.filter(p => p.status === 'active').length;
-  const newPts  = allPatients.filter(p => p.status === 'new').length;
+  var active  = allPatients.filter(function(p){return p.status==='active';}).length;
+  var newPts  = allPatients.filter(function(p){return p.status==='new';}).length;
+  var gridOn  = viewMode === 'grid';
 
-  let html = '<div class="search-bar">' +
-    '<span class="search-icon">🔍</span>' +
-    '<input class="search-input" id="search-inp" placeholder="Search by name, phone, or dentist..." ' +
-    'value="' + searchQuery + '" oninput="onSearch(this.value)">' +
+  var html =
+    '<div class="toolbar">' +
+      '<div class="search-bar">' +
+        '<span class="search-icon">🔍</span>' +
+        '<input class="search-input" id="search-inp" placeholder="Search by name, phone, or dentist..." value="' + searchQuery + '" oninput="onSearch(this.value)">' +
+      '</div>' +
+      '<div class="view-toggle">' +
+        '<button class="vt-btn ' + (gridOn?'on':'') + '" onclick="setView(\'grid\')" title="Grid view">⊞</button>' +
+        '<button class="vt-btn ' + (!gridOn?'on':'') + '" onclick="setView(\'list\')" title="List view">☰</button>' +
+      '</div>' +
     '</div>' +
     '<div class="stats-row">' +
-    '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">👥</div><div class="stat-lbl">Total patients</div><div class="stat-val">' + allPatients.length + '</div></div>' +
-    '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">✅</div><div class="stat-lbl">Active</div><div class="stat-val">' + active + '</div></div>' +
-    '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">🆕</div><div class="stat-lbl">New patients</div><div class="stat-val">' + newPts + '</div></div>' +
-    '<div class="stat-card"><div class="stat-icon" style="background:var(--a50);">🔍</div><div class="stat-lbl">Showing</div><div class="stat-val">' + list.length + '</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">👥</div><div class="stat-lbl">Total patients</div><div class="stat-val">' + allPatients.length + '</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">✅</div><div class="stat-lbl">Active</div><div class="stat-val">' + active + '</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">🆕</div><div class="stat-lbl">New patients</div><div class="stat-val">' + newPts + '</div></div>' +
+      '<div class="stat-card"><div class="stat-icon" style="background:var(--a50);">🔍</div><div class="stat-lbl">Showing</div><div class="stat-val">' + list.length + '</div></div>' +
     '</div>';
 
-  if (list.length) {
-    html += '<div class="patients-grid">' + list.map(ptCard).join('') + '</div>';
-  } else {
+  if (!list.length) {
     html += '<div class="empty-state"><div style="font-size:36px;margin-bottom:12px;">👤</div>' +
-      '<div style="font-size:14px;font-weight:600;color:var(--s600);margin-bottom:6px;">' +
-      (q ? 'No patients found' : 'No patients yet') + '</div>' +
-      '<div style="font-size:12px;">' +
-      (q ? 'Try a different search term' : 'Click &quot;Add patient&quot; to register your first patient') +
-      '</div></div>';
+      '<div style="font-size:14px;font-weight:600;color:var(--s600);margin-bottom:6px;">' + (q ? 'No patients found' : 'No patients yet') + '</div>' +
+      '<div style="font-size:12px;">' + (q ? 'Try a different search term' : 'Click &quot;Add patient&quot; to register your first patient') + '</div></div>';
+  } else if (gridOn) {
+    html += '<div class="patients-grid">' + list.map(ptCardGrid).join('') + '</div>';
+  } else {
+    html += '<div class="patients-list">' +
+      '<div class="list-header"><div>Patient</div><div>Phone</div><div>Dentist</div><div>Status</div><div>Age</div></div>' +
+      list.map(ptCardList).join('') +
+      '</div>';
   }
 
   document.getElementById('main-content').innerHTML = html;
-
   if (searchQuery) {
-    setTimeout(() => {
-      const inp = document.getElementById('search-inp');
+    setTimeout(function() {
+      var inp = document.getElementById('search-inp');
       if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
     }, 10);
   }
 }
 
-function ptCard(p) {
-  const c = ptColor(p.name || '');
-  const age = calcAge(p.dob);
-  const initials = ptInitials(p.name || '?');
-  let meta = '';
+function ptCardGrid(p) {
+  var c = ptColor(p.name || '');
+  var age = calcAge(p.dob);
+  var initials = ptInitials(p.name || '?');
+  var meta = '';
   if (p.phone)           meta += '<div class="pt-meta-row"><span style="color:var(--s400);">📞</span> ' + p.phone + '</div>';
   if (p.primary_dentist) meta += '<div class="pt-meta-row"><span class="dr-dot"></span>' + p.primary_dentist + '</div>';
-  if (p.medical_notes)   meta += '<div class="pt-meta-row" style="color:var(--s400);font-style:italic;font-size:10px;">"' +
-    p.medical_notes.slice(0, 60) + (p.medical_notes.length > 60 ? '...' : '') + '"</div>';
-
+  if (p.medical_notes)   meta += '<div class="pt-meta-row" style="color:var(--s400);font-style:italic;font-size:10px;">"' + p.medical_notes.slice(0,60) + (p.medical_notes.length>60?'...':'') + '"</div>';
   return '<div class="pt-card" onclick="openEditPtModal(\'' + p.id + '\')">' +
     '<div class="pt-card-header">' +
     '<div class="pt-av" style="background:' + c.bg + ';color:' + c.color + ';">' + initials + '</div>' +
     '<div><div class="pt-name">' + p.name + '</div>' +
-    '<div class="pt-id">' + (age ? age + ' years old' : '') + (p.gender ? ' · ' + p.gender : '') + '</div></div>' +
-    '<div style="margin-left:auto;">' + statusBadge(p.status || 'active') + '</div>' +
+    '<div class="pt-id">' + (age ? age + ' yrs' : '') + (p.gender ? ' · ' + p.gender : '') + '</div></div>' +
+    '<div style="margin-left:auto;">' + statusBadge(p.status) + '</div>' +
     '</div><div class="pt-meta">' + meta + '</div></div>';
+}
+
+function ptCardList(p) {
+  var c = ptColor(p.name || '');
+  var age = calcAge(p.dob);
+  var initials = ptInitials(p.name || '?');
+  return '<div class="list-row" onclick="openEditPtModal(\'' + p.id + '\')">' +
+    '<div class="list-pt-info">' +
+    '<div class="list-av" style="background:' + c.bg + ';color:' + c.color + ';">' + initials + '</div>' +
+    '<div><div class="list-name">' + p.name + '</div>' +
+    '<div class="list-sub">' + (p.gender||'') + (p.medical_notes ? ' · ' + p.medical_notes.slice(0,35) + (p.medical_notes.length>35?'...':'') : '') + '</div></div>' +
+    '</div>' +
+    '<div class="list-cell">' + (p.phone||'—') + '</div>' +
+    '<div class="list-cell">' + (p.primary_dentist||'—') + '</div>' +
+    '<div>' + statusBadge(p.status) + '</div>' +
+    '<div class="list-cell">' + (age ? age + ' yrs' : '—') + '</div>' +
+    '</div>';
+}
+
+function setView(v) {
+  viewMode = v;
+  localStorage.setItem('vdc-view', v);
+  renderPatientList();
 }
 
 function onSearch(v) {
@@ -399,32 +441,32 @@ function onSearch(v) {
 
 function openAddPtModal() {
   document.getElementById('pt-modal-title').textContent = 'Add new patient';
-  document.getElementById('pt-id').value       = '';
-  document.getElementById('pt-name').value     = '';
-  document.getElementById('pt-dob').value      = '';
-  document.getElementById('pt-gender').value   = '';
-  document.getElementById('pt-phone').value    = '';
-  document.getElementById('pt-email').value    = '';
-  document.getElementById('pt-status').value   = 'new';
-  document.getElementById('pt-dentist').value  = '';
-  document.getElementById('pt-notes').value    = '';
+  document.getElementById('pt-id').value      = '';
+  document.getElementById('pt-name').value    = '';
+  document.getElementById('pt-dob').value     = '';
+  document.getElementById('pt-gender').value  = '';
+  document.getElementById('pt-phone').value   = '';
+  document.getElementById('pt-email').value   = '';
+  document.getElementById('pt-status').value  = 'new';
+  document.getElementById('pt-dentist').value = '';
+  document.getElementById('pt-notes').value   = '';
   document.getElementById('pt-delete-btn').style.display = 'none';
   document.getElementById('pt-modal').classList.add('open');
 }
 
 function openEditPtModal(id) {
-  const p = allPatients.find(x => x.id === id);
+  var p = allPatients.find(function(x){return x.id===id;});
   if (!p) return;
   document.getElementById('pt-modal-title').textContent = 'Edit patient';
-  document.getElementById('pt-id').value       = p.id;
-  document.getElementById('pt-name').value     = p.name || '';
-  document.getElementById('pt-dob').value      = p.dob  || '';
-  document.getElementById('pt-gender').value   = p.gender || '';
-  document.getElementById('pt-phone').value    = p.phone  || '';
-  document.getElementById('pt-email').value    = p.email  || '';
-  document.getElementById('pt-status').value   = p.status || 'active';
-  document.getElementById('pt-dentist').value  = p.primary_dentist || '';
-  document.getElementById('pt-notes').value    = p.medical_notes   || '';
+  document.getElementById('pt-id').value      = p.id;
+  document.getElementById('pt-name').value    = p.name || '';
+  document.getElementById('pt-dob').value     = p.dob  || '';
+  document.getElementById('pt-gender').value  = p.gender || '';
+  document.getElementById('pt-phone').value   = p.phone  || '';
+  document.getElementById('pt-email').value   = p.email  || '';
+  document.getElementById('pt-status').value  = p.status || 'active';
+  document.getElementById('pt-dentist').value = p.primary_dentist || '';
+  document.getElementById('pt-notes').value   = p.medical_notes   || '';
   document.getElementById('pt-delete-btn').style.display = 'inline-flex';
   document.getElementById('pt-modal').classList.add('open');
 }
@@ -434,11 +476,11 @@ function closePtModal() {
 }
 
 async function savePatient() {
-  const name = document.getElementById('pt-name').value.trim();
+  var name = document.getElementById('pt-name').value.trim();
   if (!name) { showToast('Please enter patient name', 'error'); return; }
-  const id = document.getElementById('pt-id').value;
-  const payload = {
-    name,
+  var id = document.getElementById('pt-id').value;
+  var payload = {
+    name: name,
     dob:             document.getElementById('pt-dob').value    || null,
     gender:          document.getElementById('pt-gender').value || null,
     phone:           document.getElementById('pt-phone').value.trim()  || null,
@@ -447,25 +489,25 @@ async function savePatient() {
     primary_dentist: document.getElementById('pt-dentist').value || null,
     medical_notes:   document.getElementById('pt-notes').value.trim()  || null,
   };
-  let error;
+  var res;
   if (id) {
-    ({ error } = await db.from('patients').update(payload).eq('id', id));
+    res = await db.from('patients').update(payload).eq('id', id);
   } else {
-    ({ error } = await db.from('patients').insert([payload]));
+    res = await db.from('patients').insert([payload]);
   }
-  if (error) { showToast('Failed to save patient', 'error'); console.error(error); return; }
+  if (res.error) { showToast('Failed to save patient', 'error'); return; }
   showToast(id ? 'Patient updated successfully' : 'Patient added successfully');
   closePtModal();
   renderPatients();
 }
 
 async function deletePatient() {
-  const id   = document.getElementById('pt-id').value;
-  const name = document.getElementById('pt-name').value;
+  var id   = document.getElementById('pt-id').value;
+  var name = document.getElementById('pt-name').value;
   if (!id) return;
   if (!confirm('Are you sure you want to delete ' + name + '? This cannot be undone.')) return;
-  const { error } = await db.from('patients').delete().eq('id', id);
-  if (error) { showToast('Failed to delete patient', 'error'); return; }
+  var res = await db.from('patients').delete().eq('id', id);
+  if (res.error) { showToast('Failed to delete patient', 'error'); return; }
   showToast('Patient deleted');
   closePtModal();
   renderPatients();
