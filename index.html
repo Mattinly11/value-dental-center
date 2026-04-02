@@ -12,7 +12,7 @@
   --s50:#F8FAFC;--s100:#F1F5F9;--s200:#E2E8F0;--s400:#94A3B8;--s500:#64748B;--s600:#475569;--s700:#334155;--s800:#1E293B;
   --g50:#F0FDF4;--g100:#DCFCE7;--g600:#16A34A;--g700:#15803D;
   --r50:#FEF2F2;--r100:#FEE2E2;--r500:#EF4444;--r600:#DC2626;
-  --a50:#FFFBEB;--a600:#D97706;
+  --a50:#FFFBEB;--a100:#FEF3C7;--a600:#D97706;--a700:#B45309;
   --rad:12px;--radsm:8px;
 }
 body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5FF;font-size:13px;min-height:100vh;}
@@ -49,13 +49,14 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .logout-btn{margin-left:auto;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.4);font-size:16px;}
 .logout-btn:hover{color:var(--r500);}
 .main{flex:1;margin-left:200px;display:flex;flex-direction:column;min-height:100vh;}
-.topbar{background:white;padding:12px 20px;border-bottom:1px solid var(--s200);display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:50;}
+.topbar{background:white;padding:12px 20px;border-bottom:1px solid var(--s200);display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:50;flex-wrap:wrap;}
 .ttitle{font-size:16px;font-weight:700;color:var(--s800);}
 .tsub{font-size:11px;color:var(--s400);margin-top:1px;}
 .btn{padding:8px 16px;border-radius:var(--radsm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--s200);background:white;color:var(--s700);font-family:inherit;transition:all 0.12s;}
 .btn:hover{background:var(--s50);}
 .btnp{background:var(--b600);color:white;border-color:var(--b600);}
 .btnp:hover{background:var(--b700);}
+.btnsm{padding:5px 12px;font-size:11px;}
 .content{padding:16px 20px;flex:1;}
 .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
 .search-bar{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:10px 16px;display:flex;align-items:center;gap:10px;flex:1;min-width:200px;}
@@ -92,17 +93,72 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}
 .bg{background:var(--g50);color:var(--g700);border:1px solid var(--g100);}
 .bb{background:var(--b50);color:var(--b600);border:1px solid var(--b100);}
-.ba{background:var(--a50);color:var(--a600);border:1px solid #FEF3C7;}
+.ba{background:var(--a50);color:var(--a600);border:1px solid var(--a100);}
+.br{background:var(--r50);color:var(--r600);border:1px solid var(--r100);}
+.bs{background:var(--s100);color:var(--s600);border:1px solid var(--s200);}
 .dr-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;margin-right:4px;background:var(--b600);}
 .empty-state{text-align:center;padding:60px 20px;color:var(--s400);}
+/* APPOINTMENTS */
+.appt-topbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.date-nav{display:flex;align-items:center;gap:8px;}
+.date-nav-btn{width:32px;height:32px;border-radius:var(--radsm);border:1px solid var(--s200);background:white;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;color:var(--s600);}
+.date-nav-btn:hover{background:var(--s50);}
+.date-label{font-size:13px;font-weight:700;color:var(--s800);cursor:pointer;padding:6px 14px;border-radius:var(--radsm);border:1px solid var(--s200);background:white;}
+.date-label:hover{background:var(--s50);}
+.today-btn{padding:6px 14px;border-radius:var(--radsm);border:1px solid var(--b200);background:var(--b50);color:var(--b600);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;}
+.today-btn:hover{background:var(--b100);}
+.hours-btn{padding:6px 14px;border-radius:var(--radsm);border:1px solid var(--s200);background:white;color:var(--s600);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;}
+.hours-btn:hover{background:var(--s50);}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--s500);font-weight:500;}
+.leg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.schedule-wrap{background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:auto;max-height:calc(100vh - 320px);}
+.schedule-header{display:grid;grid-template-columns:64px repeat(5,1fr);border-bottom:2px solid var(--s200);position:sticky;top:0;background:white;z-index:10;min-width:800px;}
+.sch-h-time{padding:12px 8px;font-size:10px;font-weight:700;color:var(--s400);text-transform:uppercase;border-right:1px solid var(--s200);}
+.sch-h-room{padding:10px 8px;text-align:center;font-size:12px;font-weight:700;color:var(--s700);border-right:1px solid var(--s100);}
+.sch-h-room:last-child{border-right:none;}
+.sch-body{display:grid;grid-template-columns:64px repeat(5,1fr);min-width:800px;}
+.sch-time-col{display:flex;flex-direction:column;}
+.sch-time-slot{height:44px;border-bottom:1px solid var(--s100);border-right:1px solid var(--s200);padding:3px 6px;display:flex;align-items:flex-start;}
+.sch-time-label{font-size:10px;color:var(--s400);font-weight:500;white-space:nowrap;}
+.sch-room-col{border-right:1px solid var(--s100);position:relative;}
+.sch-room-col:last-child{border-right:none;}
+.sch-slot{height:44px;border-bottom:1px solid var(--s100);cursor:pointer;transition:background 0.1s;position:relative;}
+.sch-slot:hover{background:#F0F9FF;}
+.appt-block{position:absolute;left:3px;right:3px;border-radius:6px;padding:4px 7px;cursor:pointer;z-index:5;overflow:hidden;border-left:3px solid;transition:transform 0.1s;}
+.appt-block:hover{transform:scale(1.02);}
+.appt-pt-name{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.appt-dr{font-size:10px;opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wait-timer{font-size:9px;font-weight:700;margin-top:2px;}
+.s-open{background:#F0F9FF;border-color:#38BDF8;color:#0C4A6E;}
+.s-confirmed{background:#F0FDF4;border-color:#4ADE80;color:#14532D;}
+.s-checkedin{background:#FFFBEB;border-color:#FBBF24;color:#78350F;}
+.s-inprogress{background:#EDE9FE;border-color:#8B5CF6;color:#3B0764;}
+.s-completed{background:#DCFCE7;border-color:#16A34A;color:#14532D;}
+.s-noshow{background:#FEE2E2;border-color:#F87171;color:#7F1D1D;}
+.s-delayed{background:#FED7AA;border-color:#FB923C;color:#7C2D12;}
+/* SETTINGS PAGE */
+.settings-section{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:20px;margin-bottom:16px;}
+.settings-title{font-size:13px;font-weight:700;color:var(--s800);margin-bottom:4px;}
+.settings-sub{font-size:11px;color:var(--s400);margin-bottom:16px;}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--s100);}
+.settings-row:last-child{border:none;padding-bottom:0;}
+.settings-lbl{font-size:12px;font-weight:600;color:var(--s700);}
+.settings-desc{font-size:11px;color:var(--s400);margin-top:2px;}
+/* MODAL */
 .mbg{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:300;align-items:center;justify-content:center;padding:20px;}
 .mbg.open{display:flex;}
 .modal{background:white;border-radius:16px;padding:24px;width:500px;max-width:100%;box-shadow:0 16px 48px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;}
+.modal-wide{width:580px;}
 .mtit{font-size:15px;font-weight:700;color:var(--s800);margin-bottom:3px;}
 .msub{font-size:11px;color:var(--s400);margin-bottom:18px;}
-.mac{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+.mac{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;}
 .mbtn{padding:8px 16px;border-radius:var(--radsm);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--s200);background:white;color:var(--s700);font-family:inherit;}
+.mbtn:hover{background:var(--s50);}
 .mbtnp{background:var(--b600);color:white;border-color:var(--b600);}
+.mbtnp:hover{background:var(--b700);}
+.mbtng{background:var(--g700);color:white;border-color:var(--g700);}
+.mbtng:hover{background:var(--g600);}
 .mbtnd{background:var(--r50);color:var(--r600);border-color:var(--r100);}
 .fg{display:flex;gap:10px;}.fg>div{flex:1;min-width:0;}
 .fgrp{margin-bottom:13px;}
@@ -110,6 +166,18 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .req{color:var(--r500);}
 .finp{width:100%;padding:9px 12px;border-radius:var(--radsm);border:1.5px solid var(--s200);font-size:13px;font-family:inherit;background:var(--s50);color:var(--s700);}
 .finp:focus{outline:none;border-color:var(--b500);background:white;}
+.status-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px;}
+.status-btn{padding:9px 6px;border-radius:var(--radsm);border:1.5px solid var(--s200);background:white;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;text-align:center;transition:all 0.12s;}
+.status-btn:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+.status-btn.active-status{border-width:2.5px;transform:translateY(-1px);}
+.appt-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.appt-info-item{background:var(--s50);border-radius:var(--radsm);padding:10px 12px;}
+.appt-info-lbl{font-size:10px;color:var(--s400);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px;}
+.appt-info-val{font-size:13px;font-weight:600;color:var(--s800);}
+.wait-display{background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+.wait-label{font-size:11px;color:var(--a700);font-weight:600;}
+.wait-time-big{font-size:22px;font-weight:700;color:var(--a700);}
+.billing-banner{background:var(--g50);border:1.5px solid var(--g100);border-radius:var(--radsm);padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--s800);color:white;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:999;transform:translateY(80px);opacity:0;transition:all 0.3s;}
 .toast.show{transform:translateY(0);opacity:1;}
 .toast.success{background:var(--g700);}
@@ -156,19 +224,20 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         <div class="ssub">Clinic management</div>
       </div>
       <div class="snav">
-        <a class="ni" id="nav-dashboard" onclick="showSection('dashboard')"><div class="ni-ic">⊞</div>Dashboard</a>
-        <a class="ni" id="nav-patients" onclick="showSection('patients')"><div class="ni-ic">◉</div>Patients</a>
-        <a class="ni" id="nav-appointments" onclick="showSection('appointments')"><div class="ni-ic">◷</div>Appointments</a>
-        <a class="ni" id="nav-treatments" onclick="showSection('treatments')"><div class="ni-ic">✦</div>Treatments</a>
-        <a class="ni" id="nav-billing" onclick="showSection('billing')"><div class="ni-ic">◎</div>Billing</a>
-        <a class="ni" id="nav-finance" onclick="showSection('finance')"><div class="ni-ic">💼</div>Staff & Finance</a>
-        <a class="ni" id="nav-files" onclick="showSection('files')"><div class="ni-ic">▦</div>X-rays & Files</a>
+        <a class="ni" id="nav-dashboard" onclick="showSection('dashboard')"><div class="ni-ic">&#8962;</div>Dashboard</a>
+        <a class="ni" id="nav-patients" onclick="showSection('patients')"><div class="ni-ic">&#9673;</div>Patients</a>
+        <a class="ni" id="nav-appointments" onclick="showSection('appointments')"><div class="ni-ic">&#9719;</div>Appointments</a>
+        <a class="ni" id="nav-treatments" onclick="showSection('treatments')"><div class="ni-ic">&#10022;</div>Treatments</a>
+        <a class="ni" id="nav-billing" onclick="showSection('billing')"><div class="ni-ic">&#9678;</div>Billing</a>
+        <a class="ni" id="nav-finance" onclick="showSection('finance')"><div class="ni-ic">&#128188;</div>Staff &amp; Finance</a>
+        <a class="ni" id="nav-files" onclick="showSection('files')"><div class="ni-ic">&#9638;</div>X-rays &amp; Files</a>
+        <a class="ni" id="nav-settings" onclick="showSection('settings')"><div class="ni-ic">&#9881;</div>Settings</a>
       </div>
       <div class="sfooter">
         <div class="sfooter-inner">
           <div class="sfav">AD</div>
           <div><div class="sfname">Admin</div><div class="sfrole">Value Dental Center</div></div>
-          <button class="logout-btn" onclick="doLogout()" title="Sign out">⏻</button>
+          <button class="logout-btn" onclick="doLogout()" title="Sign out">&#9211;</button>
         </div>
       </div>
     </div>
@@ -187,6 +256,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
   </div>
 </div>
 
+<!-- PATIENT MODAL -->
 <div class="mbg" id="pt-modal">
   <div class="modal">
     <div class="mtit" id="pt-modal-title">Add new patient</div>
@@ -227,295 +297,615 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
   </div>
 </div>
 
+<!-- BOOK APPOINTMENT MODAL -->
+<div class="mbg" id="appt-modal">
+  <div class="modal modal-wide">
+    <div class="mtit" id="appt-modal-title">Book appointment</div>
+    <div class="msub">Fill in the appointment details</div>
+    <input type="hidden" id="appt-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Patient name <span class="req">*</span></label>
+        <input class="finp" id="appt-patient" placeholder="Type patient name..." list="patient-datalist" autocomplete="off">
+        <datalist id="patient-datalist"></datalist>
+      </div>
+      <div class="fgrp"><label class="flbl">Dentist <span class="req">*</span></label>
+        <select class="finp" id="appt-dentist">
+          <option value="">Select dentist...</option>
+          <option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option>
+          <option>Dr. Mateen</option><option>Dr. Ibrahim</option><option>Dr. Mahmoud</option>
+          <option>Dr. Niwar</option><option>Dr. Dilveen</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Room <span class="req">*</span></label>
+        <select class="finp" id="appt-room">
+          <option value="">Select room...</option>
+          <option value="Room 1">Room 1</option><option value="Room 2">Room 2</option>
+          <option value="Room 3">Room 3</option><option value="Room 4">Room 4</option>
+          <option value="Room 5">Room 5</option>
+        </select>
+      </div>
+      <div class="fgrp"><label class="flbl">Date <span class="req">*</span></label>
+        <input class="finp" type="date" id="appt-date">
+      </div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Start time <span class="req">*</span></label>
+        <input class="finp" type="time" id="appt-start" step="900">
+      </div>
+      <div class="fgrp"><label class="flbl">End time <span class="req">*</span></label>
+        <input class="finp" type="time" id="appt-end" step="900">
+      </div>
+    </div>
+    <div class="fgrp"><label class="flbl">Procedure type</label>
+      <select class="finp" id="appt-proc">
+        <option value="">Select procedure...</option>
+        <option>Consultation</option><option>Scaling &amp; polishing</option><option>Composite filling</option>
+        <option>Root canal</option><option>Crown (PFM)</option><option>Crown (zirconia)</option>
+        <option>Extraction</option><option>Orthodontic checkup</option><option>Implant</option><option>Other</option>
+      </select>
+    </div>
+    <div class="fgrp"><label class="flbl">Notes</label>
+      <textarea class="finp" id="appt-notes" rows="2" placeholder="Any special instructions or notes..."></textarea>
+    </div>
+    <div class="mac">
+      <button class="mbtn mbtnd" id="appt-delete-btn" style="display:none;margin-right:auto;" onclick="deleteAppt()">Cancel appointment</button>
+      <button class="mbtn" onclick="closeApptModal()">Close</button>
+      <button class="mbtn mbtnp" onclick="saveAppt()">Save appointment</button>
+    </div>
+  </div>
+</div>
+
+<!-- APPOINTMENT DETAIL MODAL -->
+<div class="mbg" id="appt-detail-modal">
+  <div class="modal modal-wide">
+    <div class="mtit">Appointment details</div>
+    <div class="msub">View info, update status, or go to billing</div>
+    <div id="appt-detail-content"></div>
+    <div class="fgrp" style="margin-bottom:0;">
+      <label class="flbl">Update status</label>
+      <div class="status-grid" id="status-grid"></div>
+    </div>
+    <div class="mac">
+      <button class="mbtn mbtnd" onclick="deleteApptFromDetail()">Cancel appointment</button>
+      <button class="mbtn" onclick="editApptFromDetail()">Edit details</button>
+      <button class="mbtn mbtnp" onclick="closeDetailModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- WORKING HOURS MODAL -->
+<div class="mbg" id="hours-modal">
+  <div class="modal">
+    <div class="mtit">Working hours</div>
+    <div class="msub">Set your clinic's opening and closing times. These are saved permanently.</div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Clinic opens at</label>
+        <input class="finp" type="time" id="hours-open" step="900">
+      </div>
+      <div class="fgrp"><label class="flbl">Clinic closes at</label>
+        <input class="finp" type="time" id="hours-close" step="900">
+      </div>
+    </div>
+    <div style="background:var(--b50);border:1px solid var(--b100);border-radius:var(--radsm);padding:10px 12px;font-size:11px;color:var(--b700);margin-bottom:4px;">
+      &#8505; The schedule grid will update to show only the hours your clinic is open.
+    </div>
+    <div class="mac">
+      <button class="mbtn" onclick="closeHoursModal()">Cancel</button>
+      <button class="mbtn mbtnp" onclick="saveHours()">Save hours</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-const SUPABASE_URL = 'https://jqtvgjroaagfewuetali.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxdHZnanJvYWFnZmV3dWV0YWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzQyNTIsImV4cCI6MjA5MDU1MDI1Mn0.vdekXCu_j4v3FQIqoPNRrQqf1oLxMsyKnVhHYkWTS2c';
-const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+var SUPA_URL = 'https://jqtvgjroaagfewuetali.supabase.co';
+var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxdHZnanJvYWFnZmV3dWV0YWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzQyNTIsImV4cCI6MjA5MDU1MDI1Mn0.vdekXCu_j4v3FQIqoPNRrQqf1oLxMsyKnVhHYkWTS2c';
+var db = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-const USERS = { 'admin': 'vdc2026admin', 'reception': 'vdc2026desk' };
-let viewMode = localStorage.getItem('vdc-view') || 'grid';
-
-function doLogin() {
-  const user = document.getElementById('login-user').value.trim();
-  const pass = document.getElementById('login-pass').value;
-  const err  = document.getElementById('login-err');
-  if (USERS[user] && USERS[user] === pass) {
-    sessionStorage.setItem('vdc-user', user);
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    showSection('patients');
-  } else {
-    err.style.display = 'block';
-    setTimeout(function(){err.style.display='none';}, 3000);
-  }
-}
-
-function doLogout() {
-  sessionStorage.removeItem('vdc-user');
-  location.reload();
-}
-
-window.onload = function() {
-  if (sessionStorage.getItem('vdc-user')) {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    showSection('patients');
-  }
-};
-
-const SECTIONS = {
-  patients:     { title: 'Patients',        sub: 'Manage your clinic patients' },
-  dashboard:    { title: 'Dashboard',       sub: 'Clinic overview' },
-  appointments: { title: 'Appointments',    sub: 'Schedule management' },
-  treatments:   { title: 'Treatments',      sub: 'Procedure records' },
-  billing:      { title: 'Billing',         sub: 'Invoices & payments' },
-  finance:      { title: 'Staff & Finance', sub: 'Payroll & partner wallets' },
-  files:        { title: 'X-rays & Files',  sub: 'Patient file management' },
-};
-
-function showSection(s) {
-  document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('act');});
-  var nav = document.getElementById('nav-' + s);
-  if (nav) nav.classList.add('act');
-  document.getElementById('page-title').textContent = SECTIONS[s] ? SECTIONS[s].title : s;
-  document.getElementById('page-sub').textContent   = SECTIONS[s] ? SECTIONS[s].sub   : '';
-  if (s === 'patients') renderPatients();
-  else renderComingSoon(s);
-}
-
-function renderComingSoon(s) {
-  document.getElementById('topbar-actions').innerHTML = '';
-  document.getElementById('main-content').innerHTML =
-    '<div class="coming-soon"><div class="coming-soon-icon">🚧</div>' +
-    '<h2>' + (SECTIONS[s] ? SECTIONS[s].title : s) + ' — Coming soon</h2>' +
-    '<p>This section is being built. Check back soon!</p></div>';
-}
-
-function showToast(msg, type) {
-  type = type || 'success';
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast ' + type + ' show';
-  setTimeout(function(){t.classList.remove('show');}, 3000);
-}
-
-var PT_COLORS = [
-  {bg:'#DBEAFE',color:'#1D4ED8'},{bg:'#CCFBF1',color:'#0F766E'},
-  {bg:'#FFE4E6',color:'#BE123C'},{bg:'#EDE9FE',color:'#6D28D9'},
-  {bg:'#FEF3C7',color:'#B45309'},{bg:'#FCE7F3',color:'#9D174D'},
-];
-
-function ptColor(name) {
-  var h = 0;
-  for (var i=0;i<name.length;i++) h = (h * 31 + name.charCodeAt(i)) % PT_COLORS.length;
-  return PT_COLORS[h];
-}
-
-function ptInitials(name) {
-  return name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-}
-
-function calcAge(dob) {
-  if (!dob) return null;
-  return Math.floor((Date.now() - new Date(dob).getTime()) / (1000*60*60*24*365.25));
-}
-
-function statusBadge(s) {
-  var m = {active:'bg', new:'bb', inactive:'ba'};
-  return '<span class="badge ' + (m[s]||'bb') + '">' + (s||'active') + '</span>';
-}
-
+var USERS = {'admin':'vdc2026admin','reception':'vdc2026desk'};
+var viewMode = localStorage.getItem('vdc-view') || 'grid';
 var allPatients = [];
+var allAppointments = [];
+var currentDate = new Date();
+var detailApptId = null;
+var waitInterval = null;
 var searchQuery = '';
 
-async function renderPatients() {
-  document.getElementById('topbar-actions').innerHTML =
-    '<button class="btn btnp" onclick="openAddPtModal()">+ Add patient</button>';
-  document.getElementById('main-content').innerHTML =
-    '<div class="loader"><div class="spinner"></div>Loading patients...</div>';
-  var res = await db.from('patients').select('*').order('created_at', {ascending: false});
-  if (res.error) { showToast('Failed to load patients', 'error'); return; }
-  allPatients = res.data || [];
-  renderPatientList();
+// Working hours — loaded from localStorage, saved permanently
+var clinicOpen  = localStorage.getItem('vdc-open')  || '14:00';
+var clinicClose = localStorage.getItem('vdc-close') || '22:00';
+
+var STATUSES = {
+  open:       {label:'Open',        emoji:'🔵', cls:'s-open',       color:'#0C4A6E', bg:'#F0F9FF', border:'#38BDF8'},
+  confirmed:  {label:'Confirmed',   emoji:'✅', cls:'s-confirmed',  color:'#14532D', bg:'#F0FDF4', border:'#4ADE80'},
+  checkedin:  {label:'Checked in',  emoji:'⏳', cls:'s-checkedin',  color:'#78350F', bg:'#FFFBEB', border:'#FBBF24'},
+  inprogress: {label:'In progress', emoji:'🔄', cls:'s-inprogress', color:'#3B0764', bg:'#EDE9FE', border:'#8B5CF6'},
+  completed:  {label:'Completed',   emoji:'✔️', cls:'s-completed',  color:'#14532D', bg:'#DCFCE7', border:'#16A34A'},
+  noshow:     {label:'No show',     emoji:'🔴', cls:'s-noshow',     color:'#7F1D1D', bg:'#FEE2E2', border:'#F87171'},
+  delayed:    {label:'Delayed',     emoji:'🟡', cls:'s-delayed',    color:'#7C2D12', bg:'#FED7AA', border:'#FB923C'}
+};
+
+var ROOMS = ['Room 1','Room 2','Room 3','Room 4','Room 5'];
+
+function getTimeSlots() {
+  var slots = [];
+  var startM = t2m(clinicOpen);
+  var endM   = t2m(clinicClose);
+  for (var m = startM; m < endM; m += 15) slots.push(m2t(m));
+  return slots;
 }
 
-function renderPatientList() {
-  var q = searchQuery.toLowerCase();
-  var list = q ? allPatients.filter(function(p) {
-    return (p.name||'').toLowerCase().includes(q) ||
-           (p.phone||'').includes(q) ||
-           (p.primary_dentist||'').toLowerCase().includes(q);
-  }) : allPatients;
+function fmtDate(d){return d.toISOString().split('T')[0];}
+function dispDate(d){return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+function t2m(t){if(!t)return 0;var p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]);}
+function m2t(m){var h=Math.floor(m/60),mn=m%60;return(h<10?'0':'')+h+':'+(mn<10?'0':'')+mn;}
+function ini(name){return(name||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();}
 
-  var active  = allPatients.filter(function(p){return p.status==='active';}).length;
-  var newPts  = allPatients.filter(function(p){return p.status==='new';}).length;
-  var gridOn  = viewMode === 'grid';
+// AUTH
+function doLogin(){
+  var u=document.getElementById('login-user').value.trim(),p=document.getElementById('login-pass').value,e=document.getElementById('login-err');
+  if(USERS[u]&&USERS[u]===p){sessionStorage.setItem('vdc-user',u);document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';showSection('patients');}
+  else{e.style.display='block';setTimeout(function(){e.style.display='none';},3000);}
+}
+function doLogout(){sessionStorage.removeItem('vdc-user');location.reload();}
+window.onload=function(){if(sessionStorage.getItem('vdc-user')){document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';showSection('patients');}};
 
-  var html =
-    '<div class="toolbar">' +
-      '<div class="search-bar">' +
-        '<span class="search-icon">🔍</span>' +
-        '<input class="search-input" id="search-inp" placeholder="Search by name, phone, or dentist..." value="' + searchQuery + '" oninput="onSearch(this.value)">' +
-      '</div>' +
-      '<div class="view-toggle">' +
-        '<button class="vt-btn ' + (gridOn?'on':'') + '" onclick="setView(\'grid\')" title="Grid view">⊞</button>' +
-        '<button class="vt-btn ' + (!gridOn?'on':'') + '" onclick="setView(\'list\')" title="List view">☰</button>' +
-      '</div>' +
-    '</div>' +
-    '<div class="stats-row">' +
-      '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">👥</div><div class="stat-lbl">Total patients</div><div class="stat-val">' + allPatients.length + '</div></div>' +
-      '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">✅</div><div class="stat-lbl">Active</div><div class="stat-val">' + active + '</div></div>' +
-      '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">🆕</div><div class="stat-lbl">New patients</div><div class="stat-val">' + newPts + '</div></div>' +
-      '<div class="stat-card"><div class="stat-icon" style="background:var(--a50);">🔍</div><div class="stat-lbl">Showing</div><div class="stat-val">' + list.length + '</div></div>' +
+var SECTIONS={
+  patients:{title:'Patients',sub:'Manage your clinic patients'},
+  appointments:{title:'Appointments',sub:'Daily schedule & room management'},
+  dashboard:{title:'Dashboard',sub:'Clinic overview'},
+  treatments:{title:'Treatments',sub:'Procedure records'},
+  billing:{title:'Billing',sub:'Invoices & payments'},
+  finance:{title:'Staff & Finance',sub:'Payroll & partner wallets'},
+  files:{title:'X-rays & Files',sub:'Patient file management'},
+  settings:{title:'Settings',sub:'Clinic preferences & working hours'}
+};
+
+function showSection(s){
+  document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('act');});
+  var nav=document.getElementById('nav-'+s);if(nav)nav.classList.add('act');
+  document.getElementById('page-title').textContent=SECTIONS[s]?SECTIONS[s].title:s;
+  document.getElementById('page-sub').textContent=SECTIONS[s]?SECTIONS[s].sub:'';
+  if(waitInterval){clearInterval(waitInterval);waitInterval=null;}
+  if(s==='patients')renderPatients();
+  else if(s==='appointments')renderAppointments();
+  else if(s==='settings')renderSettings();
+  else{document.getElementById('topbar-actions').innerHTML='';document.getElementById('main-content').innerHTML='<div class="coming-soon"><div class="coming-soon-icon">🚧</div><h2>'+(SECTIONS[s]?SECTIONS[s].title:s)+' — Coming soon</h2><p>This section is being built.</p></div>';}
+}
+
+function showToast(msg,type){
+  type=type||'success';var t=document.getElementById('toast');t.textContent=msg;t.className='toast '+type+' show';
+  setTimeout(function(){t.classList.remove('show');},3000);
+}
+
+// PATIENTS
+var PT_COLORS=[{bg:'#DBEAFE',color:'#1D4ED8'},{bg:'#CCFBF1',color:'#0F766E'},{bg:'#FFE4E6',color:'#BE123C'},{bg:'#EDE9FE',color:'#6D28D9'},{bg:'#FEF3C7',color:'#B45309'},{bg:'#FCE7F3',color:'#9D174D'}];
+function ptColor(name){var h=0;for(var i=0;i<name.length;i++)h=(h*31+name.charCodeAt(i))%PT_COLORS.length;return PT_COLORS[h];}
+function calcAge(dob){if(!dob)return null;return Math.floor((Date.now()-new Date(dob).getTime())/(1000*60*60*24*365.25));}
+function statusBadge(s){var m={active:'bg',new:'bb',inactive:'ba'};return '<span class="badge '+(m[s]||'bb')+'">'+(s||'active')+'</span>';}
+
+async function renderPatients(){
+  document.getElementById('topbar-actions').innerHTML='<button class="btn btnp" onclick="openAddPtModal()">+ Add patient</button>';
+  document.getElementById('main-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading patients...</div>';
+  var res=await db.from('patients').select('*').order('created_at',{ascending:false});
+  if(res.error){showToast('Failed to load patients','error');return;}
+  allPatients=res.data||[];renderPatientList();
+}
+
+function renderPatientList(){
+  var q=searchQuery.toLowerCase();
+  var list=q?allPatients.filter(function(p){return(p.name||'').toLowerCase().includes(q)||(p.phone||'').includes(q)||(p.primary_dentist||'').toLowerCase().includes(q);}):allPatients;
+  var active=allPatients.filter(function(p){return p.status==='active';}).length;
+  var newPts=allPatients.filter(function(p){return p.status==='new';}).length;
+  var gridOn=viewMode==='grid';
+  var html='<div class="toolbar"><div class="search-bar"><span class="search-icon">&#128269;</span><input class="search-input" id="search-inp" placeholder="Search by name, phone, or dentist..." value="'+searchQuery+'" oninput="onSearch(this.value)"></div>'+
+    '<div class="view-toggle"><button class="vt-btn '+(gridOn?'on':'')+'" onclick="setView(\'grid\')" title="Grid">&#8862;</button><button class="vt-btn '+(!gridOn?'on':'')+'" onclick="setView(\'list\')" title="List">&#9776;</button></div></div>'+
+    '<div class="stats-row">'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">&#128101;</div><div class="stat-lbl">Total patients</div><div class="stat-val">'+allPatients.length+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">&#9989;</div><div class="stat-lbl">Active</div><div class="stat-val">'+active+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">&#127381;</div><div class="stat-lbl">New patients</div><div class="stat-val">'+newPts+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--a50);">&#128269;</div><div class="stat-lbl">Showing</div><div class="stat-val">'+list.length+'</div></div>'+
     '</div>';
-
-  if (!list.length) {
-    html += '<div class="empty-state"><div style="font-size:36px;margin-bottom:12px;">👤</div>' +
-      '<div style="font-size:14px;font-weight:600;color:var(--s600);margin-bottom:6px;">' + (q ? 'No patients found' : 'No patients yet') + '</div>' +
-      '<div style="font-size:12px;">' + (q ? 'Try a different search term' : 'Click &quot;Add patient&quot; to register your first patient') + '</div></div>';
-  } else if (gridOn) {
-    html += '<div class="patients-grid">' + list.map(ptCardGrid).join('') + '</div>';
+  if(!list.length){
+    html+='<div class="empty-state"><div style="font-size:36px;margin-bottom:12px;">&#128100;</div><div style="font-size:14px;font-weight:600;color:var(--s600);margin-bottom:6px;">'+(q?'No patients found':'No patients yet')+'</div><div style="font-size:12px;">'+(q?'Try a different search term':'Click "Add patient" to register your first patient')+'</div></div>';
+  } else if(gridOn){
+    html+='<div class="patients-grid">'+list.map(ptCardGrid).join('')+'</div>';
   } else {
-    html += '<div class="patients-list">' +
-      '<div class="list-header"><div>Patient</div><div>Phone</div><div>Dentist</div><div>Status</div><div>Age</div></div>' +
-      list.map(ptCardList).join('') +
-      '</div>';
+    html+='<div class="patients-list"><div class="list-header"><div>Patient</div><div>Phone</div><div>Dentist</div><div>Status</div><div>Age</div></div>'+list.map(ptCardList).join('')+'</div>';
   }
-
-  document.getElementById('main-content').innerHTML = html;
-  if (searchQuery) {
-    setTimeout(function() {
-      var inp = document.getElementById('search-inp');
-      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
-    }, 10);
-  }
+  document.getElementById('main-content').innerHTML=html;
+  if(searchQuery)setTimeout(function(){var i=document.getElementById('search-inp');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},10);
 }
 
-function ptCardGrid(p) {
-  var c = ptColor(p.name || '');
-  var age = calcAge(p.dob);
-  var initials = ptInitials(p.name || '?');
-  var meta = '';
-  if (p.phone)           meta += '<div class="pt-meta-row"><span style="color:var(--s400);">📞</span> ' + p.phone + '</div>';
-  if (p.primary_dentist) meta += '<div class="pt-meta-row"><span class="dr-dot"></span>' + p.primary_dentist + '</div>';
-  if (p.medical_notes)   meta += '<div class="pt-meta-row" style="color:var(--s400);font-style:italic;font-size:10px;">"' + p.medical_notes.slice(0,60) + (p.medical_notes.length>60?'...':'') + '"</div>';
-  return '<div class="pt-card" onclick="openEditPtModal(\'' + p.id + '\')">' +
-    '<div class="pt-card-header">' +
-    '<div class="pt-av" style="background:' + c.bg + ';color:' + c.color + ';">' + initials + '</div>' +
-    '<div><div class="pt-name">' + p.name + '</div>' +
-    '<div class="pt-id">' + (age ? age + ' yrs' : '') + (p.gender ? ' · ' + p.gender : '') + '</div></div>' +
-    '<div style="margin-left:auto;">' + statusBadge(p.status) + '</div>' +
-    '</div><div class="pt-meta">' + meta + '</div></div>';
+function ptCardGrid(p){
+  var c=ptColor(p.name||''),age=calcAge(p.dob),in2=ini(p.name||'?'),meta='';
+  if(p.phone)meta+='<div class="pt-meta-row"><span style="color:var(--s400);">&#128222;</span> '+p.phone+'</div>';
+  if(p.primary_dentist)meta+='<div class="pt-meta-row"><span class="dr-dot"></span>'+p.primary_dentist+'</div>';
+  if(p.medical_notes)meta+='<div class="pt-meta-row" style="color:var(--s400);font-style:italic;font-size:10px;">"'+p.medical_notes.slice(0,60)+(p.medical_notes.length>60?'...':'')+'"</div>';
+  return '<div class="pt-card" onclick="openEditPtModal(\''+p.id+'\')"><div class="pt-card-header"><div class="pt-av" style="background:'+c.bg+';color:'+c.color+';">'+in2+'</div><div><div class="pt-name">'+p.name+'</div><div class="pt-id">'+(age?age+' yrs':'')+(p.gender?' · '+p.gender:'')+'</div></div><div style="margin-left:auto;">'+statusBadge(p.status)+'</div></div><div class="pt-meta">'+meta+'</div></div>';
 }
-
-function ptCardList(p) {
-  var c = ptColor(p.name || '');
-  var age = calcAge(p.dob);
-  var initials = ptInitials(p.name || '?');
-  return '<div class="list-row" onclick="openEditPtModal(\'' + p.id + '\')">' +
-    '<div class="list-pt-info">' +
-    '<div class="list-av" style="background:' + c.bg + ';color:' + c.color + ';">' + initials + '</div>' +
-    '<div><div class="list-name">' + p.name + '</div>' +
-    '<div class="list-sub">' + (p.gender||'') + (p.medical_notes ? ' · ' + p.medical_notes.slice(0,35) + (p.medical_notes.length>35?'...':'') : '') + '</div></div>' +
-    '</div>' +
-    '<div class="list-cell">' + (p.phone||'—') + '</div>' +
-    '<div class="list-cell">' + (p.primary_dentist||'—') + '</div>' +
-    '<div>' + statusBadge(p.status) + '</div>' +
-    '<div class="list-cell">' + (age ? age + ' yrs' : '—') + '</div>' +
-    '</div>';
+function ptCardList(p){
+  var c=ptColor(p.name||''),age=calcAge(p.dob),in2=ini(p.name||'?');
+  return '<div class="list-row" onclick="openEditPtModal(\''+p.id+'\')"><div class="list-pt-info"><div class="list-av" style="background:'+c.bg+';color:'+c.color+';">'+in2+'</div><div><div class="list-name">'+p.name+'</div><div class="list-sub">'+(p.gender||'')+(p.medical_notes?' · '+p.medical_notes.slice(0,35)+(p.medical_notes.length>35?'...':''):'')+'</div></div></div><div class="list-cell">'+(p.phone||'—')+'</div><div class="list-cell">'+(p.primary_dentist||'—')+'</div><div>'+statusBadge(p.status)+'</div><div class="list-cell">'+(age?age+' yrs':'—')+'</div></div>';
 }
+function setView(v){viewMode=v;localStorage.setItem('vdc-view',v);renderPatientList();}
+function onSearch(v){searchQuery=v;renderPatientList();}
 
-function setView(v) {
-  viewMode = v;
-  localStorage.setItem('vdc-view', v);
-  renderPatientList();
-}
-
-function onSearch(v) {
-  searchQuery = v;
-  renderPatientList();
-}
-
-function openAddPtModal() {
-  document.getElementById('pt-modal-title').textContent = 'Add new patient';
-  document.getElementById('pt-id').value      = '';
-  document.getElementById('pt-name').value    = '';
-  document.getElementById('pt-dob').value     = '';
-  document.getElementById('pt-gender').value  = '';
-  document.getElementById('pt-phone').value   = '';
-  document.getElementById('pt-email').value   = '';
-  document.getElementById('pt-status').value  = 'new';
-  document.getElementById('pt-dentist').value = '';
-  document.getElementById('pt-notes').value   = '';
-  document.getElementById('pt-delete-btn').style.display = 'none';
+function openAddPtModal(){
+  document.getElementById('pt-modal-title').textContent='Add new patient';
+  ['pt-id','pt-name','pt-dob','pt-phone','pt-email','pt-notes'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('pt-gender').value='';document.getElementById('pt-status').value='new';document.getElementById('pt-dentist').value='';
+  document.getElementById('pt-delete-btn').style.display='none';
   document.getElementById('pt-modal').classList.add('open');
 }
-
-function openEditPtModal(id) {
-  var p = allPatients.find(function(x){return x.id===id;});
-  if (!p) return;
-  document.getElementById('pt-modal-title').textContent = 'Edit patient';
-  document.getElementById('pt-id').value      = p.id;
-  document.getElementById('pt-name').value    = p.name || '';
-  document.getElementById('pt-dob').value     = p.dob  || '';
-  document.getElementById('pt-gender').value  = p.gender || '';
-  document.getElementById('pt-phone').value   = p.phone  || '';
-  document.getElementById('pt-email').value   = p.email  || '';
-  document.getElementById('pt-status').value  = p.status || 'active';
-  document.getElementById('pt-dentist').value = p.primary_dentist || '';
-  document.getElementById('pt-notes').value   = p.medical_notes   || '';
-  document.getElementById('pt-delete-btn').style.display = 'inline-flex';
+function openEditPtModal(id){
+  var p=allPatients.find(function(x){return x.id===id;});if(!p)return;
+  document.getElementById('pt-modal-title').textContent='Edit patient';
+  document.getElementById('pt-id').value=p.id;document.getElementById('pt-name').value=p.name||'';document.getElementById('pt-dob').value=p.dob||'';
+  document.getElementById('pt-gender').value=p.gender||'';document.getElementById('pt-phone').value=p.phone||'';document.getElementById('pt-email').value=p.email||'';
+  document.getElementById('pt-status').value=p.status||'active';document.getElementById('pt-dentist').value=p.primary_dentist||'';document.getElementById('pt-notes').value=p.medical_notes||'';
+  document.getElementById('pt-delete-btn').style.display='inline-flex';
   document.getElementById('pt-modal').classList.add('open');
 }
+function closePtModal(){document.getElementById('pt-modal').classList.remove('open');}
+async function savePatient(){
+  var name=document.getElementById('pt-name').value.trim();
+  if(!name){showToast('Please enter patient name','error');return;}
+  var id=document.getElementById('pt-id').value;
+  var payload={name:name,dob:document.getElementById('pt-dob').value||null,gender:document.getElementById('pt-gender').value||null,phone:document.getElementById('pt-phone').value.trim()||null,email:document.getElementById('pt-email').value.trim()||null,status:document.getElementById('pt-status').value,primary_dentist:document.getElementById('pt-dentist').value||null,medical_notes:document.getElementById('pt-notes').value.trim()||null};
+  var res=id?await db.from('patients').update(payload).eq('id',id):await db.from('patients').insert([payload]);
+  if(res.error){showToast('Failed to save patient','error');return;}
+  showToast(id?'Patient updated':'Patient added');closePtModal();renderPatients();
+}
+async function deletePatient(){
+  var id=document.getElementById('pt-id').value,name=document.getElementById('pt-name').value;
+  if(!id||!confirm('Delete '+name+'? This cannot be undone.'))return;
+  var res=await db.from('patients').delete().eq('id',id);
+  if(res.error){showToast('Failed to delete','error');return;}
+  showToast('Patient deleted');closePtModal();renderPatients();
+}
+document.getElementById('pt-modal').addEventListener('click',function(e){if(e.target===this)closePtModal();});
 
-function closePtModal() {
-  document.getElementById('pt-modal').classList.remove('open');
+// APPOINTMENTS
+async function renderAppointments(){
+  document.getElementById('topbar-actions').innerHTML=
+    '<button class="hours-btn" onclick="openHoursModal()">&#9881; Working hours: '+clinicOpen+' – '+clinicClose+'</button>'+
+    '<button class="btn btnp" onclick="openNewApptModal()">+ Book appointment</button>';
+  document.getElementById('main-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading schedule...</div>';
+  var pRes=await db.from('patients').select('id,name').order('name');
+  if(!pRes.error)allPatients=pRes.data||[];
+  var aRes=await db.from('appointments').select('*').eq('date',fmtDate(currentDate));
+  if(!aRes.error)allAppointments=aRes.data||[];
+  buildSchedule();
 }
 
-async function savePatient() {
-  var name = document.getElementById('pt-name').value.trim();
-  if (!name) { showToast('Please enter patient name', 'error'); return; }
-  var id = document.getElementById('pt-id').value;
-  var payload = {
-    name: name,
-    dob:             document.getElementById('pt-dob').value    || null,
-    gender:          document.getElementById('pt-gender').value || null,
-    phone:           document.getElementById('pt-phone').value.trim()  || null,
-    email:           document.getElementById('pt-email').value.trim()  || null,
-    status:          document.getElementById('pt-status').value,
-    primary_dentist: document.getElementById('pt-dentist').value || null,
-    medical_notes:   document.getElementById('pt-notes').value.trim()  || null,
-  };
-  var res;
-  if (id) {
-    res = await db.from('patients').update(payload).eq('id', id);
-  } else {
-    res = await db.from('patients').insert([payload]);
+function buildSchedule(){
+  var slots=getTimeSlots();
+  var isToday=fmtDate(currentDate)===fmtDate(new Date());
+  var total=allAppointments.length;
+  var cin=allAppointments.filter(function(a){return a.status==='checkedin';}).length;
+  var inp=allAppointments.filter(function(a){return a.status==='inprogress';}).length;
+  var comp=allAppointments.filter(function(a){return a.status==='completed';}).length;
+  var counts={};ROOMS.forEach(function(r){counts[r]=0;});
+  allAppointments.forEach(function(a){if(counts[a.room]!==undefined)counts[a.room]++;});
+
+  var legendHtml=Object.keys(STATUSES).map(function(k){
+    return '<div class="leg-item"><div class="leg-dot" style="background:'+STATUSES[k].bg+';border:1.5px solid '+STATUSES[k].border+';"></div>'+STATUSES[k].emoji+' '+STATUSES[k].label+'</div>';
+  }).join('');
+
+  var html=
+    '<div class="appt-topbar">'+
+    '<div class="date-nav">'+
+    '<button class="date-nav-btn" onclick="chgDate(-1)">&#8249;</button>'+
+    '<span class="date-label" onclick="pickDate()">'+dispDate(currentDate)+(isToday?' (Today)':'')+'</span>'+
+    '<button class="date-nav-btn" onclick="chgDate(1)">&#8250;</button>'+
+    '</div>'+
+    '<button class="today-btn" onclick="goToday()">Today</button>'+
+    '<input type="date" id="hdp" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;" onchange="onDatePick(this.value)">'+
+    '</div>'+
+    '<div class="stats-row">'+
+    '<div class="stat-card"><div class="stat-icon" style="background:#F0F9FF;">&#128197;</div><div class="stat-lbl">Total today</div><div class="stat-val">'+total+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:#FFFBEB;">&#8987;</div><div class="stat-lbl">Checked in</div><div class="stat-val">'+cin+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:#EDE9FE;">&#128260;</div><div class="stat-lbl">In progress</div><div class="stat-val">'+inp+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">&#10004;&#65039;</div><div class="stat-lbl">Completed</div><div class="stat-val">'+comp+'</div></div>'+
+    '</div>'+
+    '<div class="legend">'+legendHtml+'</div>'+
+    '<div class="schedule-wrap">'+
+    '<div class="schedule-header">'+
+    '<div class="sch-h-time">Time</div>'+
+    ROOMS.map(function(r){return '<div class="sch-h-room">'+r+'<br><span style="font-size:10px;color:var(--s400);font-weight:400;">'+counts[r]+' appt'+(counts[r]!==1?'s':'')+'</span></div>';}).join('')+
+    '</div>'+
+    '<div class="sch-body">'+buildTimeCol(slots)+ROOMS.map(function(r){return buildRoomCol(r,slots);}).join('')+
+    '</div></div>';
+
+  document.getElementById('main-content').innerHTML=html;
+  tickWait();
+  if(waitInterval)clearInterval(waitInterval);
+  waitInterval=setInterval(tickWait,15000);
+}
+
+function buildTimeCol(slots){
+  return '<div class="sch-time-col">'+slots.map(function(t){
+    var parts=t.split(':'),isHour=parts[1]==='00';
+    return '<div class="sch-time-slot" style="'+(isHour?'border-top:1px solid var(--s200);':'')+'"><span class="sch-time-label" style="'+(isHour?'font-weight:700;color:var(--s600);':'')+'">'+t+'</span></div>';
+  }).join('')+'</div>';
+}
+
+function buildRoomCol(room,slots){
+  var appts=allAppointments.filter(function(a){return a.room===room;});
+  var slotH=44,startMin=t2m(slots[0]);
+  var totalH=slots.length*slotH;
+  var html='<div class="sch-room-col" style="position:relative;height:'+totalH+'px;">';
+  slots.forEach(function(t,i){
+    var parts=t.split(':'),isHour=parts[1]==='00';
+    html+='<div class="sch-slot" style="position:absolute;top:'+(i*slotH)+'px;left:0;right:0;height:'+slotH+'px;'+(isHour?'border-top:1px solid var(--s200);':'')+'" onclick="openNewApptAt(\''+room+'\',\''+t+'\')"></div>';
+  });
+  appts.forEach(function(a){
+    var aS=t2m(a.start_time),aE=t2m(a.end_time);
+    if(!aS||!aE||aE<=aS)return;
+    var top=(aS-startMin)/15*slotH;
+    var height=Math.max((aE-aS)/15*slotH-3,28);
+    var sc=STATUSES[a.status]||STATUSES.open;
+    var wt='';
+    if(a.status==='checkedin'&&a.checkin_time){
+      var mins=Math.floor((Date.now()-new Date(a.checkin_time).getTime())/60000);
+      var hh=Math.floor(mins/60),mm=mins%60;
+      wt='<div class="wait-timer" id="wt-'+a.id+'">&#9203; '+(hh>0?hh+'h ':'')+mm+'m</div>';
+    }
+    html+='<div class="appt-block '+sc.cls+'" style="top:'+top+'px;height:'+height+'px;" onclick="event.stopPropagation();openDetail(\''+a.id+'\')">'+
+      '<div class="appt-pt-name">'+(a.patient_name||'?')+'</div>'+
+      '<div class="appt-dr">'+(a.dentist||'')+(a.procedure_type?' · '+a.procedure_type:'')+'</div>'+
+      wt+'</div>';
+  });
+  return html+'</div>';
+}
+
+function tickWait(){
+  allAppointments.forEach(function(a){
+    if(a.status==='checkedin'&&a.checkin_time){
+      var el=document.getElementById('wt-'+a.id);
+      if(el){var mins=Math.floor((Date.now()-new Date(a.checkin_time).getTime())/60000),hh=Math.floor(mins/60),mm=mins%60;el.textContent='⏱ '+(hh>0?hh+'h ':'')+mm+'m';}
+      var mel=document.getElementById('modal-wait');
+      if(mel){var mins2=Math.floor((Date.now()-new Date(a.checkin_time).getTime())/60000),hh2=Math.floor(mins2/60),mm2=mins2%60;mel.textContent=(hh2>0?hh2+'h ':'')+mm2+'m';}
+    }
+  });
+}
+
+function chgDate(d){currentDate=new Date(currentDate);currentDate.setDate(currentDate.getDate()+d);renderAppointments();}
+function goToday(){currentDate=new Date();renderAppointments();}
+function pickDate(){var dp=document.getElementById('hdp');if(dp){dp.value=fmtDate(currentDate);try{dp.showPicker();}catch(e){dp.click();}}}
+function onDatePick(v){if(v){currentDate=new Date(v+'T12:00:00');renderAppointments();}}
+
+function populateDL(){
+  var dl=document.getElementById('patient-datalist');
+  if(dl)dl.innerHTML=allPatients.map(function(p){return '<option value="'+p.name+'">';}).join('');
+}
+
+function openNewApptModal(){
+  resetApptForm();
+  document.getElementById('appt-date').value=fmtDate(currentDate);
+  document.getElementById('appt-start').value=clinicOpen;
+  document.getElementById('appt-end').value=m2t(t2m(clinicOpen)+30);
+  document.getElementById('appt-modal').classList.add('open');
+  populateDL();
+}
+function openNewApptAt(room,time){
+  resetApptForm();
+  document.getElementById('appt-room').value=room;
+  document.getElementById('appt-date').value=fmtDate(currentDate);
+  document.getElementById('appt-start').value=time;
+  document.getElementById('appt-end').value=m2t(t2m(time)+30);
+  document.getElementById('appt-modal').classList.add('open');
+  populateDL();
+}
+function resetApptForm(){
+  document.getElementById('appt-modal-title').textContent='Book appointment';
+  ['appt-id','appt-patient','appt-date','appt-start','appt-end','appt-notes'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('appt-dentist').value='';document.getElementById('appt-room').value='';document.getElementById('appt-proc').value='';
+  document.getElementById('appt-delete-btn').style.display='none';
+}
+function closeApptModal(){document.getElementById('appt-modal').classList.remove('open');}
+document.getElementById('appt-modal').addEventListener('click',function(e){if(e.target===this)closeApptModal();});
+
+async function saveAppt(){
+  var patient=document.getElementById('appt-patient').value.trim();
+  var dentist=document.getElementById('appt-dentist').value;
+  var room=document.getElementById('appt-room').value;
+  var date=document.getElementById('appt-date').value;
+  var start=document.getElementById('appt-start').value;
+  var end=document.getElementById('appt-end').value;
+  if(!patient||!dentist||!room||!date||!start||!end){showToast('Please fill in all required fields','error');return;}
+  if(t2m(end)<=t2m(start)){showToast('End time must be after start time','error');return;}
+  var id=document.getElementById('appt-id').value;
+  var payload={patient_name:patient,dentist:dentist,room:room,date:date,start_time:start,end_time:end,procedure_type:document.getElementById('appt-proc').value||null,notes:document.getElementById('appt-notes').value.trim()||null};
+  if(!id)payload.status='open';
+  var res=id?await db.from('appointments').update(payload).eq('id',id):await db.from('appointments').insert([payload]);
+  if(res.error){showToast('Failed to save appointment','error');return;}
+  showToast(id?'Appointment updated':'Appointment booked');
+  closeApptModal();
+  var aRes=await db.from('appointments').select('*').eq('date',fmtDate(currentDate));
+  if(!aRes.error)allAppointments=aRes.data||[];
+  buildSchedule();
+}
+
+async function deleteAppt(){
+  var id=document.getElementById('appt-id').value;
+  if(!id||!confirm('Cancel this appointment?'))return;
+  var res=await db.from('appointments').delete().eq('id',id);
+  if(res.error){showToast('Failed to cancel','error');return;}
+  showToast('Appointment cancelled');closeApptModal();
+  var aRes=await db.from('appointments').select('*').eq('date',fmtDate(currentDate));
+  if(!aRes.error)allAppointments=aRes.data||[];
+  buildSchedule();
+}
+
+function openDetail(id){
+  var a=allAppointments.find(function(x){return x.id===id;});if(!a)return;
+  detailApptId=id;
+  var sc=STATUSES[a.status]||STATUSES.open;
+  var waitHtml='';
+  if(a.status==='checkedin'&&a.checkin_time){
+    var mins=Math.floor((Date.now()-new Date(a.checkin_time).getTime())/60000),hh=Math.floor(mins/60),mm=mins%60;
+    waitHtml='<div class="wait-display"><div class="wait-label">&#9203; Waiting time</div><div class="wait-time-big" id="modal-wait">'+(hh>0?hh+'h ':'')+mm+'m</div></div>';
   }
-  if (res.error) { showToast('Failed to save patient', 'error'); return; }
-  showToast(id ? 'Patient updated successfully' : 'Patient added successfully');
-  closePtModal();
-  renderPatients();
+  var billingBanner='';
+  if(a.status==='completed'){
+    billingBanner='<div class="billing-banner"><div><div style="font-size:12px;font-weight:700;color:var(--g700);">&#10003; Appointment completed</div><div style="font-size:11px;color:var(--g600);margin-top:2px;">Ready to process billing for '+a.patient_name+'</div></div><button class="mbtn mbtng" onclick="goToBilling(\''+id+'\')">&#128180; Go to billing</button></div>';
+  }
+  document.getElementById('appt-detail-content').innerHTML=
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--s100);">'+
+    '<div style="width:48px;height:48px;border-radius:50%;background:#DBEAFE;color:#1D4ED8;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;">'+ini(a.patient_name||'')+'</div>'+
+    '<div><div style="font-size:15px;font-weight:700;color:var(--s800);">'+(a.patient_name||'Unknown')+'</div>'+
+    '<div style="font-size:12px;color:var(--s400);margin-top:3px;">'+sc.emoji+' '+sc.label+'</div></div></div>'+
+    billingBanner+
+    '<div class="appt-info-grid">'+
+    '<div class="appt-info-item"><div class="appt-info-lbl">Dentist</div><div class="appt-info-val">'+(a.dentist||'—')+'</div></div>'+
+    '<div class="appt-info-item"><div class="appt-info-lbl">Room</div><div class="appt-info-val">'+(a.room||'—')+'</div></div>'+
+    '<div class="appt-info-item"><div class="appt-info-lbl">Date</div><div class="appt-info-val">'+(a.date||'—')+'</div></div>'+
+    '<div class="appt-info-item"><div class="appt-info-lbl">Time</div><div class="appt-info-val">'+(a.start_time||'')+'&#8211;'+(a.end_time||'')+'</div></div>'+
+    (a.procedure_type?'<div class="appt-info-item"><div class="appt-info-lbl">Procedure</div><div class="appt-info-val">'+a.procedure_type+'</div></div>':'')+
+    (a.notes?'<div class="appt-info-item" style="grid-column:1/-1"><div class="appt-info-lbl">Notes</div><div class="appt-info-val">'+a.notes+'</div></div>':'')+
+    '</div>'+waitHtml;
+
+  document.getElementById('status-grid').innerHTML=Object.keys(STATUSES).map(function(k){
+    var s=STATUSES[k],active=a.status===k;
+    return '<button class="status-btn'+(active?' active-status':'')+'" style="background:'+s.bg+';border-color:'+s.border+';color:'+s.color+';" onclick="updateStatus(\''+id+'\',\''+k+'\')">'+s.emoji+' '+s.label+'</button>';
+  }).join('');
+
+  document.getElementById('appt-detail-modal').classList.add('open');
 }
 
-async function deletePatient() {
-  var id   = document.getElementById('pt-id').value;
-  var name = document.getElementById('pt-name').value;
-  if (!id) return;
-  if (!confirm('Are you sure you want to delete ' + name + '? This cannot be undone.')) return;
-  var res = await db.from('patients').delete().eq('id', id);
-  if (res.error) { showToast('Failed to delete patient', 'error'); return; }
-  showToast('Patient deleted');
-  closePtModal();
-  renderPatients();
+async function updateStatus(id,newStatus){
+  var updates={status:newStatus};
+  if(newStatus==='checkedin')updates.checkin_time=new Date().toISOString();
+  var res=await db.from('appointments').update(updates).eq('id',id);
+  if(res.error){showToast('Failed to update status','error');return;}
+  showToast('Status: '+STATUSES[newStatus].emoji+' '+STATUSES[newStatus].label);
+  closeDetailModal();
+  var aRes=await db.from('appointments').select('*').eq('date',fmtDate(currentDate));
+  if(!aRes.error)allAppointments=aRes.data||[];
+  buildSchedule();
 }
 
-document.getElementById('pt-modal').addEventListener('click', function(e) {
-  if (e.target === this) closePtModal();
-});
+function goToBilling(apptId){
+  closeDetailModal();
+  showToast('Billing section coming soon — will link automatically!');
+  showSection('billing');
+}
+
+async function deleteApptFromDetail(){
+  if(!detailApptId||!confirm('Cancel this appointment?'))return;
+  var res=await db.from('appointments').delete().eq('id',detailApptId);
+  if(res.error){showToast('Failed to cancel','error');return;}
+  showToast('Appointment cancelled');closeDetailModal();
+  var aRes=await db.from('appointments').select('*').eq('date',fmtDate(currentDate));
+  if(!aRes.error)allAppointments=aRes.data||[];
+  buildSchedule();
+}
+
+function editApptFromDetail(){
+  var a=allAppointments.find(function(x){return x.id===detailApptId;});if(!a)return;
+  closeDetailModal();
+  document.getElementById('appt-modal-title').textContent='Edit appointment';
+  document.getElementById('appt-id').value=a.id;
+  document.getElementById('appt-patient').value=a.patient_name||'';
+  document.getElementById('appt-dentist').value=a.dentist||'';
+  document.getElementById('appt-room').value=a.room||'';
+  document.getElementById('appt-date').value=a.date||'';
+  document.getElementById('appt-start').value=a.start_time||'';
+  document.getElementById('appt-end').value=a.end_time||'';
+  document.getElementById('appt-proc').value=a.procedure_type||'';
+  document.getElementById('appt-notes').value=a.notes||'';
+  document.getElementById('appt-delete-btn').style.display='inline-flex';
+  document.getElementById('appt-modal').classList.add('open');
+  populateDL();
+}
+
+function closeDetailModal(){document.getElementById('appt-detail-modal').classList.remove('open');detailApptId=null;}
+document.getElementById('appt-detail-modal').addEventListener('click',function(e){if(e.target===this)closeDetailModal();});
+
+// WORKING HOURS
+function openHoursModal(){
+  document.getElementById('hours-open').value=clinicOpen;
+  document.getElementById('hours-close').value=clinicClose;
+  document.getElementById('hours-modal').classList.add('open');
+}
+function closeHoursModal(){document.getElementById('hours-modal').classList.remove('open');}
+document.getElementById('hours-modal').addEventListener('click',function(e){if(e.target===this)closeHoursModal();});
+function saveHours(){
+  var o=document.getElementById('hours-open').value;
+  var c=document.getElementById('hours-close').value;
+  if(!o||!c){showToast('Please enter both times','error');return;}
+  if(t2m(c)<=t2m(o)){showToast('Closing time must be after opening time','error');return;}
+  clinicOpen=o;clinicClose=c;
+  localStorage.setItem('vdc-open',o);localStorage.setItem('vdc-close',c);
+  closeHoursModal();
+  showToast('Working hours saved: '+o+' – '+c);
+  renderAppointments();
+}
+
+// SETTINGS PAGE
+function renderSettings(){
+  document.getElementById('topbar-actions').innerHTML='';
+  document.getElementById('main-content').innerHTML=
+    '<div class="settings-section">'+
+    '<div class="settings-title">&#128336; Working hours</div>'+
+    '<div class="settings-sub">Set the hours your clinic is open. The appointment schedule grid will only show these hours.</div>'+
+    '<div class="settings-row">'+
+    '<div><div class="settings-lbl">Opening time</div><div class="settings-desc">When the clinic opens each day</div></div>'+
+    '<div style="display:flex;align-items:center;gap:10px;">'+
+    '<span style="font-size:14px;font-weight:700;color:var(--b600);">'+clinicOpen+'</span>'+
+    '<button class="btn btnsm" onclick="openHoursFromSettings()">Change</button>'+
+    '</div></div>'+
+    '<div class="settings-row">'+
+    '<div><div class="settings-lbl">Closing time</div><div class="settings-desc">When the clinic closes each day</div></div>'+
+    '<div style="display:flex;align-items:center;gap:10px;">'+
+    '<span style="font-size:14px;font-weight:700;color:var(--b600);">'+clinicClose+'</span>'+
+    '<button class="btn btnsm" onclick="openHoursFromSettings()">Change</button>'+
+    '</div></div>'+
+    '</div>'+
+    '<div class="settings-section">'+
+    '<div class="settings-title">&#127973; Clinic info</div>'+
+    '<div class="settings-sub">Basic information about your clinic.</div>'+
+    '<div class="settings-row"><div><div class="settings-lbl">Clinic name</div></div><div style="font-size:13px;font-weight:600;color:var(--s700);">Value Dental Center</div></div>'+
+    '<div class="settings-row"><div><div class="settings-lbl">Location</div></div><div style="font-size:13px;color:var(--s500);">Duhok, Iraq</div></div>'+
+    '<div class="settings-row"><div><div class="settings-lbl">Treatment rooms</div></div><div style="font-size:13px;color:var(--s500);">5 rooms</div></div>'+
+    '</div>'+
+    '<div class="settings-section">'+
+    '<div class="settings-title">&#128100; Login credentials</div>'+
+    '<div class="settings-sub">Current login accounts for your team.</div>'+
+    '<div class="settings-row"><div><div class="settings-lbl">Admin</div></div><div style="font-size:12px;color:var(--s500);">Username: admin</div></div>'+
+    '<div class="settings-row"><div><div class="settings-lbl">Receptionist</div></div><div style="font-size:12px;color:var(--s500);">Username: reception</div></div>'+
+    '</div>';
+}
+
+function openHoursFromSettings(){
+  document.getElementById('hours-open').value=clinicOpen;
+  document.getElementById('hours-close').value=clinicClose;
+  document.getElementById('hours-modal').classList.add('open');
+  // After saving, re-render settings page
+  var origSave=window._hoursSaveCb;
+  window._fromSettings=true;
+}
+
+// Override saveHours to also re-render settings if opened from settings
+var _origSaveHours=saveHours;
+saveHours=function(){
+  var o=document.getElementById('hours-open').value;
+  var c=document.getElementById('hours-close').value;
+  if(!o||!c){showToast('Please enter both times','error');return;}
+  if(t2m(c)<=t2m(o)){showToast('Closing time must be after opening time','error');return;}
+  clinicOpen=o;clinicClose=c;
+  localStorage.setItem('vdc-open',o);localStorage.setItem('vdc-close',c);
+  closeHoursModal();
+  showToast('Working hours saved: '+o+' – '+c);
+  var cur=document.getElementById('page-title').textContent;
+  if(cur==='Settings')renderSettings();
+  else renderAppointments();
+};
 </script>
 </body>
 </html>
