@@ -94,8 +94,6 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .bg{background:var(--g50);color:var(--g700);border:1px solid var(--g100);}
 .bb{background:var(--b50);color:var(--b600);border:1px solid var(--b100);}
 .ba{background:var(--a50);color:var(--a600);border:1px solid var(--a100);}
-.br{background:var(--r50);color:var(--r600);border:1px solid var(--r100);}
-.bs{background:var(--s100);color:var(--s600);border:1px solid var(--s200);}
 .dr-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;margin-right:4px;background:var(--b600);}
 .empty-state{text-align:center;padding:60px 20px;color:var(--s400);}
 /* APPOINTMENTS */
@@ -107,7 +105,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .date-label:hover{background:var(--s50);}
 .today-btn{padding:6px 14px;border-radius:var(--radsm);border:1px solid var(--b200);background:var(--b50);color:var(--b600);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;}
 .today-btn:hover{background:var(--b100);}
-.hours-btn{padding:6px 14px;border-radius:var(--radsm);border:1px solid var(--s200);background:white;color:var(--s600);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;}
+.hours-btn{padding:6px 14px;border-radius:var(--radsm);border:1px solid var(--s200);background:white;color:var(--s600);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;}
 .hours-btn:hover{background:var(--s50);}
 .legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
 .leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--s500);font-weight:500;}
@@ -125,11 +123,34 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .sch-room-col:last-child{border-right:none;}
 .sch-slot{height:44px;border-bottom:1px solid var(--s100);cursor:pointer;transition:background 0.1s;position:relative;}
 .sch-slot:hover{background:#F0F9FF;}
-.appt-block{position:absolute;left:3px;right:3px;border-radius:6px;padding:4px 7px;cursor:pointer;z-index:5;overflow:hidden;border-left:3px solid;transition:transform 0.1s;}
-.appt-block:hover{transform:scale(1.02);}
-.appt-pt-name{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.appt-dr{font-size:10px;opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.wait-timer{font-size:9px;font-weight:700;margin-top:2px;}
+/* APPOINTMENT BLOCK — new layout */
+.appt-block{
+  position:absolute;left:3px;right:3px;
+  border-radius:7px;padding:5px 7px;
+  cursor:grab;z-index:5;overflow:hidden;
+  border-left:3px solid;
+  transition:box-shadow 0.15s,transform 0.1s;
+  user-select:none;
+}
+.appt-block:hover{box-shadow:0 3px 12px rgba(0,0,0,0.15);}
+.appt-block.dragging{opacity:0.55;cursor:grabbing;transform:scale(1.03);z-index:50;}
+.appt-block-inner{display:flex;flex-direction:column;height:100%;gap:1px;}
+.appt-row1{display:flex;justify-content:space-between;align-items:flex-start;gap:4px;}
+.appt-row2{display:flex;justify-content:space-between;align-items:flex-start;gap:4px;}
+.appt-pt{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.appt-status-badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;white-space:nowrap;flex-shrink:0;border:1px solid rgba(0,0,0,0.08);}
+.appt-dr{font-size:10px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.appt-proc{font-size:9px;opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;max-width:60%;}
+.appt-bottom{display:flex;align-items:center;gap:5px;margin-top:2px;}
+.wait-timer{font-size:9px;font-weight:700;}
+.note-icon{font-size:10px;opacity:0.7;}
+/* RESIZE HANDLE */
+.resize-handle{position:absolute;bottom:0;left:0;right:0;height:6px;cursor:ns-resize;background:transparent;border-radius:0 0 4px 4px;}
+.resize-handle:hover{background:rgba(0,0,0,0.1);}
+/* DROP HIGHLIGHT */
+.sch-slot.drag-over{background:#DBEAFE !important;border:1.5px dashed var(--b500);}
+.sch-room-col.drag-over-col{background:rgba(37,99,235,0.03);}
+/* STATUS COLORS */
 .s-open{background:#F0F9FF;border-color:#38BDF8;color:#0C4A6E;}
 .s-confirmed{background:#F0FDF4;border-color:#4ADE80;color:#14532D;}
 .s-checkedin{background:#FFFBEB;border-color:#FBBF24;color:#78350F;}
@@ -137,7 +158,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .s-completed{background:#DCFCE7;border-color:#16A34A;color:#14532D;}
 .s-noshow{background:#FEE2E2;border-color:#F87171;color:#7F1D1D;}
 .s-delayed{background:#FED7AA;border-color:#FB923C;color:#7C2D12;}
-/* SETTINGS PAGE */
+/* SETTINGS */
 .settings-section{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:20px;margin-bottom:16px;}
 .settings-title{font-size:13px;font-weight:700;color:var(--s800);margin-bottom:4px;}
 .settings-sub{font-size:11px;color:var(--s400);margin-bottom:16px;}
@@ -158,7 +179,6 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .mbtnp{background:var(--b600);color:white;border-color:var(--b600);}
 .mbtnp:hover{background:var(--b700);}
 .mbtng{background:var(--g700);color:white;border-color:var(--g700);}
-.mbtng:hover{background:var(--g600);}
 .mbtnd{background:var(--r50);color:var(--r600);border-color:var(--r100);}
 .fg{display:flex;gap:10px;}.fg>div{flex:1;min-width:0;}
 .fgrp{margin-bottom:13px;}
@@ -170,6 +190,11 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .status-btn{padding:9px 6px;border-radius:var(--radsm);border:1.5px solid var(--s200);background:white;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;text-align:center;transition:all 0.12s;}
 .status-btn:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,0.08);}
 .status-btn.active-status{border-width:2.5px;transform:translateY(-1px);}
+/* status selector in booking form */
+.status-select-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.ss-btn{padding:7px 4px;border-radius:var(--radsm);border:1.5px solid var(--s200);background:white;cursor:pointer;font-size:10px;font-weight:600;font-family:inherit;text-align:center;transition:all 0.1s;}
+.ss-btn:hover{transform:translateY(-1px);}
+.ss-btn.sel{border-width:2px;}
 .appt-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
 .appt-info-item{background:var(--s50);border-radius:var(--radsm);padding:10px 12px;}
 .appt-info-lbl{font-size:10px;color:var(--s400);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px;}
@@ -346,6 +371,10 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         <option>Extraction</option><option>Orthodontic checkup</option><option>Implant</option><option>Other</option>
       </select>
     </div>
+    <div class="fgrp"><label class="flbl">Appointment status</label>
+      <div class="status-select-grid" id="appt-status-grid"></div>
+      <input type="hidden" id="appt-status-val" value="open">
+    </div>
     <div class="fgrp"><label class="flbl">Notes</label>
       <textarea class="finp" id="appt-notes" rows="2" placeholder="Any special instructions or notes..."></textarea>
     </div>
@@ -379,17 +408,10 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 <div class="mbg" id="hours-modal">
   <div class="modal">
     <div class="mtit">Working hours</div>
-    <div class="msub">Set your clinic's opening and closing times. These are saved permanently.</div>
+    <div class="msub">Set your clinic opening and closing times. Saved permanently.</div>
     <div class="fg">
-      <div class="fgrp"><label class="flbl">Clinic opens at</label>
-        <input class="finp" type="time" id="hours-open" step="900">
-      </div>
-      <div class="fgrp"><label class="flbl">Clinic closes at</label>
-        <input class="finp" type="time" id="hours-close" step="900">
-      </div>
-    </div>
-    <div style="background:var(--b50);border:1px solid var(--b100);border-radius:var(--radsm);padding:10px 12px;font-size:11px;color:var(--b700);margin-bottom:4px;">
-      &#8505; The schedule grid will update to show only the hours your clinic is open.
+      <div class="fgrp"><label class="flbl">Clinic opens at</label><input class="finp" type="time" id="hours-open" step="900"></div>
+      <div class="fgrp"><label class="flbl">Clinic closes at</label><input class="finp" type="time" id="hours-close" step="900"></div>
     </div>
     <div class="mac">
       <button class="mbtn" onclick="closeHoursModal()">Cancel</button>
@@ -398,53 +420,50 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
   </div>
 </div>
 
+<!-- DRAG CONFIRM MODAL -->
+<div class="mbg" id="drag-modal">
+  <div class="modal">
+    <div class="mtit">Confirm appointment change</div>
+    <div class="msub" id="drag-modal-sub"></div>
+    <div class="mac">
+      <button class="mbtn" onclick="cancelDrag()">Cancel</button>
+      <button class="mbtn mbtnp" onclick="confirmDrag()">Confirm change</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-var SUPA_URL = 'https://jqtvgjroaagfewuetali.supabase.co';
-var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxdHZnanJvYWFnZmV3dWV0YWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzQyNTIsImV4cCI6MjA5MDU1MDI1Mn0.vdekXCu_j4v3FQIqoPNRrQqf1oLxMsyKnVhHYkWTS2c';
-var db = supabase.createClient(SUPA_URL, SUPA_KEY);
+var SUPA_URL='https://jqtvgjroaagfewuetali.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxdHZnanJvYWFnZmV3dWV0YWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzQyNTIsImV4cCI6MjA5MDU1MDI1Mn0.vdekXCu_j4v3FQIqoPNRrQqf1oLxMsyKnVhHYkWTS2c';
+var db=supabase.createClient(SUPA_URL,SUPA_KEY);
+var USERS={'admin':'vdc2026admin','reception':'vdc2026desk'};
+var viewMode=localStorage.getItem('vdc-view')||'grid';
+var allPatients=[],allAppointments=[],currentDate=new Date(),detailApptId=null,waitInterval=null,searchQuery='';
+var clinicOpen=localStorage.getItem('vdc-open')||'14:00';
+var clinicClose=localStorage.getItem('vdc-close')||'22:00';
 
-var USERS = {'admin':'vdc2026admin','reception':'vdc2026desk'};
-var viewMode = localStorage.getItem('vdc-view') || 'grid';
-var allPatients = [];
-var allAppointments = [];
-var currentDate = new Date();
-var detailApptId = null;
-var waitInterval = null;
-var searchQuery = '';
+// drag state
+var dragApptId=null,dragPendingUpdate=null;
 
-// Working hours — loaded from localStorage, saved permanently
-var clinicOpen  = localStorage.getItem('vdc-open')  || '14:00';
-var clinicClose = localStorage.getItem('vdc-close') || '22:00';
-
-var STATUSES = {
-  open:       {label:'Open',        emoji:'🔵', cls:'s-open',       color:'#0C4A6E', bg:'#F0F9FF', border:'#38BDF8'},
-  confirmed:  {label:'Confirmed',   emoji:'✅', cls:'s-confirmed',  color:'#14532D', bg:'#F0FDF4', border:'#4ADE80'},
-  checkedin:  {label:'Checked in',  emoji:'⏳', cls:'s-checkedin',  color:'#78350F', bg:'#FFFBEB', border:'#FBBF24'},
-  inprogress: {label:'In progress', emoji:'🔄', cls:'s-inprogress', color:'#3B0764', bg:'#EDE9FE', border:'#8B5CF6'},
-  completed:  {label:'Completed',   emoji:'✔️', cls:'s-completed',  color:'#14532D', bg:'#DCFCE7', border:'#16A34A'},
-  noshow:     {label:'No show',     emoji:'🔴', cls:'s-noshow',     color:'#7F1D1D', bg:'#FEE2E2', border:'#F87171'},
-  delayed:    {label:'Delayed',     emoji:'🟡', cls:'s-delayed',    color:'#7C2D12', bg:'#FED7AA', border:'#FB923C'}
+var STATUSES={
+  open:      {label:'Open',       emoji:'🔵',cls:'s-open',      color:'#0C4A6E',bg:'#F0F9FF',border:'#38BDF8'},
+  confirmed: {label:'Confirmed',  emoji:'✅',cls:'s-confirmed', color:'#14532D',bg:'#F0FDF4',border:'#4ADE80'},
+  checkedin: {label:'Checked in', emoji:'⏳',cls:'s-checkedin', color:'#78350F',bg:'#FFFBEB',border:'#FBBF24'},
+  inprogress:{label:'In progress',emoji:'🔄',cls:'s-inprogress',color:'#3B0764',bg:'#EDE9FE',border:'#8B5CF6'},
+  completed: {label:'Completed',  emoji:'✔️',cls:'s-completed', color:'#14532D',bg:'#DCFCE7',border:'#16A34A'},
+  noshow:    {label:'No show',    emoji:'🔴',cls:'s-noshow',    color:'#7F1D1D',bg:'#FEE2E2',border:'#F87171'},
+  delayed:   {label:'Delayed',    emoji:'🟡',cls:'s-delayed',   color:'#7C2D12',bg:'#FED7AA',border:'#FB923C'}
 };
-
-var ROOMS = ['Room 1','Room 2','Room 3','Room 4','Room 5'];
-
-function getTimeSlots() {
-  var slots = [];
-  var startM = t2m(clinicOpen);
-  var endM   = t2m(clinicClose);
-  for (var m = startM; m < endM; m += 15) slots.push(m2t(m));
-  return slots;
-}
-
+var ROOMS=['Room 1','Room 2','Room 3','Room 4','Room 5'];
+function getSlots(){var s=[],sm=t2m(clinicOpen),em=t2m(clinicClose);for(var m=sm;m<em;m+=15)s.push(m2t(m));return s;}
 function fmtDate(d){return d.toISOString().split('T')[0];}
 function dispDate(d){return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 function t2m(t){if(!t)return 0;var p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]);}
 function m2t(m){var h=Math.floor(m/60),mn=m%60;return(h<10?'0':'')+h+':'+(mn<10?'0':'')+mn;}
-function ini(name){return(name||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();}
+function ini(n){return(n||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();}
 
-// AUTH
 function doLogin(){
   var u=document.getElementById('login-user').value.trim(),p=document.getElementById('login-pass').value,e=document.getElementById('login-err');
   if(USERS[u]&&USERS[u]===p){sessionStorage.setItem('vdc-user',u);document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';showSection('patients');}
@@ -475,13 +494,12 @@ function showSection(s){
   else if(s==='settings')renderSettings();
   else{document.getElementById('topbar-actions').innerHTML='';document.getElementById('main-content').innerHTML='<div class="coming-soon"><div class="coming-soon-icon">🚧</div><h2>'+(SECTIONS[s]?SECTIONS[s].title:s)+' — Coming soon</h2><p>This section is being built.</p></div>';}
 }
-
 function showToast(msg,type){
   type=type||'success';var t=document.getElementById('toast');t.textContent=msg;t.className='toast '+type+' show';
   setTimeout(function(){t.classList.remove('show');},3000);
 }
 
-// PATIENTS
+// ── PATIENTS ──────────────────────────────────────────────────────
 var PT_COLORS=[{bg:'#DBEAFE',color:'#1D4ED8'},{bg:'#CCFBF1',color:'#0F766E'},{bg:'#FFE4E6',color:'#BE123C'},{bg:'#EDE9FE',color:'#6D28D9'},{bg:'#FEF3C7',color:'#B45309'},{bg:'#FCE7F3',color:'#9D174D'}];
 function ptColor(name){var h=0;for(var i=0;i<name.length;i++)h=(h*31+name.charCodeAt(i))%PT_COLORS.length;return PT_COLORS[h];}
 function calcAge(dob){if(!dob)return null;return Math.floor((Date.now()-new Date(dob).getTime())/(1000*60*60*24*365.25));}
@@ -494,7 +512,6 @@ async function renderPatients(){
   if(res.error){showToast('Failed to load patients','error');return;}
   allPatients=res.data||[];renderPatientList();
 }
-
 function renderPatientList(){
   var q=searchQuery.toLowerCase();
   var list=q?allPatients.filter(function(p){return(p.name||'').toLowerCase().includes(q)||(p.phone||'').includes(q)||(p.primary_dentist||'').toLowerCase().includes(q);}):allPatients;
@@ -519,7 +536,6 @@ function renderPatientList(){
   document.getElementById('main-content').innerHTML=html;
   if(searchQuery)setTimeout(function(){var i=document.getElementById('search-inp');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},10);
 }
-
 function ptCardGrid(p){
   var c=ptColor(p.name||''),age=calcAge(p.dob),in2=ini(p.name||'?'),meta='';
   if(p.phone)meta+='<div class="pt-meta-row"><span style="color:var(--s400);">&#128222;</span> '+p.phone+'</div>';
@@ -533,13 +549,11 @@ function ptCardList(p){
 }
 function setView(v){viewMode=v;localStorage.setItem('vdc-view',v);renderPatientList();}
 function onSearch(v){searchQuery=v;renderPatientList();}
-
 function openAddPtModal(){
   document.getElementById('pt-modal-title').textContent='Add new patient';
   ['pt-id','pt-name','pt-dob','pt-phone','pt-email','pt-notes'].forEach(function(id){document.getElementById(id).value='';});
   document.getElementById('pt-gender').value='';document.getElementById('pt-status').value='new';document.getElementById('pt-dentist').value='';
-  document.getElementById('pt-delete-btn').style.display='none';
-  document.getElementById('pt-modal').classList.add('open');
+  document.getElementById('pt-delete-btn').style.display='none';document.getElementById('pt-modal').classList.add('open');
 }
 function openEditPtModal(id){
   var p=allPatients.find(function(x){return x.id===id;});if(!p)return;
@@ -547,8 +561,7 @@ function openEditPtModal(id){
   document.getElementById('pt-id').value=p.id;document.getElementById('pt-name').value=p.name||'';document.getElementById('pt-dob').value=p.dob||'';
   document.getElementById('pt-gender').value=p.gender||'';document.getElementById('pt-phone').value=p.phone||'';document.getElementById('pt-email').value=p.email||'';
   document.getElementById('pt-status').value=p.status||'active';document.getElementById('pt-dentist').value=p.primary_dentist||'';document.getElementById('pt-notes').value=p.medical_notes||'';
-  document.getElementById('pt-delete-btn').style.display='inline-flex';
-  document.getElementById('pt-modal').classList.add('open');
+  document.getElementById('pt-delete-btn').style.display='inline-flex';document.getElementById('pt-modal').classList.add('open');
 }
 function closePtModal(){document.getElementById('pt-modal').classList.remove('open');}
 async function savePatient(){
@@ -569,11 +582,11 @@ async function deletePatient(){
 }
 document.getElementById('pt-modal').addEventListener('click',function(e){if(e.target===this)closePtModal();});
 
-// APPOINTMENTS
+// ── APPOINTMENTS ──────────────────────────────────────────────────
 async function renderAppointments(){
   document.getElementById('topbar-actions').innerHTML=
-    '<button class="hours-btn" onclick="openHoursModal()">&#9881; Working hours: '+clinicOpen+' – '+clinicClose+'</button>'+
-    '<button class="btn btnp" onclick="openNewApptModal()">+ Book appointment</button>';
+    '<button class="hours-btn" onclick="openHoursModal()">&#9881; Hours: '+clinicOpen+' – '+clinicClose+'</button>'+
+    ' <button class="btn btnp" onclick="openNewApptModal()">+ Book appointment</button>';
   document.getElementById('main-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading schedule...</div>';
   var pRes=await db.from('patients').select('id,name').order('name');
   if(!pRes.error)allPatients=pRes.data||[];
@@ -583,19 +596,16 @@ async function renderAppointments(){
 }
 
 function buildSchedule(){
-  var slots=getTimeSlots();
-  var isToday=fmtDate(currentDate)===fmtDate(new Date());
+  var slots=getSlots(),isToday=fmtDate(currentDate)===fmtDate(new Date());
   var total=allAppointments.length;
   var cin=allAppointments.filter(function(a){return a.status==='checkedin';}).length;
   var inp=allAppointments.filter(function(a){return a.status==='inprogress';}).length;
   var comp=allAppointments.filter(function(a){return a.status==='completed';}).length;
   var counts={};ROOMS.forEach(function(r){counts[r]=0;});
   allAppointments.forEach(function(a){if(counts[a.room]!==undefined)counts[a.room]++;});
-
   var legendHtml=Object.keys(STATUSES).map(function(k){
     return '<div class="leg-item"><div class="leg-dot" style="background:'+STATUSES[k].bg+';border:1.5px solid '+STATUSES[k].border+';"></div>'+STATUSES[k].emoji+' '+STATUSES[k].label+'</div>';
   }).join('');
-
   var html=
     '<div class="appt-topbar">'+
     '<div class="date-nav">'+
@@ -610,26 +620,26 @@ function buildSchedule(){
     '<div class="stat-card"><div class="stat-icon" style="background:#F0F9FF;">&#128197;</div><div class="stat-lbl">Total today</div><div class="stat-val">'+total+'</div></div>'+
     '<div class="stat-card"><div class="stat-icon" style="background:#FFFBEB;">&#8987;</div><div class="stat-lbl">Checked in</div><div class="stat-val">'+cin+'</div></div>'+
     '<div class="stat-card"><div class="stat-icon" style="background:#EDE9FE;">&#128260;</div><div class="stat-lbl">In progress</div><div class="stat-val">'+inp+'</div></div>'+
-    '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">&#10004;&#65039;</div><div class="stat-lbl">Completed</div><div class="stat-val">'+comp+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">&#10004;</div><div class="stat-lbl">Completed</div><div class="stat-val">'+comp+'</div></div>'+
     '</div>'+
     '<div class="legend">'+legendHtml+'</div>'+
-    '<div class="schedule-wrap">'+
+    '<div class="schedule-wrap" id="schedule-wrap">'+
     '<div class="schedule-header">'+
     '<div class="sch-h-time">Time</div>'+
     ROOMS.map(function(r){return '<div class="sch-h-room">'+r+'<br><span style="font-size:10px;color:var(--s400);font-weight:400;">'+counts[r]+' appt'+(counts[r]!==1?'s':'')+'</span></div>';}).join('')+
     '</div>'+
-    '<div class="sch-body">'+buildTimeCol(slots)+ROOMS.map(function(r){return buildRoomCol(r,slots);}).join('')+
-    '</div></div>';
-
+    '<div class="sch-body" id="sch-body">'+buildTimeCol(slots)+ROOMS.map(function(r){return buildRoomCol(r,slots);}).join('')+'</div>'+
+    '</div>';
   document.getElementById('main-content').innerHTML=html;
   tickWait();
   if(waitInterval)clearInterval(waitInterval);
   waitInterval=setInterval(tickWait,15000);
+  setupDragDrop();
 }
 
 function buildTimeCol(slots){
   return '<div class="sch-time-col">'+slots.map(function(t){
-    var parts=t.split(':'),isHour=parts[1]==='00';
+    var isHour=t.split(':')[1]==='00';
     return '<div class="sch-time-slot" style="'+(isHour?'border-top:1px solid var(--s200);':'')+'"><span class="sch-time-label" style="'+(isHour?'font-weight:700;color:var(--s600);':'')+'">'+t+'</span></div>';
   }).join('')+'</div>';
 }
@@ -637,28 +647,42 @@ function buildTimeCol(slots){
 function buildRoomCol(room,slots){
   var appts=allAppointments.filter(function(a){return a.room===room;});
   var slotH=44,startMin=t2m(slots[0]);
-  var totalH=slots.length*slotH;
-  var html='<div class="sch-room-col" style="position:relative;height:'+totalH+'px;">';
+  var html='<div class="sch-room-col" id="col-'+room.replace(' ','-')+'" style="position:relative;height:'+(slots.length*slotH)+'px;" data-room="'+room+'">';
   slots.forEach(function(t,i){
-    var parts=t.split(':'),isHour=parts[1]==='00';
-    html+='<div class="sch-slot" style="position:absolute;top:'+(i*slotH)+'px;left:0;right:0;height:'+slotH+'px;'+(isHour?'border-top:1px solid var(--s200);':'')+'" onclick="openNewApptAt(\''+room+'\',\''+t+'\')"></div>';
+    var isHour=t.split(':')[1]==='00';
+    html+='<div class="sch-slot" style="position:absolute;top:'+(i*slotH)+'px;left:0;right:0;height:'+slotH+'px;'+(isHour?'border-top:1px solid var(--s200);':'')+'" data-room="'+room+'" data-time="'+t+'" onclick="openNewApptAt(\''+room+'\',\''+t+'\')"></div>';
   });
   appts.forEach(function(a){
     var aS=t2m(a.start_time),aE=t2m(a.end_time);
     if(!aS||!aE||aE<=aS)return;
     var top=(aS-startMin)/15*slotH;
-    var height=Math.max((aE-aS)/15*slotH-3,28);
+    var height=Math.max((aE-aS)/15*slotH-3,36);
     var sc=STATUSES[a.status]||STATUSES.open;
+    // wait timer
     var wt='';
     if(a.status==='checkedin'&&a.checkin_time){
       var mins=Math.floor((Date.now()-new Date(a.checkin_time).getTime())/60000);
       var hh=Math.floor(mins/60),mm=mins%60;
       wt='<div class="wait-timer" id="wt-'+a.id+'">&#9203; '+(hh>0?hh+'h ':'')+mm+'m</div>';
     }
-    html+='<div class="appt-block '+sc.cls+'" style="top:'+top+'px;height:'+height+'px;" onclick="event.stopPropagation();openDetail(\''+a.id+'\')">'+
-      '<div class="appt-pt-name">'+(a.patient_name||'?')+'</div>'+
-      '<div class="appt-dr">'+(a.dentist||'')+(a.procedure_type?' · '+a.procedure_type:'')+'</div>'+
-      wt+'</div>';
+    // note icon
+    var noteIcon=a.notes?'<span class="note-icon" title="'+a.notes+'">&#128221;</span>':'';
+    // status badge text
+    var sbadge='<span class="appt-status-badge" style="background:'+sc.border+'22;color:'+sc.color+';border-color:'+sc.border+';">'+sc.emoji+' '+sc.label+'</span>';
+    // proc short
+    var procShort=a.procedure_type?(a.procedure_type.length>12?a.procedure_type.slice(0,11)+'…':a.procedure_type):'';
+
+    html+='<div class="appt-block '+sc.cls+'" id="ab-'+a.id+'" draggable="true"'+
+      ' style="top:'+top+'px;height:'+height+'px;"'+
+      ' data-id="'+a.id+'" data-start="'+a.start_time+'" data-end="'+a.end_time+'" data-room="'+room+'"'+
+      ' onclick="event.stopPropagation();openDetail(\''+a.id+'\')">'+
+      '<div class="appt-block-inner">'+
+      '<div class="appt-row1"><div class="appt-pt">'+(a.patient_name||'?')+'</div>'+sbadge+'</div>'+
+      '<div class="appt-row2"><div class="appt-dr">'+(a.dentist||'')+'</div><div class="appt-proc">'+procShort+'</div></div>'+
+      (wt||noteIcon?'<div class="appt-bottom">'+wt+noteIcon+'</div>':'')+
+      '</div>'+
+      '<div class="resize-handle" data-id="'+a.id+'" onmousedown="startResize(event,\''+a.id+'\')"></div>'+
+      '</div>';
   });
   return html+'</div>';
 }
@@ -669,7 +693,7 @@ function tickWait(){
       var el=document.getElementById('wt-'+a.id);
       if(el){var mins=Math.floor((Date.now()-new Date(a.checkin_time).getTime())/60000),hh=Math.floor(mins/60),mm=mins%60;el.textContent='⏱ '+(hh>0?hh+'h ':'')+mm+'m';}
       var mel=document.getElementById('modal-wait');
-      if(mel){var mins2=Math.floor((Date.now()-new Date(a.checkin_time).getTime())/60000),hh2=Math.floor(mins2/60),mm2=mins2%60;mel.textContent=(hh2>0?hh2+'h ':'')+mm2+'m';}
+      if(mel){var m2=Math.floor((Date.now()-new Date(a.checkin_time).getTime())/60000),h2=Math.floor(m2/60),mn2=m2%60;mel.textContent=(h2>0?h2+'h ':'')+mn2+'m';}
     }
   });
 }
@@ -679,33 +703,151 @@ function goToday(){currentDate=new Date();renderAppointments();}
 function pickDate(){var dp=document.getElementById('hdp');if(dp){dp.value=fmtDate(currentDate);try{dp.showPicker();}catch(e){dp.click();}}}
 function onDatePick(v){if(v){currentDate=new Date(v+'T12:00:00');renderAppointments();}}
 
+// ── DRAG & DROP ────────────────────────────────────────────────────
+function setupDragDrop(){
+  // drag blocks
+  document.querySelectorAll('.appt-block').forEach(function(el){
+    el.addEventListener('dragstart',function(e){
+      dragApptId=el.dataset.id;
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain',el.dataset.id);
+    });
+    el.addEventListener('dragend',function(){
+      el.classList.remove('dragging');
+      document.querySelectorAll('.sch-slot').forEach(function(s){s.classList.remove('drag-over');});
+    });
+  });
+  // drop slots
+  document.querySelectorAll('.sch-slot').forEach(function(slot){
+    slot.addEventListener('dragover',function(e){
+      e.preventDefault();
+      document.querySelectorAll('.sch-slot').forEach(function(s){s.classList.remove('drag-over');});
+      slot.classList.add('drag-over');
+    });
+    slot.addEventListener('dragleave',function(){slot.classList.remove('drag-over');});
+    slot.addEventListener('drop',function(e){
+      e.preventDefault();slot.classList.remove('drag-over');
+      var id=e.dataTransfer.getData('text/plain')||dragApptId;
+      if(!id)return;
+      var a=allAppointments.find(function(x){return x.id===id;});if(!a)return;
+      var newRoom=slot.dataset.room;
+      var newStart=slot.dataset.time;
+      var dur=t2m(a.end_time)-t2m(a.start_time);
+      var newEnd=m2t(t2m(newStart)+dur);
+      if(newStart===a.start_time&&newRoom===a.room)return;
+      dragPendingUpdate={id:id,room:newRoom,start_time:newStart,end_time:newEnd};
+      var sub='Move <strong>'+(a.patient_name||'?')+'</strong> to <strong>'+newRoom+'</strong> at <strong>'+newStart+'</strong>?';
+      document.getElementById('drag-modal-sub').innerHTML=sub;
+      document.getElementById('drag-modal').classList.add('open');
+    });
+  });
+}
+
+async function confirmDrag(){
+  document.getElementById('drag-modal').classList.remove('open');
+  if(!dragPendingUpdate)return;
+  var u=dragPendingUpdate;dragPendingUpdate=null;
+  var res=await db.from('appointments').update({room:u.room,start_time:u.start_time,end_time:u.end_time}).eq('id',u.id);
+  if(res.error){showToast('Failed to move appointment','error');return;}
+  showToast('Appointment moved');
+  var aRes=await db.from('appointments').select('*').eq('date',fmtDate(currentDate));
+  if(!aRes.error)allAppointments=aRes.data||[];
+  buildSchedule();
+}
+function cancelDrag(){document.getElementById('drag-modal').classList.remove('open');dragPendingUpdate=null;}
+
+// ── RESIZE ─────────────────────────────────────────────────────────
+var resizing=null;
+function startResize(e,id){
+  e.stopPropagation();e.preventDefault();
+  var a=allAppointments.find(function(x){return x.id===id;});if(!a)return;
+  var startY=e.clientY;
+  var origEnd=t2m(a.end_time);
+  resizing={id:id,startY:startY,origEnd:origEnd};
+  document.addEventListener('mousemove',onResizeMove);
+  document.addEventListener('mouseup',onResizeUp);
+}
+function onResizeMove(e){
+  if(!resizing)return;
+  var dy=e.clientY-resizing.startY;
+  var deltaMins=Math.round(dy/44)*15;
+  var newEnd=Math.max(resizing.origEnd+15,resizing.origEnd+deltaMins);
+  var el=document.getElementById('ab-'+resizing.id);
+  if(el){
+    var a=allAppointments.find(function(x){return x.id===resizing.id;});
+    if(a){
+      var slots=getSlots(),startMin=t2m(slots[0]);
+      var top=(t2m(a.start_time)-startMin)/15*44;
+      var height=Math.max((newEnd-t2m(a.start_time))/15*44-3,36);
+      el.style.height=height+'px';
+    }
+  }
+}
+async function onResizeUp(e){
+  document.removeEventListener('mousemove',onResizeMove);
+  document.removeEventListener('mouseup',onResizeUp);
+  if(!resizing)return;
+  var dy=e.clientY-resizing.startY;
+  var deltaMins=Math.round(dy/44)*15;
+  var newEnd=Math.max(resizing.origEnd+15,resizing.origEnd+deltaMins);
+  var newEndStr=m2t(newEnd);
+  var a=allAppointments.find(function(x){return x.id===resizing.id;});
+  resizing=null;
+  if(!a||newEndStr===a.end_time)return;
+  if(!confirm('Change end time to '+newEndStr+'?')){buildSchedule();return;}
+  var res=await db.from('appointments').update({end_time:newEndStr}).eq('id',a.id);
+  if(res.error){showToast('Failed to resize','error');buildSchedule();return;}
+  showToast('End time updated to '+newEndStr);
+  var aRes=await db.from('appointments').select('*').eq('date',fmtDate(currentDate));
+  if(!aRes.error)allAppointments=aRes.data||[];
+  buildSchedule();
+}
+
+// ── STATUS SELECT IN BOOKING FORM ────────────────────────────────
+function buildStatusSelectGrid(currentVal){
+  var html='';
+  Object.keys(STATUSES).forEach(function(k){
+    var s=STATUSES[k];
+    var sel=currentVal===k;
+    html+='<button type="button" class="ss-btn'+(sel?' sel':'')+'" style="background:'+s.bg+';border-color:'+(sel?s.border:'var(--s200)')+';color:'+s.color+';" onclick="selectApptStatus(\''+k+'\')">'+s.emoji+'<br>'+s.label+'</button>';
+  });
+  return html;
+}
+function selectApptStatus(k){
+  document.getElementById('appt-status-val').value=k;
+  var grid=document.getElementById('appt-status-grid');
+  if(grid)grid.innerHTML=buildStatusSelectGrid(k);
+}
+
+// ── BOOKING MODAL ─────────────────────────────────────────────────
 function populateDL(){
   var dl=document.getElementById('patient-datalist');
   if(dl)dl.innerHTML=allPatients.map(function(p){return '<option value="'+p.name+'">';}).join('');
 }
-
 function openNewApptModal(){
-  resetApptForm();
+  resetApptForm('open');
   document.getElementById('appt-date').value=fmtDate(currentDate);
   document.getElementById('appt-start').value=clinicOpen;
   document.getElementById('appt-end').value=m2t(t2m(clinicOpen)+30);
-  document.getElementById('appt-modal').classList.add('open');
-  populateDL();
+  document.getElementById('appt-modal').classList.add('open');populateDL();
 }
 function openNewApptAt(room,time){
-  resetApptForm();
+  resetApptForm('open');
   document.getElementById('appt-room').value=room;
   document.getElementById('appt-date').value=fmtDate(currentDate);
   document.getElementById('appt-start').value=time;
   document.getElementById('appt-end').value=m2t(t2m(time)+30);
-  document.getElementById('appt-modal').classList.add('open');
-  populateDL();
+  document.getElementById('appt-modal').classList.add('open');populateDL();
 }
-function resetApptForm(){
+function resetApptForm(initStatus){
   document.getElementById('appt-modal-title').textContent='Book appointment';
   ['appt-id','appt-patient','appt-date','appt-start','appt-end','appt-notes'].forEach(function(id){document.getElementById(id).value='';});
   document.getElementById('appt-dentist').value='';document.getElementById('appt-room').value='';document.getElementById('appt-proc').value='';
   document.getElementById('appt-delete-btn').style.display='none';
+  var sv=initStatus||'open';
+  document.getElementById('appt-status-val').value=sv;
+  var sg=document.getElementById('appt-status-grid');if(sg)sg.innerHTML=buildStatusSelectGrid(sv);
 }
 function closeApptModal(){document.getElementById('appt-modal').classList.remove('open');}
 document.getElementById('appt-modal').addEventListener('click',function(e){if(e.target===this)closeApptModal();});
@@ -720,17 +862,17 @@ async function saveAppt(){
   if(!patient||!dentist||!room||!date||!start||!end){showToast('Please fill in all required fields','error');return;}
   if(t2m(end)<=t2m(start)){showToast('End time must be after start time','error');return;}
   var id=document.getElementById('appt-id').value;
-  var payload={patient_name:patient,dentist:dentist,room:room,date:date,start_time:start,end_time:end,procedure_type:document.getElementById('appt-proc').value||null,notes:document.getElementById('appt-notes').value.trim()||null};
-  if(!id)payload.status='open';
+  var status=document.getElementById('appt-status-val').value||'open';
+  var payload={patient_name:patient,dentist:dentist,room:room,date:date,start_time:start,end_time:end,procedure_type:document.getElementById('appt-proc').value||null,notes:document.getElementById('appt-notes').value.trim()||null,status:status};
+  if(status==='checkedin'&&!id)payload.checkin_time=new Date().toISOString();
   var res=id?await db.from('appointments').update(payload).eq('id',id):await db.from('appointments').insert([payload]);
-  if(res.error){showToast('Failed to save appointment','error');return;}
+  if(res.error){showToast('Failed to save appointment','error');console.error(res.error);return;}
   showToast(id?'Appointment updated':'Appointment booked');
   closeApptModal();
   var aRes=await db.from('appointments').select('*').eq('date',fmtDate(currentDate));
   if(!aRes.error)allAppointments=aRes.data||[];
   buildSchedule();
 }
-
 async function deleteAppt(){
   var id=document.getElementById('appt-id').value;
   if(!id||!confirm('Cancel this appointment?'))return;
@@ -742,6 +884,7 @@ async function deleteAppt(){
   buildSchedule();
 }
 
+// ── DETAIL MODAL ──────────────────────────────────────────────────
 function openDetail(id){
   var a=allAppointments.find(function(x){return x.id===id;});if(!a)return;
   detailApptId=id;
@@ -753,7 +896,7 @@ function openDetail(id){
   }
   var billingBanner='';
   if(a.status==='completed'){
-    billingBanner='<div class="billing-banner"><div><div style="font-size:12px;font-weight:700;color:var(--g700);">&#10003; Appointment completed</div><div style="font-size:11px;color:var(--g600);margin-top:2px;">Ready to process billing for '+a.patient_name+'</div></div><button class="mbtn mbtng" onclick="goToBilling(\''+id+'\')">&#128180; Go to billing</button></div>';
+    billingBanner='<div class="billing-banner"><div><div style="font-size:12px;font-weight:700;color:var(--g700);">&#10003; Appointment completed</div><div style="font-size:11px;color:var(--g600);margin-top:2px;">Ready to process billing for '+(a.patient_name||'')+'</div></div><button class="mbtn mbtng" onclick="goToBilling(\''+id+'\')">&#128180; Go to billing</button></div>';
   }
   document.getElementById('appt-detail-content').innerHTML=
     '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--s100);">'+
@@ -769,15 +912,12 @@ function openDetail(id){
     (a.procedure_type?'<div class="appt-info-item"><div class="appt-info-lbl">Procedure</div><div class="appt-info-val">'+a.procedure_type+'</div></div>':'')+
     (a.notes?'<div class="appt-info-item" style="grid-column:1/-1"><div class="appt-info-lbl">Notes</div><div class="appt-info-val">'+a.notes+'</div></div>':'')+
     '</div>'+waitHtml;
-
   document.getElementById('status-grid').innerHTML=Object.keys(STATUSES).map(function(k){
     var s=STATUSES[k],active=a.status===k;
     return '<button class="status-btn'+(active?' active-status':'')+'" style="background:'+s.bg+';border-color:'+s.border+';color:'+s.color+';" onclick="updateStatus(\''+id+'\',\''+k+'\')">'+s.emoji+' '+s.label+'</button>';
   }).join('');
-
   document.getElementById('appt-detail-modal').classList.add('open');
 }
-
 async function updateStatus(id,newStatus){
   var updates={status:newStatus};
   if(newStatus==='checkedin')updates.checkin_time=new Date().toISOString();
@@ -789,13 +929,7 @@ async function updateStatus(id,newStatus){
   if(!aRes.error)allAppointments=aRes.data||[];
   buildSchedule();
 }
-
-function goToBilling(apptId){
-  closeDetailModal();
-  showToast('Billing section coming soon — will link automatically!');
-  showSection('billing');
-}
-
+function goToBilling(apptId){closeDetailModal();showToast('Billing section coming soon!');showSection('billing');}
 async function deleteApptFromDetail(){
   if(!detailApptId||!confirm('Cancel this appointment?'))return;
   var res=await db.from('appointments').delete().eq('id',detailApptId);
@@ -805,7 +939,6 @@ async function deleteApptFromDetail(){
   if(!aRes.error)allAppointments=aRes.data||[];
   buildSchedule();
 }
-
 function editApptFromDetail(){
   var a=allAppointments.find(function(x){return x.id===detailApptId;});if(!a)return;
   closeDetailModal();
@@ -820,92 +953,54 @@ function editApptFromDetail(){
   document.getElementById('appt-proc').value=a.procedure_type||'';
   document.getElementById('appt-notes').value=a.notes||'';
   document.getElementById('appt-delete-btn').style.display='inline-flex';
-  document.getElementById('appt-modal').classList.add('open');
-  populateDL();
+  var sv=a.status||'open';
+  document.getElementById('appt-status-val').value=sv;
+  var sg=document.getElementById('appt-status-grid');if(sg)sg.innerHTML=buildStatusSelectGrid(sv);
+  document.getElementById('appt-modal').classList.add('open');populateDL();
 }
-
 function closeDetailModal(){document.getElementById('appt-detail-modal').classList.remove('open');detailApptId=null;}
 document.getElementById('appt-detail-modal').addEventListener('click',function(e){if(e.target===this)closeDetailModal();});
 
-// WORKING HOURS
-function openHoursModal(){
-  document.getElementById('hours-open').value=clinicOpen;
-  document.getElementById('hours-close').value=clinicClose;
-  document.getElementById('hours-modal').classList.add('open');
-}
+// ── WORKING HOURS ─────────────────────────────────────────────────
+function openHoursModal(){document.getElementById('hours-open').value=clinicOpen;document.getElementById('hours-close').value=clinicClose;document.getElementById('hours-modal').classList.add('open');}
 function closeHoursModal(){document.getElementById('hours-modal').classList.remove('open');}
 document.getElementById('hours-modal').addEventListener('click',function(e){if(e.target===this)closeHoursModal();});
 function saveHours(){
-  var o=document.getElementById('hours-open').value;
-  var c=document.getElementById('hours-close').value;
+  var o=document.getElementById('hours-open').value,c=document.getElementById('hours-close').value;
   if(!o||!c){showToast('Please enter both times','error');return;}
   if(t2m(c)<=t2m(o)){showToast('Closing time must be after opening time','error');return;}
-  clinicOpen=o;clinicClose=c;
-  localStorage.setItem('vdc-open',o);localStorage.setItem('vdc-close',c);
-  closeHoursModal();
-  showToast('Working hours saved: '+o+' – '+c);
-  renderAppointments();
+  clinicOpen=o;clinicClose=c;localStorage.setItem('vdc-open',o);localStorage.setItem('vdc-close',c);
+  closeHoursModal();showToast('Working hours saved: '+o+' – '+c);
+  var cur=document.getElementById('page-title').textContent;
+  if(cur==='Settings')renderSettings();else renderAppointments();
 }
 
-// SETTINGS PAGE
+// ── SETTINGS ──────────────────────────────────────────────────────
 function renderSettings(){
   document.getElementById('topbar-actions').innerHTML='';
   document.getElementById('main-content').innerHTML=
     '<div class="settings-section">'+
     '<div class="settings-title">&#128336; Working hours</div>'+
-    '<div class="settings-sub">Set the hours your clinic is open. The appointment schedule grid will only show these hours.</div>'+
-    '<div class="settings-row">'+
-    '<div><div class="settings-lbl">Opening time</div><div class="settings-desc">When the clinic opens each day</div></div>'+
-    '<div style="display:flex;align-items:center;gap:10px;">'+
-    '<span style="font-size:14px;font-weight:700;color:var(--b600);">'+clinicOpen+'</span>'+
-    '<button class="btn btnsm" onclick="openHoursFromSettings()">Change</button>'+
-    '</div></div>'+
-    '<div class="settings-row">'+
-    '<div><div class="settings-lbl">Closing time</div><div class="settings-desc">When the clinic closes each day</div></div>'+
-    '<div style="display:flex;align-items:center;gap:10px;">'+
-    '<span style="font-size:14px;font-weight:700;color:var(--b600);">'+clinicClose+'</span>'+
-    '<button class="btn btnsm" onclick="openHoursFromSettings()">Change</button>'+
-    '</div></div>'+
+    '<div class="settings-sub">Set the hours your clinic is open. The appointment grid only shows these hours.</div>'+
+    '<div class="settings-row"><div><div class="settings-lbl">Opening time</div><div class="settings-desc">When the clinic opens</div></div>'+
+    '<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:14px;font-weight:700;color:var(--b600);">'+clinicOpen+'</span><button class="btn btnsm" onclick="openHoursModal()">Change</button></div></div>'+
+    '<div class="settings-row"><div><div class="settings-lbl">Closing time</div><div class="settings-desc">When the clinic closes</div></div>'+
+    '<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:14px;font-weight:700;color:var(--b600);">'+clinicClose+'</span><button class="btn btnsm" onclick="openHoursModal()">Change</button></div></div>'+
     '</div>'+
     '<div class="settings-section">'+
     '<div class="settings-title">&#127973; Clinic info</div>'+
-    '<div class="settings-sub">Basic information about your clinic.</div>'+
+    '<div class="settings-sub">Basic clinic information.</div>'+
     '<div class="settings-row"><div><div class="settings-lbl">Clinic name</div></div><div style="font-size:13px;font-weight:600;color:var(--s700);">Value Dental Center</div></div>'+
     '<div class="settings-row"><div><div class="settings-lbl">Location</div></div><div style="font-size:13px;color:var(--s500);">Duhok, Iraq</div></div>'+
     '<div class="settings-row"><div><div class="settings-lbl">Treatment rooms</div></div><div style="font-size:13px;color:var(--s500);">5 rooms</div></div>'+
     '</div>'+
     '<div class="settings-section">'+
-    '<div class="settings-title">&#128100; Login credentials</div>'+
+    '<div class="settings-title">&#128100; Login accounts</div>'+
     '<div class="settings-sub">Current login accounts for your team.</div>'+
     '<div class="settings-row"><div><div class="settings-lbl">Admin</div></div><div style="font-size:12px;color:var(--s500);">Username: admin</div></div>'+
     '<div class="settings-row"><div><div class="settings-lbl">Receptionist</div></div><div style="font-size:12px;color:var(--s500);">Username: reception</div></div>'+
     '</div>';
 }
-
-function openHoursFromSettings(){
-  document.getElementById('hours-open').value=clinicOpen;
-  document.getElementById('hours-close').value=clinicClose;
-  document.getElementById('hours-modal').classList.add('open');
-  // After saving, re-render settings page
-  var origSave=window._hoursSaveCb;
-  window._fromSettings=true;
-}
-
-// Override saveHours to also re-render settings if opened from settings
-var _origSaveHours=saveHours;
-saveHours=function(){
-  var o=document.getElementById('hours-open').value;
-  var c=document.getElementById('hours-close').value;
-  if(!o||!c){showToast('Please enter both times','error');return;}
-  if(t2m(c)<=t2m(o)){showToast('Closing time must be after opening time','error');return;}
-  clinicOpen=o;clinicClose=c;
-  localStorage.setItem('vdc-open',o);localStorage.setItem('vdc-close',c);
-  closeHoursModal();
-  showToast('Working hours saved: '+o+' – '+c);
-  var cur=document.getElementById('page-title').textContent;
-  if(cur==='Settings')renderSettings();
-  else renderAppointments();
-};
 </script>
 </body>
 </html>
