@@ -479,7 +479,7 @@ var SECTIONS={
   patients:{title:'Patients',sub:'Manage your clinic patients'},
   appointments:{title:'Appointments',sub:'Daily schedule & room management'},
   dashboard:{title:'Dashboard',sub:'Clinic overview'},
-  treatments:{title:'Treatments',sub:'Procedure records'},
+  treatments:{title:'Treatments',sub:'Dental chart & procedure records'},
   billing:{title:'Billing',sub:'Invoices & payments'},
   finance:{title:'Staff & Finance',sub:'Payroll & partner wallets'},
   files:{title:'X-rays & Files',sub:'Patient file management'},
@@ -495,6 +495,7 @@ function showSection(s){
   if(nowInterval){clearInterval(nowInterval);nowInterval=null;}
   if(s==='patients')renderPatients();
   else if(s==='appointments')renderAppointments();
+  else if(s==='treatments')renderTreatments(null,null);
   else if(s==='settings')renderSettings();
   else{document.getElementById('topbar-actions').innerHTML='';document.getElementById('main-content').innerHTML='<div class="coming-soon"><div class="coming-soon-icon">🚧</div><h2>'+(SECTIONS[s]?SECTIONS[s].title:s)+' — Coming soon</h2><p>This section is being built.</p></div>';}
 }
@@ -541,7 +542,11 @@ function ptCardGrid(p){
   if(p.phone)meta+='<div class="pt-meta-row"><span style="color:var(--s400);">&#128222;</span> '+p.phone+'</div>';
   if(p.primary_dentist)meta+='<div class="pt-meta-row"><span class="dr-dot"></span>'+p.primary_dentist+'</div>';
   if(p.medical_notes)meta+='<div class="pt-meta-row" style="color:var(--s400);font-style:italic;font-size:10px;">"'+p.medical_notes.slice(0,60)+(p.medical_notes.length>60?'...':'')+'"</div>';
-  return '<div class="pt-card" onclick="openEditPtModal(\''+p.id+'\')"><div class="pt-card-header"><div class="pt-av" style="background:'+c.bg+';color:'+c.color+';">'+in2+'</div><div><div class="pt-name">'+p.name+'</div><div class="pt-id">'+(age?age+' yrs':'')+(p.gender?' · '+p.gender:'')+'</div></div><div style="margin-left:auto;">'+statusBadge(p.status)+'</div></div><div class="pt-meta">'+meta+'</div></div>';
+  return '<div class="pt-card" onclick="openEditPtModal(\''+p.id+'\')"><div class="pt-card-header"><div class="pt-av" style="background:'+c.bg+';color:'+c.color+';">'+in2+'</div><div><div class="pt-name">'+p.name+'</div><div class="pt-id">'+(age?age+' yrs':'')+(p.gender?' · '+p.gender:'')+'</div></div><div style="margin-left:auto;">'+statusBadge(p.status)+'</div></div><div class="pt-meta">'+meta+'</div>'+
+    '<div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--s100);">'+
+    '<button class="btn btnsm" style="font-size:10px;flex:1;" onclick="event.stopPropagation();goToTxFromPt(\''+p.id+'\',\''+p.name.replace(/'/g,"\\'")+'\')" >&#10022; Treatments</button>'+
+    '</div>'+
+    '</div>';
 }
 function ptCardList(p){
   var c=ptColor(p.name||''),age=calcAge(p.dob),in2=ini(p.name||'?');
@@ -549,6 +554,7 @@ function ptCardList(p){
 }
 function setView(v){viewMode=v;localStorage.setItem('vdc-view',v);renderPatientList();}
 function onSearch(v){searchQuery=v;renderPatientList();}
+function goToTxFromPt(id,name){showSection('treatments');setTimeout(function(){renderTreatments(id,name);},50);}
 function openAddPtModal(){
   document.getElementById('pt-modal-title').textContent='Add new patient';
   ['pt-id','pt-name','pt-dob','pt-phone','pt-email','pt-notes'].forEach(function(id){document.getElementById(id).value='';});
@@ -1039,3 +1045,421 @@ function renderSettings(){
 </script>
 </body>
 </html>
+<!-- TREATMENTS INJECTION - append before </body> -->
+<script>
+// ── TREATMENTS ────────────────────────────────────────────────────
+// FDI numbering: upper right 18-11, upper left 21-28, lower left 31-38, lower right 41-48
+// Primary: upper right 55-51, upper left 61-65, lower left 71-75, lower right 81-85
+
+var FDI_PERMANENT = {
+  upper: [[18,17,16,15,14,13,12,11],[21,22,23,24,25,26,27,28]],
+  lower: [[48,47,46,45,44,43,42,41],[31,32,33,34,35,36,37,38]]
+};
+var FDI_PRIMARY = {
+  upper: [[55,54,53,52,51],[61,62,63,64,65]],
+  lower: [[85,84,83,82,81],[71,72,73,74,75]]
+};
+
+var txState = {
+  patientId: null,
+  patientName: null,
+  teeth: {}, // toothNum -> 'planned'|'inprogress'|'completed'
+  selectedTeeth: {},
+  isPrimary: false,
+  procedures: [],
+  editingProcId: null
+};
+
+async function renderTreatments(patientId, patientName) {
+  txState.patientId = patientId || null;
+  txState.patientName = patientName || null;
+  txState.selectedTeeth = {};
+  txState.isPrimary = false;
+
+  document.getElementById('topbar-actions').innerHTML =
+    '<button class="btn btnp" onclick="openTxProcModal()" id="add-proc-btn"' +
+    (txState.patientId ? '' : ' disabled style="opacity:0.5;"') +
+    '>+ Record procedure</button>';
+
+  document.getElementById('main-content').innerHTML =
+    '<div class="loader"><div class="spinner"></div>Loading treatments...</div>';
+
+  // load patients for selector
+  var pRes = await db.from('patients').select('id,name').order('name');
+  var patients = pRes.data || [];
+
+  // load teeth states & procedures if patient selected
+  if (txState.patientId) {
+    var tRes = await db.from('procedures').select('*')
+      .eq('patient_id', txState.patientId)
+      .order('created_at', {ascending: false});
+    txState.procedures = tRes.data || [];
+    // rebuild teeth states from procedures
+    txState.teeth = {};
+    txState.procedures.forEach(function(p) {
+      if (p.teeth && Array.isArray(p.teeth)) {
+        p.teeth.forEach(function(t) {
+          if (p.status === 'completed') txState.teeth[t] = 'completed';
+          else if (p.status === 'inprogress' && txState.teeth[t] !== 'completed') txState.teeth[t] = 'inprogress';
+          else if (p.status === 'planned' && !txState.teeth[t]) txState.teeth[t] = 'planned';
+        });
+      }
+    });
+  } else {
+    txState.procedures = [];
+    txState.teeth = {};
+  }
+
+  buildTxUI(patients);
+}
+
+function buildTxUI(patients) {
+  var html =
+    // Patient selector bar
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
+    '<div style="font-size:11px;font-weight:700;color:var(--s500);text-transform:uppercase;letter-spacing:0.4px;white-space:nowrap;">Patient</div>' +
+    '<select id="tx-pt-sel" class="finp" style="max-width:280px;" onchange="onTxPatientChange(this.value)">' +
+    '<option value="">Select patient...</option>' +
+    patients.map(function(p) {
+      return '<option value="' + p.id + '" data-name="' + p.name + '"' +
+        (txState.patientId === p.id ? ' selected' : '') + '>' + p.name + '</option>';
+    }).join('') +
+    '</select>' +
+    (txState.patientId ? '<span style="font-size:12px;font-weight:600;color:var(--b700);">&#128100; ' + txState.patientName + '</span>' : '') +
+    '<div style="margin-left:auto;display:flex;gap:8px;align-items:center;">' +
+    '<span style="font-size:11px;color:var(--s500);">Dentition:</span>' +
+    '<button class="btn btnsm' + (!txState.isPrimary ? ' btnp' : '') + '" onclick="setTxDentition(false)">Permanent</button>' +
+    '<button class="btn btnsm' + (txState.isPrimary ? ' btnp' : '') + '" onclick="setTxDentition(true)">Primary</button>' +
+    '</div>' +
+    '</div>' +
+
+    // Quick select buttons
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:10px 14px;margin-bottom:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+    '<span style="font-size:11px;font-weight:600;color:var(--s500);">Quick select:</span>' +
+    '<button class="btn btnsm" onclick="quickSelect(\'upper\')">Upper arch</button>' +
+    '<button class="btn btnsm" onclick="quickSelect(\'lower\')">Lower arch</button>' +
+    '<button class="btn btnsm" onclick="quickSelect(\'all\')">Full mouth</button>' +
+    '<button class="btn btnsm" onclick="quickSelect(\'clear\')">Clear selection</button>' +
+    '<span style="margin-left:auto;font-size:11px;color:var(--s400);" id="sel-count">' +
+    Object.keys(txState.selectedTeeth).length + ' teeth selected</span>' +
+    '</div>' +
+
+    // Tooth state legend
+    '<div style="display:flex;gap:14px;margin-bottom:10px;flex-wrap:wrap;">' +
+    '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--s500);">' +
+    '<div style="width:14px;height:14px;border-radius:3px;background:white;border:1.5px solid var(--s300);"></div>Healthy</div>' +
+    '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--s500);">' +
+    '<div style="width:14px;height:14px;border-radius:3px;background:#3B82F6;border:1.5px solid #2563EB;"></div>Selected</div>' +
+    '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--s500);">' +
+    '<div style="width:14px;height:14px;border-radius:3px;background:#FCD34D;border:1.5px solid #F59E0B;"></div>Planned</div>' +
+    '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--s500);">' +
+    '<div style="width:14px;height:14px;border-radius:3px;background:#8B5CF6;border:1.5px solid #7C3AED;"></div>In progress</div>' +
+    '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--s500);">' +
+    '<div style="width:14px;height:14px;border-radius:3px;background:#10B981;border:1.5px solid #059669;"></div>Completed</div>' +
+    '</div>' +
+
+    // Dental chart
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:16px 12px;margin-bottom:14px;">' +
+    buildDentalChart() +
+    '</div>' +
+
+    // Procedures list
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:hidden;">' +
+    '<div style="padding:11px 14px;border-bottom:1px solid var(--s200);display:flex;align-items:center;justify-content:space-between;">' +
+    '<div style="font-size:12px;font-weight:700;color:var(--s700);">Procedure history</div>' +
+    '<div style="font-size:11px;color:var(--s400);">' + txState.procedures.length + ' procedures</div>' +
+    '</div>' +
+    (txState.procedures.length ? buildProcTable() : '<div class="empty-state" style="padding:30px 20px;"><div style="font-size:13px;color:var(--s400);">No procedures recorded yet</div></div>') +
+    '</div>';
+
+  document.getElementById('main-content').innerHTML = html;
+}
+
+function buildDentalChart() {
+  var fdi = txState.isPrimary ? FDI_PRIMARY : FDI_PERMANENT;
+  var html = '';
+
+  // UPPER JAW
+  html += '<div style="margin-bottom:6px;">';
+  html += '<div style="font-size:10px;font-weight:600;color:var(--s400);text-align:center;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Upper jaw</div>';
+  html += '<div style="display:flex;justify-content:center;gap:3px;margin-bottom:2px;">';
+  // upper right (patient's right = display left)
+  fdi.upper[0].forEach(function(n) { html += toothBtn(n, 'upper'); });
+  html += '<div style="width:12px;"></div>';
+  fdi.upper[1].forEach(function(n) { html += toothBtn(n, 'upper'); });
+  html += '</div>';
+  // tooth numbers top
+  html += '<div style="display:flex;justify-content:center;gap:3px;">';
+  fdi.upper[0].forEach(function(n) { html += '<div style="width:32px;text-align:center;font-size:8px;color:var(--s400);">' + n + '</div>'; });
+  html += '<div style="width:12px;"></div>';
+  fdi.upper[1].forEach(function(n) { html += '<div style="width:32px;text-align:center;font-size:8px;color:var(--s400);">' + n + '</div>'; });
+  html += '</div>';
+  html += '</div>';
+
+  // midline
+  html += '<div style="border-top:1.5px dashed var(--s200);margin:10px 0;position:relative;">' +
+    '<span style="position:absolute;left:50%;transform:translateX(-50%);top:-8px;background:white;padding:0 8px;font-size:9px;color:var(--s400);">midline</span></div>';
+
+  // LOWER JAW
+  html += '<div>';
+  // tooth numbers bottom
+  html += '<div style="display:flex;justify-content:center;gap:3px;margin-bottom:2px;">';
+  fdi.lower[0].forEach(function(n) { html += '<div style="width:32px;text-align:center;font-size:8px;color:var(--s400);">' + n + '</div>'; });
+  html += '<div style="width:12px;"></div>';
+  fdi.lower[1].forEach(function(n) { html += '<div style="width:32px;text-align:center;font-size:8px;color:var(--s400);">' + n + '</div>'; });
+  html += '</div>';
+  html += '<div style="display:flex;justify-content:center;gap:3px;">';
+  fdi.lower[0].forEach(function(n) { html += toothBtn(n, 'lower'); });
+  html += '<div style="width:12px;"></div>';
+  fdi.lower[1].forEach(function(n) { html += toothBtn(n, 'lower'); });
+  html += '</div>';
+  html += '<div style="font-size:10px;font-weight:600;color:var(--s400);text-align:center;margin-top:6px;text-transform:uppercase;letter-spacing:0.4px;">Lower jaw</div>';
+  html += '</div>';
+
+  // R/L labels
+  html = '<div style="position:relative;">' +
+    '<div style="position:absolute;left:0;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--s400);">R</div>' +
+    '<div style="position:absolute;right:0;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--s400);">L</div>' +
+    html + '</div>';
+
+  return html;
+}
+
+function toothBtn(n, jaw) {
+  var state = txState.teeth[n];
+  var selected = txState.selectedTeeth[n];
+  var bg = 'white', border = 'var(--s300)', color = 'var(--s700)', shadow = '';
+  if (selected) { bg = '#3B82F6'; border = '#2563EB'; color = 'white'; shadow = '0 0 0 2px #BFDBFE'; }
+  else if (state === 'completed') { bg = '#10B981'; border = '#059669'; color = 'white'; }
+  else if (state === 'inprogress') { bg = '#8B5CF6'; border = '#7C3AED'; color = 'white'; }
+  else if (state === 'planned') { bg = '#FCD34D'; border = '#F59E0B'; color = '#78350F'; }
+
+  var isUpper = jaw === 'upper';
+  var borderRadius = isUpper ? '6px 6px 3px 3px' : '3px 3px 6px 6px';
+
+  return '<button onclick="toggleTooth(' + n + ')" style="width:32px;height:36px;border-radius:' + borderRadius + ';' +
+    'border:1.5px solid ' + border + ';background:' + bg + ';color:' + color + ';' +
+    'font-size:9px;font-weight:700;cursor:pointer;' +
+    (shadow ? 'box-shadow:' + shadow + ';' : '') +
+    'transition:all 0.1s;">' + (txState.isPrimary ? '' : '') + '</button>';
+}
+
+function toggleTooth(n) {
+  if (txState.selectedTeeth[n]) delete txState.selectedTeeth[n];
+  else txState.selectedTeeth[n] = true;
+  refreshChart();
+}
+
+function refreshChart() {
+  var chartDiv = document.querySelector('#main-content > div:nth-child(4)');
+  if (!chartDiv) { renderTreatments(txState.patientId, txState.patientName); return; }
+  // rebuild just the chart and quick-select count
+  var inner = buildDentalChart();
+  chartDiv.innerHTML = inner;
+  var cnt = document.getElementById('sel-count');
+  if (cnt) cnt.textContent = Object.keys(txState.selectedTeeth).length + ' teeth selected';
+}
+
+function quickSelect(type) {
+  var fdi = txState.isPrimary ? FDI_PRIMARY : FDI_PERMANENT;
+  var all = [];
+  fdi.upper[0].concat(fdi.upper[1]).concat(fdi.lower[0]).concat(fdi.lower[1]).forEach(function(n){ all.push(n); });
+  var upper = fdi.upper[0].concat(fdi.upper[1]);
+  var lower = fdi.lower[0].concat(fdi.lower[1]);
+  if (type === 'clear') { txState.selectedTeeth = {}; }
+  else if (type === 'upper') { txState.selectedTeeth = {}; upper.forEach(function(n){ txState.selectedTeeth[n]=true; }); }
+  else if (type === 'lower') { txState.selectedTeeth = {}; lower.forEach(function(n){ txState.selectedTeeth[n]=true; }); }
+  else if (type === 'all') { txState.selectedTeeth = {}; all.forEach(function(n){ txState.selectedTeeth[n]=true; }); }
+  renderTreatments(txState.patientId, txState.patientName);
+}
+
+function setTxDentition(isPrimary) {
+  txState.isPrimary = isPrimary;
+  txState.selectedTeeth = {};
+  renderTreatments(txState.patientId, txState.patientName);
+}
+
+function onTxPatientChange(id) {
+  var sel = document.getElementById('tx-pt-sel');
+  var opt = sel ? sel.options[sel.selectedIndex] : null;
+  var name = opt ? opt.dataset.name : '';
+  txState.selectedTeeth = {};
+  renderTreatments(id, name);
+  var btn = document.getElementById('add-proc-btn');
+  if (btn) { btn.disabled = !id; btn.style.opacity = id ? '1' : '0.5'; }
+}
+
+function buildProcTable() {
+  var statusColors = { planned: '#F59E0B', inprogress: '#7C3AED', completed: '#059669' };
+  var statusBg = { planned: '#FFFBEB', inprogress: '#F5F3FF', completed: '#F0FDF4' };
+  return '<table class="tbl" style="font-size:11px;">' +
+    '<thead><tr>' +
+    '<th>Date</th><th>Procedure</th><th>Teeth</th><th>Dentist</th><th>Fee (USD)</th><th>Status</th><th>Notes</th><th></th>' +
+    '</tr></thead><tbody>' +
+    txState.procedures.map(function(p) {
+      var sc = statusColors[p.status] || '#64748B';
+      var sb = statusBg[p.status] || '#F8FAFC';
+      var teeth = (p.teeth || []).join(', ') || '—';
+      return '<tr>' +
+        '<td style="color:var(--s400);">' + (p.date || '—') + '</td>' +
+        '<td style="font-weight:600;">' + (p.procedure_name || '—') + '</td>' +
+        '<td style="font-size:10px;color:var(--s500);">' + teeth + '</td>' +
+        '<td>' + (p.treating_dentist || '—') + '</td>' +
+        '<td style="font-weight:600;color:var(--b700);">$' + (p.fee ? Number(p.fee).toLocaleString() : '0') + '</td>' +
+        '<td><span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:' + sb + ';color:' + sc + ';border:1px solid ' + sc + '20;">' + (p.status || '—') + '</span></td>' +
+        '<td style="color:var(--s400);font-size:10px;font-style:italic;">' + (p.notes ? '"' + p.notes.slice(0,40) + (p.notes.length>40?'...':'') + '"' : '—') + '</td>' +
+        '<td><button class="btn btnsm" onclick="editProcedure(\'' + p.id + '\')" style="font-size:10px;">Edit</button></td>' +
+        '</tr>';
+    }).join('') +
+    '</tbody></table>';
+}
+
+// ── PROCEDURE MODAL ───────────────────────────────────────────────
+function openTxProcModal() {
+  if (!txState.patientId) { showToast('Please select a patient first', 'error'); return; }
+  txState.editingProcId = null;
+  document.getElementById('tx-modal-title').textContent = 'Record procedure';
+  document.getElementById('tx-proc-name').value = '';
+  document.getElementById('tx-proc-dentist').value = '';
+  document.getElementById('tx-proc-referrer').value = '';
+  document.getElementById('tx-proc-fee').value = '';
+  document.getElementById('tx-proc-status').value = 'planned';
+  document.getElementById('tx-proc-notes').value = '';
+  document.getElementById('tx-proc-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tx-selected-teeth').textContent =
+    Object.keys(txState.selectedTeeth).length > 0
+      ? Object.keys(txState.selectedTeeth).sort(function(a,b){return a-b;}).join(', ')
+      : 'None selected — you can still save without selecting teeth';
+  document.getElementById('tx-modal').classList.add('open');
+}
+
+function editProcedure(id) {
+  var p = txState.procedures.find(function(x){ return x.id === id; });
+  if (!p) return;
+  txState.editingProcId = id;
+  // restore selected teeth from this procedure
+  txState.selectedTeeth = {};
+  (p.teeth || []).forEach(function(t){ txState.selectedTeeth[t] = true; });
+  document.getElementById('tx-modal-title').textContent = 'Edit procedure';
+  document.getElementById('tx-proc-name').value = p.procedure_name || '';
+  document.getElementById('tx-proc-dentist').value = p.treating_dentist || '';
+  document.getElementById('tx-proc-referrer').value = p.referrer || '';
+  document.getElementById('tx-proc-fee').value = p.fee || '';
+  document.getElementById('tx-proc-status').value = p.status || 'planned';
+  document.getElementById('tx-proc-notes').value = p.notes || '';
+  document.getElementById('tx-proc-date').value = p.date || '';
+  document.getElementById('tx-selected-teeth').textContent =
+    (p.teeth || []).length > 0 ? (p.teeth || []).join(', ') : 'No teeth selected';
+  document.getElementById('tx-modal').classList.add('open');
+}
+
+function closeTxModal() { document.getElementById('tx-modal').classList.remove('open'); }
+window.addEventListener('load', function(){
+  var txm = document.getElementById('tx-modal');
+  if(txm) txm.addEventListener('click', function(e){ if(e.target===this)closeTxModal(); });
+});
+
+async function saveProcedure() {
+  var procName = document.getElementById('tx-proc-name').value.trim();
+  if (!procName) { showToast('Please enter procedure name', 'error'); return; }
+  var teethArr = Object.keys(txState.selectedTeeth).map(function(n){ return parseInt(n); }).sort(function(a,b){return a-b;});
+  var payload = {
+    patient_id: txState.patientId,
+    patient_name: txState.patientName,
+    procedure_name: procName,
+    date: document.getElementById('tx-proc-date').value || null,
+    treating_dentist: document.getElementById('tx-proc-dentist').value || null,
+    referrer: document.getElementById('tx-proc-referrer').value || null,
+    fee: parseFloat(document.getElementById('tx-proc-fee').value) || 0,
+    status: document.getElementById('tx-proc-status').value || 'planned',
+    notes: document.getElementById('tx-proc-notes').value.trim() || null,
+    teeth: teethArr.length > 0 ? teethArr : null,
+    category: 'general'
+  };
+  var res = txState.editingProcId
+    ? await db.from('procedures').update(payload).eq('id', txState.editingProcId)
+    : await db.from('procedures').insert([payload]);
+  if (res.error) { showToast('Failed to save procedure', 'error'); console.error(res.error); return; }
+  showToast(txState.editingProcId ? 'Procedure updated' : 'Procedure recorded');
+  closeTxModal();
+  renderTreatments(txState.patientId, txState.patientName);
+}
+
+async function deleteProcedure() {
+  if (!txState.editingProcId || !confirm('Delete this procedure?')) return;
+  var res = await db.from('procedures').delete().eq('id', txState.editingProcId);
+  if (res.error) { showToast('Failed to delete', 'error'); return; }
+  showToast('Procedure deleted');
+  closeTxModal();
+  renderTreatments(txState.patientId, txState.patientName);
+}
+</script>
+
+<!-- PROCEDURE MODAL -->
+<div class="mbg" id="tx-modal">
+  <div class="modal modal-wide">
+    <div class="mtit" id="tx-modal-title">Record procedure</div>
+    <div class="msub">Record a dental procedure for this patient</div>
+    <div style="background:var(--b50);border:1px solid var(--b100);border-radius:var(--radsm);padding:9px 12px;margin-bottom:14px;font-size:11px;color:var(--b700);">
+      <strong>Selected teeth:</strong> <span id="tx-selected-teeth">None</span>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Procedure name <span class="req">*</span></label>
+        <select class="finp" id="tx-proc-name">
+          <option value="">Select procedure...</option>
+          <option>Consultation</option><option>Scaling &amp; polishing</option>
+          <option>Composite filling</option><option>Amalgam filling</option>
+          <option>Root canal treatment</option><option>Crown (PFM)</option>
+          <option>Crown (zirconia)</option><option>Crown (metal)</option>
+          <option>Extraction (simple)</option><option>Extraction (surgical)</option>
+          <option>Implant placement</option><option>Implant crown</option>
+          <option>Bridge (PFM)</option><option>Bridge (zirconia)</option>
+          <option>Denture (full)</option><option>Denture (partial)</option>
+          <option>Orthodontic consultation</option><option>Braces placement</option>
+          <option>Bleaching</option><option>Veneer</option>
+          <option>Gingivectomy</option><option>Bone graft</option>
+          <option>Sinus lift</option><option>Other</option>
+        </select>
+      </div>
+      <div class="fgrp"><label class="flbl">Date</label>
+        <input class="finp" type="date" id="tx-proc-date">
+      </div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Treating dentist</label>
+        <select class="finp" id="tx-proc-dentist">
+          <option value="">Select dentist...</option>
+          <option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option>
+          <option>Dr. Mateen</option><option>Dr. Ibrahim</option><option>Dr. Mahmoud</option>
+          <option>Dr. Niwar</option><option>Dr. Dilveen</option>
+        </select>
+      </div>
+      <div class="fgrp"><label class="flbl">Referred by</label>
+        <select class="finp" id="tx-proc-referrer">
+          <option value="">No referral</option>
+          <option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Fee (USD)</label>
+        <input class="finp" type="number" id="tx-proc-fee" placeholder="0" min="0" step="0.01">
+      </div>
+      <div class="fgrp"><label class="flbl">Status</label>
+        <select class="finp" id="tx-proc-status">
+          <option value="planned">Planned</option>
+          <option value="inprogress">In progress</option>
+          <option value="completed">Completed</option>
+        </select>
+      </div>
+    </div>
+    <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Notes</label>
+      <textarea class="finp" id="tx-proc-notes" rows="2" placeholder="Clinical notes, observations..."></textarea>
+    </div>
+    <div class="mac">
+      <button class="mbtn mbtnd" id="tx-delete-btn" style="margin-right:auto;" onclick="deleteProcedure()">Delete</button>
+      <button class="mbtn" onclick="closeTxModal()">Cancel</button>
+      <button class="mbtn mbtnp" onclick="saveProcedure()">Save procedure</button>
+    </div>
+  </div>
+</div>
