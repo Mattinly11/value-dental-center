@@ -978,7 +978,19 @@ async function updateStatus(id,ns){
   var aRes=await db.from('appointments').select('*').eq('date',fmtDate(currentDate));
   if(!aRes.error)allAppointments=aRes.data||[];buildSchedule();
 }
-function goToBilling(apptId){closeDetailModal();showSection('billing');setTimeout(function(){openVisitSummary(apptId);},80);}
+function goToBilling(apptId){
+  closeDetailModal();
+  var pendingApptId=apptId;
+  document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('act');});
+  var nav=document.getElementById('nav-billing');if(nav)nav.classList.add('act');
+  document.getElementById('page-title').textContent='Billing';
+  document.getElementById('page-sub').textContent='Invoices, payments & visit summaries';
+  if(waitInterval){clearInterval(waitInterval);waitInterval=null;}
+  if(nowInterval){clearInterval(nowInterval);nowInterval=null;}
+  document.getElementById('topbar-actions').innerHTML='<button class="btn" onclick="renderBilling(null)">&#8592; Back to invoices</button>';
+  document.getElementById('main-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading visit...</div>';
+  openVisitSummary(pendingApptId);
+}
 async function deleteApptFromDetail(){
   if(!detailApptId||!confirm('Cancel this appointment?'))return;
   var res=await db.from('appointments').delete().eq('id',detailApptId);
@@ -1600,20 +1612,17 @@ function invCard(inv, payments) {
 
 // ── VISIT SUMMARY (from appointment) ─────────────────────────────
 async function openVisitSummary(apptId) {
+  if(!apptId){renderVisitSummary(null);return;}
   var a = allAppointments.find(function(x){return x.id===apptId;});
   if(!a) {
-    // try loading from db
-    var res = await db.from('appointments').select('*').eq('id',apptId).single();
-    if(res.data) a = res.data; else { showToast('Appointment not found','error'); return; }
+    var res = await db.from('appointments').select('*').eq('id',apptId);
+    if(res.data&&res.data.length>0){a=res.data[0];}
+    else{openNewVisitFromAppt(apptId);return;}
   }
   billingState.visitApptId = apptId;
   billingState.visitProcs = [];
-  // pre-fill one procedure from appointment
-  if(a.procedure_type) {
-    billingState.visitProcs.push({
-      name: a.procedure_type, teeth: '', fee: 0, status: 'completed',
-      notes: '', dentist: a.dentist || '', referrer: ''
-    });
+  if(a.procedure_type){
+    billingState.visitProcs.push({name:a.procedure_type,teeth:'',fee:0,status:'completed',notes:'',dentist:a.dentist||'',referrer:''});
   } else {
     billingState.visitProcs.push({name:'',teeth:'',fee:0,status:'completed',notes:'',dentist:a.dentist||'',referrer:''});
   }
