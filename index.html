@@ -746,6 +746,8 @@ function setupMouseDrag(){
       el.classList.add('dragging');
       document.addEventListener('mousemove',onDragMove);
       document.addEventListener('mouseup',onDragUp);
+      // block the click that fires after mouseup if we dragged
+      el.addEventListener('click',function blockClick(ev){ev.stopPropagation();el.removeEventListener('click',blockClick);},{capture:true,once:true});
     });
   });
 }
@@ -778,7 +780,7 @@ async function onDragUp(e){
   var d=dragging;dragging=null;
   var el=document.getElementById('ab-'+d.id);
   if(el)el.classList.remove('dragging');
-  if(!d.moved){return;}// was a click, not drag
+  if(!d.moved){openDetail(d.id);return;}// was a click, not drag — open detail
   var dy=e.clientY-d.startY;
   var deltaMins=Math.round(dy/SLOT_H)*SLOT_MIN;
   var newStartM=Math.max(t2m(clinicOpen),Math.min(t2m(clinicClose)-d.dur,d.origStartM+deltaMins));
@@ -799,6 +801,9 @@ function startResize(e,id){
   e.stopPropagation();e.preventDefault();
   var a=allAppointments.find(function(x){return x.id===id;});if(!a)return;
   resizing={id:id,startY:e.clientY,origEndM:t2m(a.end_time),origStartM:t2m(a.start_time)};
+  // block click on parent after resize
+  var el=document.getElementById('ab-'+id);
+  if(el)el.addEventListener('click',function blockC(ev){ev.stopPropagation();el.removeEventListener('click',blockC);},{capture:true,once:true});
   document.addEventListener('mousemove',onResizeMove);
   document.addEventListener('mouseup',onResizeUp);
 }
@@ -905,6 +910,7 @@ async function saveAppt(){
   var status=document.getElementById('appt-status-val').value||'open';
   var payload={patient_name:patient,dentist:dentist,room:room,date:date,start_time:start,end_time:end,procedure_type:document.getElementById('appt-proc').value||null,notes:document.getElementById('appt-notes').value.trim()||null,status:status};
   if(status==='checkedin')payload.checkin_time=new Date().toISOString();
+  else payload.checkin_time=null;
   var res=id?await db.from('appointments').update(payload).eq('id',id):await db.from('appointments').insert([payload]);
   if(res.error){showToast('Failed to save appointment','error');console.error(res.error);return;}
   showToast(id?'Appointment updated':'Appointment booked');closeApptModal();
@@ -957,6 +963,7 @@ function openDetail(id){
 async function updateStatus(id,ns){
   var updates={status:ns};
   if(ns==='checkedin')updates.checkin_time=new Date().toISOString();
+  else updates.checkin_time=null;
   var res=await db.from('appointments').update(updates).eq('id',id);
   if(res.error){showToast('Failed to update status','error');return;}
   showToast('Status: '+STATUSES[ns].emoji+' '+STATUSES[ns].label);
