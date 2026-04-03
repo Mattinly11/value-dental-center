@@ -480,7 +480,7 @@ var SECTIONS={
   appointments:{title:'Appointments',sub:'Daily schedule & room management'},
   dashboard:{title:'Dashboard',sub:'Clinic overview'},
   treatments:{title:'Treatments',sub:'Dental chart & procedure records'},
-  billing:{title:'Billing',sub:'Invoices & payments'},
+  billing:{title:'Billing',sub:'Invoices, payments & visit summaries'},
   finance:{title:'Staff & Finance',sub:'Payroll & partner wallets'},
   files:{title:'X-rays & Files',sub:'Patient file management'},
   settings:{title:'Settings',sub:'Clinic preferences & working hours'}
@@ -496,6 +496,7 @@ function showSection(s){
   if(s==='patients')renderPatients();
   else if(s==='appointments')renderAppointments();
   else if(s==='treatments')renderTreatments(null,null);
+  else if(s==='billing')renderBilling(null);
   else if(s==='settings')renderSettings();
   else{document.getElementById('topbar-actions').innerHTML='';document.getElementById('main-content').innerHTML='<div class="coming-soon"><div class="coming-soon-icon">🚧</div><h2>'+(SECTIONS[s]?SECTIONS[s].title:s)+' — Coming soon</h2><p>This section is being built.</p></div>';}
 }
@@ -977,7 +978,7 @@ async function updateStatus(id,ns){
   var aRes=await db.from('appointments').select('*').eq('date',fmtDate(currentDate));
   if(!aRes.error)allAppointments=aRes.data||[];buildSchedule();
 }
-function goToBilling(apptId){closeDetailModal();showToast('Billing section coming soon!');showSection('billing');}
+function goToBilling(apptId){closeDetailModal();showSection('billing');setTimeout(function(){openVisitSummary(apptId);},80);}
 async function deleteApptFromDetail(){
   if(!detailApptId||!confirm('Cancel this appointment?'))return;
   var res=await db.from('appointments').delete().eq('id',detailApptId);
@@ -1460,6 +1461,445 @@ async function deleteProcedure() {
       <button class="mbtn mbtnd" id="tx-delete-btn" style="margin-right:auto;" onclick="deleteProcedure()">Delete</button>
       <button class="mbtn" onclick="closeTxModal()">Cancel</button>
       <button class="mbtn mbtnp" onclick="saveProcedure()">Save procedure</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── BILLING SECTION ─────────────────────────────────────────── -->
+<style>
+.inv-card{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:14px 16px;cursor:pointer;transition:all 0.12s;margin-bottom:10px;}
+.inv-card:hover{border-color:var(--b300);box-shadow:0 2px 10px rgba(37,99,235,0.07);}
+.inv-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.inv-pt{font-size:13px;font-weight:700;color:var(--s800);}
+.inv-meta{font-size:11px;color:var(--s400);margin-top:2px;}
+.inv-amount{text-align:right;}
+.inv-total{font-size:16px;font-weight:700;color:var(--s800);}
+.inv-bal{font-size:11px;margin-top:2px;}
+.inv-procs{display:flex;gap:6px;flex-wrap:wrap;}
+.inv-proc-tag{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:var(--b50);color:var(--b700);border:1px solid var(--b100);}
+.pay-status-paid{background:var(--g50);color:var(--g700);border:1px solid var(--g100);}
+.pay-status-partial{background:var(--a50);color:var(--a700);border:1px solid var(--a100);}
+.pay-status-unpaid{background:var(--r50);color:var(--r600);border:1px solid var(--r100);}
+/* VISIT SUMMARY */
+.vs-section{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:18px;margin-bottom:14px;}
+.vs-section-title{font-size:12px;font-weight:700;color:var(--s700);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--s100);display:flex;align-items:center;justify-content:space-between;}
+.vs-proc-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s50);border-radius:var(--radsm);margin-bottom:8px;border:1px solid var(--s200);}
+.vs-proc-row:last-child{margin-bottom:0;}
+.pay-method-btn{padding:7px 14px;border-radius:var(--radsm);border:1.5px solid var(--s200);background:white;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;transition:all 0.1s;}
+.pay-method-btn.sel{background:var(--b600);color:white;border-color:var(--b600);}
+</style>
+
+<script>
+var IQD_RATE = 1310;
+var billingState = {
+  visitApptId: null,
+  visitProcs: [], // [{name,teeth,fee,status,notes,dentist,referrer}]
+  invoices: []
+};
+
+// ── BILLING MAIN ──────────────────────────────────────────────────
+async function renderBilling(apptId) {
+  document.getElementById('topbar-actions').innerHTML =
+    '<button class="btn btnp" onclick="openNewVisit()">+ New visit / invoice</button>';
+  document.getElementById('main-content').innerHTML =
+    '<div class="loader"><div class="spinner"></div>Loading billing...</div>';
+
+  // Load invoices with their payments
+  var invRes = await db.from('invoices').select('*').order('created_at',{ascending:false});
+  billingState.invoices = invRes.data || [];
+
+  // Load payments for each invoice
+  var payRes = await db.from('payments').select('*');
+  var payments = payRes.data || [];
+
+  buildBillingUI(payments);
+}
+
+function buildBillingUI(payments) {
+  var invs = billingState.invoices;
+
+  // compute totals
+  var totalRevenue = 0, totalPending = 0;
+  invs.forEach(function(inv) {
+    var paid = payments.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(s,p){return s+Number(p.amount);},0);
+    var bal = Number(inv.fee) - paid;
+    totalRevenue += paid;
+    if(bal > 0) totalPending += bal;
+  });
+
+  var html =
+    '<div class="stats-row">' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">&#128176;</div><div class="stat-lbl">Total collected</div><div class="stat-val" style="color:var(--g700);">$' + totalRevenue.toLocaleString() + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--r50);">&#9888;</div><div class="stat-lbl">Outstanding balance</div><div class="stat-val" style="color:var(--r600);">$' + totalPending.toLocaleString() + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">&#128203;</div><div class="stat-lbl">Total invoices</div><div class="stat-val">' + invs.length + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--a50);">&#8987;</div><div class="stat-lbl">Unpaid / partial</div><div class="stat-val">' + invs.filter(function(i){return i.status!=='paid';}).length + '</div></div>' +
+    '</div>' +
+
+    // Filter tabs
+    '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">' +
+    ['all','unpaid','partial','paid'].map(function(f){
+      return '<button class="btn btnsm" id="bf-'+f+'" onclick="filterInvoices(\''+f+'\')">'+
+        (f==='all'?'All invoices':f.charAt(0).toUpperCase()+f.slice(1))+'</button>';
+    }).join('') +
+    '<div style="flex:1;"></div>' +
+    '<input class="finp" id="bill-search" placeholder="Search patient..." style="max-width:220px;padding:6px 10px;font-size:12px;" oninput="filterInvoices(currentBillFilter)">' +
+    '</div>' +
+
+    '<div id="inv-list">' +
+    (invs.length ? invs.map(function(inv){return invCard(inv,payments);}).join('') :
+      '<div class="empty-state"><div style="font-size:36px;margin-bottom:12px;">&#128203;</div><div style="font-size:14px;font-weight:600;color:var(--s600);margin-bottom:6px;">No invoices yet</div><div style="font-size:12px;">Click "+ New visit / invoice" to create the first one</div></div>') +
+    '</div>';
+
+  document.getElementById('main-content').innerHTML = html;
+  document.getElementById('bf-all').style.background = 'var(--b600)';
+  document.getElementById('bf-all').style.color = 'white';
+  document.getElementById('bf-all').style.borderColor = 'var(--b600)';
+}
+
+var currentBillFilter = 'all';
+function filterInvoices(f) {
+  currentBillFilter = f;
+  ['all','unpaid','partial','paid'].forEach(function(x){
+    var btn = document.getElementById('bf-'+x);
+    if(!btn) return;
+    if(x===f){btn.style.background='var(--b600)';btn.style.color='white';btn.style.borderColor='var(--b600)';}
+    else{btn.style.background='white';btn.style.color='var(--s700)';btn.style.borderColor='var(--s200)';}
+  });
+  var q = (document.getElementById('bill-search')||{}).value || '';
+  var list = billingState.invoices.filter(function(inv){
+    var matchF = f==='all' || inv.status===f;
+    var matchQ = !q || (inv.patient_name||'').toLowerCase().includes(q.toLowerCase());
+    return matchF && matchQ;
+  });
+  var il = document.getElementById('inv-list');
+  if(!il) return;
+  il.innerHTML = list.length ? list.map(function(inv){return invCard(inv,[]);}).join('') :
+    '<div class="empty-state" style="padding:30px 20px;"><div style="font-size:13px;color:var(--s400);">No invoices match this filter</div></div>';
+}
+
+function invCard(inv, payments) {
+  var paid = payments.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(s,p){return s+Number(p.amount);},0);
+  var bal = Number(inv.fee) - paid;
+  var statusClass = bal<=0 ? 'pay-status-paid' : paid>0 ? 'pay-status-partial' : 'pay-status-unpaid';
+  var statusLabel = bal<=0 ? '✓ Paid' : paid>0 ? 'Partial' : 'Unpaid';
+  var procs = [];
+  try { procs = JSON.parse(inv.procedure_name || '[]'); } catch(e) { procs = inv.procedure_name ? [inv.procedure_name] : []; }
+  if(!Array.isArray(procs)) procs = [procs];
+  return '<div class="inv-card" onclick="openInvoiceDetail(\'' + inv.id + '\')">' +
+    '<div class="inv-header">' +
+    '<div><div class="inv-pt">' + (inv.patient_name||'Unknown') + '</div>' +
+    '<div class="inv-meta">' + (inv.date||'—') + ' · ' + (inv.dentist||'—') + '</div></div>' +
+    '<div class="inv-amount">' +
+    '<div class="inv-total">$' + Number(inv.fee).toLocaleString() + '</div>' +
+    '<div class="inv-bal"><span class="badge ' + statusClass + '">' + statusLabel + '</span>' +
+    (bal>0 ? ' <span style="font-size:10px;color:var(--r600);">$'+bal.toLocaleString()+' due</span>' : '') +
+    '</div></div></div>' +
+    '<div class="inv-procs">' + procs.map(function(p){return '<span class="inv-proc-tag">'+p+'</span>';}).join('') + '</div>' +
+    '</div>';
+}
+
+// ── VISIT SUMMARY (from appointment) ─────────────────────────────
+async function openVisitSummary(apptId) {
+  var a = allAppointments.find(function(x){return x.id===apptId;});
+  if(!a) {
+    // try loading from db
+    var res = await db.from('appointments').select('*').eq('id',apptId).single();
+    if(res.data) a = res.data; else { showToast('Appointment not found','error'); return; }
+  }
+  billingState.visitApptId = apptId;
+  billingState.visitProcs = [];
+  // pre-fill one procedure from appointment
+  if(a.procedure_type) {
+    billingState.visitProcs.push({
+      name: a.procedure_type, teeth: '', fee: 0, status: 'completed',
+      notes: '', dentist: a.dentist || '', referrer: ''
+    });
+  } else {
+    billingState.visitProcs.push({name:'',teeth:'',fee:0,status:'completed',notes:'',dentist:a.dentist||'',referrer:''});
+  }
+  renderVisitSummary(a);
+}
+
+function openNewVisit() {
+  billingState.visitApptId = null;
+  billingState.visitProcs = [{name:'',teeth:'',fee:0,status:'completed',notes:'',dentist:'',referrer:''}];
+  renderVisitSummary(null);
+}
+
+function renderVisitSummary(appt) {
+  document.getElementById('topbar-actions').innerHTML =
+    '<button class="btn" onclick="renderBilling(null)">&#8592; Back to invoices</button>';
+
+  var totalFee = billingState.visitProcs.reduce(function(s,p){return s+Number(p.fee||0);},0);
+
+  var html =
+    // Header
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:16px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px;">' +
+    '<div style="width:44px;height:44px;border-radius:50%;background:var(--b50);color:var(--b700);display:flex;align-items:center;justify-content:center;font-size:18px;">&#128100;</div>' +
+    '<div><div style="font-size:15px;font-weight:700;color:var(--s800);">' + (appt ? appt.patient_name : 'New visit') + '</div>' +
+    '<div style="font-size:11px;color:var(--s400);margin-top:2px;">' +
+    (appt ? (appt.date||'') + ' · ' + (appt.dentist||'') + ' · ' + (appt.room||'') : 'Manual invoice entry') +
+    '</div></div>' +
+    (appt ? '<span class="badge bg" style="margin-left:auto;">&#10003; Appointment completed</span>' : '') +
+    '</div>' +
+
+    // Procedures
+    '<div class="vs-section">' +
+    '<div class="vs-section-title">Procedures performed' +
+    '<button class="btn btnsm btnp" onclick="addVisitProc()">+ Add procedure</button></div>' +
+    billingState.visitProcs.map(function(p,i){ return visitProcRow(p,i); }).join('') +
+    '</div>' +
+
+    // Billing
+    '<div class="vs-section">' +
+    '<div class="vs-section-title">Billing</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">' +
+    '<div><div class="flbl">Total fee (USD)</div>' +
+    '<div style="font-size:22px;font-weight:700;color:var(--s800);" id="vs-total">$' + totalFee.toLocaleString() + '</div>' +
+    '<div style="font-size:11px;color:var(--s400);margin-top:2px;">= ' + (totalFee*IQD_RATE).toLocaleString() + ' IQD</div></div>' +
+    '<div><div class="flbl">Amount paid today (USD)</div>' +
+    '<input class="finp" type="number" id="vs-paid" placeholder="0" min="0" step="0.01" value="' + totalFee + '" oninput="updateBalance()">' +
+    '</div></div>' +
+    '<div style="background:var(--s50);border-radius:var(--radsm);padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">' +
+    '<div style="font-size:12px;font-weight:600;color:var(--s700);">Remaining balance</div>' +
+    '<div style="font-size:18px;font-weight:700;" id="vs-balance" style="color:var(--g700);">$0</div>' +
+    '</div>' +
+    '<div class="fgrp"><div class="flbl">Payment method</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;" id="pay-method-btns">' +
+    ['Cash','Card','Bank transfer','Insurance'].map(function(m,i){
+      return '<button class="pay-method-btn' + (i===0?' sel':'') + '" onclick="selPayMethod(this,\''+m+'\')">' + m + '</button>';
+    }).join('') +
+    '</div>' +
+    '<input type="hidden" id="vs-method" value="Cash">' +
+    '</div>' +
+    '<div class="fgrp"><div class="flbl">Invoice notes (optional)</div>' +
+    '<textarea class="finp" id="vs-inv-notes" rows="2" placeholder="Any notes for this invoice..."></textarea>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">' +
+    '<button class="btn" onclick="renderBilling(null)">Cancel</button>' +
+    '<button class="btn mbtnp btnp" onclick="saveVisit(' + (appt?'\''+appt.id+'\'':'null') + ',\'' + (appt?appt.patient_name:'') + '\',\'' + (appt?appt.dentist:'') + '\')">&#128180; Save &amp; create invoice</button>' +
+    '</div></div>';
+
+  document.getElementById('main-content').innerHTML = html;
+  updateBalance();
+}
+
+function visitProcRow(p, i) {
+  return '<div class="vs-proc-row" id="vpr-'+i+'">' +
+    '<div style="flex:1;min-width:0;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;align-items:end;">' +
+    '<div><div class="flbl" style="margin-bottom:3px;">Procedure</div>' +
+    '<select class="finp" style="font-size:12px;padding:6px 8px;" onchange="updateVisitProc('+i+',\'name\',this.value)">' +
+    '<option value="">Select...</option>' +
+    ['Consultation','Scaling & polishing','Composite filling','Amalgam filling','Root canal treatment',
+     'Crown (PFM)','Crown (zirconia)','Crown (metal)','Extraction (simple)','Extraction (surgical)',
+     'Implant placement','Implant crown','Bridge (PFM)','Bridge (zirconia)','Bleaching','Veneer','Other'].map(function(n){
+      return '<option value="'+n+'"'+(p.name===n?' selected':'')+'>'+n+'</option>';
+    }).join('') +
+    '</select></div>' +
+    '<div><div class="flbl" style="margin-bottom:3px;">Teeth (FDI)</div>' +
+    '<input class="finp" style="font-size:12px;padding:6px 8px;" placeholder="e.g. 14,15" value="'+(p.teeth||'')+'" onchange="updateVisitProc('+i+',\'teeth\',this.value)"></div>' +
+    '<div><div class="flbl" style="margin-bottom:3px;">Fee (USD)</div>' +
+    '<input class="finp" type="number" style="font-size:12px;padding:6px 8px;" placeholder="0" value="'+(p.fee||'')+'" oninput="updateVisitProc('+i+',\'fee\',this.value);updateTotal()"></div>' +
+    '<div><div class="flbl" style="margin-bottom:3px;">Status</div>' +
+    '<select class="finp" style="font-size:12px;padding:6px 8px;" onchange="updateVisitProc('+i+',\'status\',this.value)">' +
+    ['planned','inprogress','completed'].map(function(s){return '<option value="'+s+'"'+(p.status===s?' selected':'')+'>'+s.charAt(0).toUpperCase()+s.slice(1)+'</option>';}).join('') +
+    '</select></div>' +
+    '</div>' +
+    '<button onclick="removeVisitProc('+i+')" style="background:none;border:none;cursor:pointer;color:var(--r500);font-size:18px;padding:0 4px;flex-shrink:0;margin-top:16px;">&#215;</button>' +
+    '</div>';
+}
+
+function addVisitProc() {
+  billingState.visitProcs.push({name:'',teeth:'',fee:0,status:'completed',notes:'',dentist:'',referrer:''});
+  // re-render just the procedures section
+  var a = allAppointments.find(function(x){return x.id===billingState.visitApptId;});
+  renderVisitSummary(a||null);
+}
+function removeVisitProc(i) {
+  if(billingState.visitProcs.length <= 1){showToast('At least one procedure required','error');return;}
+  billingState.visitProcs.splice(i,1);
+  var a = allAppointments.find(function(x){return x.id===billingState.visitApptId;});
+  renderVisitSummary(a||null);
+}
+function updateVisitProc(i,field,val) {
+  if(billingState.visitProcs[i]) billingState.visitProcs[i][field] = field==='fee'?parseFloat(val)||0:val;
+}
+function updateTotal() {
+  var total = billingState.visitProcs.reduce(function(s,p){return s+Number(p.fee||0);},0);
+  var tv = document.getElementById('vs-total');
+  if(tv) tv.textContent = '$' + total.toLocaleString();
+  var pv = document.getElementById('vs-paid');
+  if(pv && !pv.dataset.touched) pv.value = total;
+  updateBalance();
+}
+function updateBalance() {
+  var total = billingState.visitProcs.reduce(function(s,p){return s+Number(p.fee||0);},0);
+  var paid = parseFloat((document.getElementById('vs-paid')||{}).value)||0;
+  var bal = Math.max(0, total - paid);
+  var bel = document.getElementById('vs-balance');
+  if(bel){bel.textContent='$'+bal.toLocaleString();bel.style.color=bal>0?'var(--r600)':'var(--g700)';}
+  var pv = document.getElementById('vs-paid');
+  if(pv) pv.dataset.touched = '1';
+}
+function selPayMethod(btn,method) {
+  document.querySelectorAll('.pay-method-btn').forEach(function(b){b.classList.remove('sel');});
+  btn.classList.add('sel');
+  var hid = document.getElementById('vs-method');
+  if(hid) hid.value = method;
+}
+
+async function saveVisit(apptId, patientName, dentist) {
+  // validate
+  var hasProc = billingState.visitProcs.some(function(p){return p.name;});
+  if(!hasProc){showToast('Please add at least one procedure','error');return;}
+
+  var totalFee = billingState.visitProcs.reduce(function(s,p){return s+Number(p.fee||0);},0);
+  var paidAmt = parseFloat((document.getElementById('vs-paid')||{}).value)||0;
+  var method = (document.getElementById('vs-method')||{}).value||'Cash';
+  var invNotes = (document.getElementById('vs-inv-notes')||{}).value||'';
+  var bal = Math.max(0, totalFee - paidAmt);
+  var invStatus = bal<=0 ? 'paid' : paidAmt>0 ? 'partial' : 'unpaid';
+
+  // find patient id
+  var ptRes = await db.from('patients').select('id').eq('name',patientName).single();
+  var patientId = ptRes.data ? ptRes.data.id : null;
+
+  // Save each procedure to procedures table
+  var procNames = [];
+  for(var i=0;i<billingState.visitProcs.length;i++){
+    var p = billingState.visitProcs[i];
+    if(!p.name) continue;
+    procNames.push(p.name);
+    var teethArr = p.teeth ? p.teeth.split(',').map(function(t){return parseInt(t.trim());}).filter(function(t){return !isNaN(t);}) : [];
+    var pPayload = {
+      patient_id: patientId,
+      patient_name: patientName,
+      procedure_name: p.name,
+      date: new Date().toISOString().split('T')[0],
+      treating_dentist: p.dentist || dentist || null,
+      referrer: p.referrer || null,
+      fee: p.fee || 0,
+      status: p.status || 'completed',
+      notes: p.notes || null,
+      teeth: teethArr.length > 0 ? teethArr : null,
+      category: 'general'
+    };
+    await db.from('procedures').insert([pPayload]);
+  }
+
+  // Create invoice
+  var invPayload = {
+    patient_id: patientId,
+    patient_name: patientName,
+    procedure_name: JSON.stringify(procNames),
+    dentist: dentist || null,
+    fee: totalFee,
+    exchange_rate: IQD_RATE,
+    payment_method: method,
+    status: invStatus,
+    date: new Date().toISOString().split('T')[0]
+  };
+  var invRes = await db.from('invoices').insert([invPayload]).select().single();
+  if(invRes.error){showToast('Failed to create invoice','error');console.error(invRes.error);return;}
+
+  // Record payment if amount paid > 0
+  if(paidAmt > 0 && invRes.data) {
+    await db.from('payments').insert([{
+      invoice_id: invRes.data.id,
+      amount: paidAmt,
+      method: method,
+      date: new Date().toISOString().split('T')[0],
+      note: invNotes || null
+    }]);
+  }
+
+  // Mark appointment as completed if from appointment
+  if(apptId) {
+    await db.from('appointments').update({status:'completed'}).eq('id',apptId);
+  }
+
+  showToast('Visit saved — invoice created!');
+  renderBilling(null);
+}
+
+// ── INVOICE DETAIL ────────────────────────────────────────────────
+async function openInvoiceDetail(id) {
+  var inv = billingState.invoices.find(function(x){return x.id===id;});
+  if(!inv) return;
+
+  var payRes = await db.from('payments').select('*').eq('invoice_id',id);
+  var payments = payRes.data || [];
+  var paid = payments.reduce(function(s,p){return s+Number(p.amount);},0);
+  var bal = Number(inv.fee) - paid;
+
+  var procs = [];
+  try { procs = JSON.parse(inv.procedure_name||'[]'); } catch(e){ procs=[inv.procedure_name||'—']; }
+  if(!Array.isArray(procs)) procs=[procs];
+
+  var statusClass = bal<=0?'pay-status-paid':paid>0?'pay-status-partial':'pay-status-unpaid';
+  var statusLabel = bal<=0?'Paid in full':paid>0?'Partially paid':'Unpaid';
+
+  document.getElementById('inv-detail-content').innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">' +
+    '<div><div style="font-size:16px;font-weight:700;color:var(--s800);">' + (inv.patient_name||'Unknown') + '</div>' +
+    '<div style="font-size:11px;color:var(--s400);margin-top:3px;">' + (inv.date||'—') + ' · ' + (inv.dentist||'—') + '</div></div>' +
+    '<span class="badge ' + statusClass + '" style="font-size:11px;padding:4px 12px;">' + statusLabel + '</span>' +
+    '</div>' +
+    '<div class="appt-info-grid" style="margin-bottom:14px;">' +
+    '<div class="appt-info-item"><div class="appt-info-lbl">Total fee</div><div class="appt-info-val" style="color:var(--s800);">$' + Number(inv.fee).toLocaleString() + '</div><div style="font-size:10px;color:var(--s400);">' + (Number(inv.fee)*IQD_RATE).toLocaleString() + ' IQD</div></div>' +
+    '<div class="appt-info-item"><div class="appt-info-lbl">Amount paid</div><div class="appt-info-val" style="color:var(--g700);">$' + paid.toLocaleString() + '</div></div>' +
+    '<div class="appt-info-item"><div class="appt-info-lbl">Balance due</div><div class="appt-info-val" style="color:' + (bal>0?'var(--r600)':'var(--g700)') + ';">$' + bal.toLocaleString() + '</div></div>' +
+    '<div class="appt-info-item"><div class="appt-info-lbl">Payment method</div><div class="appt-info-val">' + (inv.payment_method||'—') + '</div></div>' +
+    '</div>' +
+    '<div style="margin-bottom:14px;"><div class="flbl">Procedures</div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + procs.map(function(p){return '<span class="inv-proc-tag">'+p+'</span>';}).join('') + '</div></div>' +
+    (payments.length ? '<div><div class="flbl" style="margin-bottom:8px;">Payment history</div>' +
+    payments.map(function(py){return '<div style="display:flex;justify-content:space-between;padding:8px 10px;background:var(--s50);border-radius:var(--radsm);margin-bottom:6px;font-size:12px;"><span style="color:var(--s500);">' + (py.date||'—') + ' · ' + (py.method||'—') + '</span><span style="font-weight:700;color:var(--g700);">$' + Number(py.amount).toLocaleString() + '</span></div>';}).join('') + '</div>' : '') +
+    // Add payment section if balance remaining
+    (bal > 0 ?
+      '<div style="border-top:1px solid var(--s100);padding-top:14px;margin-top:14px;">' +
+      '<div class="flbl">Record additional payment</div>' +
+      '<div class="fg" style="margin-top:8px;">' +
+      '<div class="fgrp"><label class="flbl">Amount (USD)</label><input class="finp" type="number" id="add-pay-amt" placeholder="0" max="' + bal + '" value="' + bal + '"></div>' +
+      '<div class="fgrp"><label class="flbl">Method</label><select class="finp" id="add-pay-method"><option>Cash</option><option>Card</option><option>Bank transfer</option><option>Insurance</option></select></div>' +
+      '</div>' +
+      '<button class="btn btnp" onclick="addPayment(\'' + id + '\',' + bal + ')">+ Record payment</button>' +
+      '</div>' : '');
+
+  document.getElementById('inv-detail-modal').classList.add('open');
+}
+
+async function addPayment(invId, maxBal) {
+  var amt = parseFloat((document.getElementById('add-pay-amt')||{}).value)||0;
+  var method = (document.getElementById('add-pay-method')||{}).value||'Cash';
+  if(amt<=0){showToast('Enter a valid amount','error');return;}
+  if(amt>maxBal){showToast('Amount exceeds remaining balance','error');return;}
+  var res = await db.from('payments').insert([{invoice_id:invId,amount:amt,method:method,date:new Date().toISOString().split('T')[0]}]);
+  if(res.error){showToast('Failed to record payment','error');return;}
+  // update invoice status
+  var newBal = maxBal - amt;
+  var newStatus = newBal<=0 ? 'paid' : 'partial';
+  await db.from('invoices').update({status:newStatus}).eq('id',invId);
+  showToast('Payment recorded!');
+  closeInvDetailModal();
+  renderBilling(null);
+}
+
+function closeInvDetailModal(){document.getElementById('inv-detail-modal').classList.remove('open');}
+window.addEventListener('load',function(){
+  var m=document.getElementById('inv-detail-modal');
+  if(m)m.addEventListener('click',function(e){if(e.target===this)closeInvDetailModal();});
+});
+</script>
+
+<!-- INVOICE DETAIL MODAL -->
+<div class="mbg" id="inv-detail-modal">
+  <div class="modal modal-wide">
+    <div class="mtit">Invoice details</div>
+    <div class="msub">View payments and record additional amounts</div>
+    <div id="inv-detail-content"></div>
+    <div class="mac">
+      <button class="mbtn" onclick="closeInvDetailModal()">Close</button>
     </div>
   </div>
 </div>
