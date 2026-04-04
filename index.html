@@ -497,6 +497,7 @@ function showSection(s){
   else if(s==='appointments')renderAppointments();
   else if(s==='treatments')renderTreatments(null,null);
   else if(s==='billing')renderBilling(null);
+  else if(s==='finance')renderFinance();
   else if(s==='settings')renderSettings();
   else{document.getElementById('topbar-actions').innerHTML='';document.getElementById('main-content').innerHTML='<div class="coming-soon"><div class="coming-soon-icon">🚧</div><h2>'+(SECTIONS[s]?SECTIONS[s].title:s)+' — Coming soon</h2><p>This section is being built.</p></div>';}
 }
@@ -1909,6 +1910,623 @@ window.addEventListener('load',function(){
     <div id="inv-detail-content"></div>
     <div class="mac">
       <button class="mbtn" onclick="closeInvDetailModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── STAFF & FINANCE SECTION ────────────────────────────────── -->
+<style>
+.fin-tabs{display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:14px;flex-wrap:wrap;}
+.fin-tab{padding:7px 14px;border-radius:var(--radsm);font-size:12px;font-weight:600;cursor:pointer;color:var(--s500);border:none;background:transparent;font-family:inherit;}
+.fin-tab:hover{color:var(--s700);}
+.fin-tab.act{background:var(--b600);color:white;}
+.wallet-card{border-radius:var(--rad);padding:16px;border:1.5px solid;}
+.wallet-val{font-size:22px;font-weight:700;letter-spacing:-0.5px;}
+.wallet-sub{font-size:10px;margin-top:3px;opacity:0.8;}
+.dr-rate-card{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:14px;}
+.dr-rate-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.dr-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.rate-box{border-radius:var(--radsm);border:1px solid var(--s200);overflow:hidden;margin-bottom:10px;}
+.rate-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--s100);}
+.rate-row:last-child{border:none;}
+.rate-bar-wrap{width:60px;height:5px;background:var(--s100);border-radius:3px;overflow:hidden;}
+.rate-bar{height:100%;border-radius:3px;}
+.fin-tbl{width:100%;border-collapse:collapse;font-size:11px;}
+.fin-tbl th{text-align:left;padding:8px 12px;color:var(--s400);font-weight:600;font-size:10px;background:var(--s50);border-bottom:1px solid var(--s200);text-transform:uppercase;letter-spacing:0.4px;}
+.fin-tbl td{padding:9px 12px;border-bottom:1px solid var(--s100);color:var(--s700);vertical-align:middle;}
+.fin-tbl tr:last-child td{border:none;}
+.fin-tbl tr:hover td{background:var(--b50);}
+.month-pill{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--s200);background:white;color:var(--s500);font-family:inherit;}
+.month-pill.on{background:var(--b600);color:white;border-color:var(--b600);}
+</style>
+
+<script>
+var IQD_RATE2 = 1310;
+var finState = {
+  tab: 'overview',
+  month: new Date().getMonth(),
+  year: new Date().getFullYear(),
+  procedures: [],
+  invoices: [],
+  payments: [],
+  expenses: [],
+  substaff: [],
+  dentistRates: JSON.parse(localStorage.getItem('vdc-dr-rates')||'{}'),
+};
+
+var PARTNERS = ['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen'];
+var REG_DENTISTS = ['Dr. Mateen','Dr. Ibrahim','Dr. Mahmoud','Dr. Niwar','Dr. Dilveen'];
+
+function saveDrRates(){localStorage.setItem('vdc-dr-rates',JSON.stringify(finState.dentistRates));}
+
+function getDrRates(name){
+  if(!finState.dentistRates[name]) finState.dentistRates[name]={ownPct:35,refPct:20};
+  return finState.dentistRates[name];
+}
+
+function fu2(n){return '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});}
+function fiqd(n){return ((Number(n)||0)*IQD_RATE2).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})+' IQD';}
+
+function monthLabel(m,y){
+  return new Date(y,m,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+}
+
+async function renderFinance(){
+  document.getElementById('topbar-actions').innerHTML='';
+  document.getElementById('main-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading finance data...</div>';
+
+  // load all data
+  var pRes=await db.from('procedures').select('*');
+  var iRes=await db.from('invoices').select('*');
+  var pyRes=await db.from('payments').select('*');
+  var eRes=await db.from('expenses').select('*');
+  var sRes=await db.from('substaff').select('*');
+
+  finState.procedures=pRes.data||[];
+  finState.invoices=iRes.data||[];
+  finState.payments=pyRes.data||[];
+  finState.expenses=eRes.data||[];
+  finState.substaff=sRes.data||[];
+
+  buildFinanceUI();
+}
+
+function buildFinanceUI(){
+  // month selector
+  var months=[];
+  for(var i=0;i<6;i++){
+    var d=new Date(finState.year,finState.month-i,1);
+    months.push({m:d.getMonth(),y:d.getFullYear(),label:d.toLocaleDateString('en-GB',{month:'short',year:'numeric'})});
+  }
+
+  var html=
+    '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">'+
+    '<span style="font-size:11px;font-weight:600;color:var(--s500);">Month:</span>'+
+    months.map(function(mn){
+      var on=mn.m===finState.month&&mn.y===finState.year;
+      return '<button class="month-pill'+(on?' on':'')+'" onclick="setFinMonth('+mn.m+','+mn.y+')">'+mn.label+'</button>';
+    }).join('')+
+    '</div>'+
+    '<div class="fin-tabs">'+
+    ['overview','procedures','dentists','substaff','expenses'].map(function(t){
+      var labels={overview:'Finance overview',procedures:'Procedure log',dentists:'Dentist payroll',substaff:'Substaff',expenses:'Expenses'};
+      return '<button class="fin-tab'+(finState.tab===t?' act':'')+'" onclick="setFinTab(\''+t+'\')">'+labels[t]+'</button>';
+    }).join('')+
+    '</div>'+
+    '<div id="fin-tab-content"></div>';
+
+  document.getElementById('main-content').innerHTML=html;
+  renderFinTab();
+}
+
+function setFinMonth(m,y){finState.month=m;finState.year=y;buildFinanceUI();}
+function setFinTab(t){finState.tab=t;renderFinTab();}
+
+function getMonthProcs(){
+  return finState.procedures.filter(function(p){
+    if(!p.date)return false;
+    var d=new Date(p.date);
+    return d.getMonth()===finState.month&&d.getFullYear()===finState.year;
+  });
+}
+function getMonthExpenses(){
+  return finState.expenses.filter(function(e){
+    if(!e.date)return false;
+    var d=new Date(e.date);
+    return d.getMonth()===finState.month&&d.getFullYear()===finState.year;
+  });
+}
+
+function calcDistribution(proc){
+  var treater=proc.treating_dentist||'';
+  var referrer=proc.referrer||'';
+  var fee=Number(proc.fee)||0;
+  var isPartner=PARTNERS.indexOf(treater)>=0;
+  var refIsPartner=referrer&&PARTNERS.indexOf(referrer)>=0;
+
+  if(isPartner){
+    // partner treats own patient or partner refers to partner
+    return {treaterGets:fee,referrerGets:0,valueGets:0,type:'partner'};
+  }
+  if(refIsPartner){
+    // partner refers to regular dentist → referred rate
+    var rates=getDrRates(treater);
+    var pct=rates.refPct/100;
+    var tg=fee*pct;
+    return {treaterGets:tg,referrerGets:fee-tg,valueGets:0,type:'referred',pct:rates.refPct};
+  }
+  // regular dentist own patient → own rate
+  var rates2=getDrRates(treater);
+  var pct2=rates2.ownPct/100;
+  var tg2=fee*pct2;
+  return {treaterGets:tg2,referrerGets:0,valueGets:fee-tg2,type:'own',pct:rates2.ownPct};
+}
+
+function renderFinTab(){
+  var el=document.getElementById('fin-tab-content');
+  if(!el)return;
+  if(finState.tab==='overview') el.innerHTML=buildOverviewTab();
+  else if(finState.tab==='procedures') el.innerHTML=buildProcLogTab();
+  else if(finState.tab==='dentists') el.innerHTML=buildDentistsTab();
+  else if(finState.tab==='substaff') el.innerHTML=buildSubstaffTab();
+  else if(finState.tab==='expenses') el.innerHTML=buildExpensesTab();
+}
+
+// ── OVERVIEW TAB ──────────────────────────────────────────────────
+function buildOverviewTab(){
+  var procs=getMonthProcs();
+  var exps=getMonthExpenses();
+  var totalExp=exps.reduce(function(s,e){return s+Number(e.amount||0);},0);
+  var expPP=totalExp/3;
+
+  // partner wallets
+  var wallets={};
+  PARTNERS.forEach(function(p){wallets[p]=0;});
+  var valueWallet=0;
+
+  procs.forEach(function(p){
+    var d=calcDistribution(p);
+    var t=p.treating_dentist||'';
+    var r=p.referrer||'';
+    if(PARTNERS.indexOf(t)>=0) wallets[t]=(wallets[t]||0)+d.treaterGets;
+    if(r&&PARTNERS.indexOf(r)>=0) wallets[r]=(wallets[r]||0)+d.referrerGets;
+    valueWallet+=d.valueGets;
+  });
+
+  var vPP=valueWallet/3;
+
+  // wallets grid
+  var wHtml='<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px;">';
+  var pColors=[{bg:'#DBEAFE',border:'#2563EB',color:'#1D4ED8'},{bg:'#CCFBF1',border:'#0D9488',color:'#0F766E'},{bg:'#EDE9FE',border:'#7C3AED',color:'#6D28D9'}];
+  PARTNERS.forEach(function(p,i){
+    var c=pColors[i];
+    var gross=wallets[p];
+    var net=gross+vPP-expPP;
+    wHtml+='<div class="wallet-card" style="background:'+c.bg+';border-color:'+c.border+';">'+
+      '<div style="font-size:10px;font-weight:700;color:'+c.color+';text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">'+p+'</div>'+
+      '<div class="wallet-val" style="color:'+c.color+';">'+fu2(gross)+'</div>'+
+      '<div class="wallet-sub" style="color:'+c.color+';">Own procedures</div>'+
+      '<div style="margin-top:6px;font-size:10px;color:'+c.color+';">Net: '+fu2(net)+'</div>'+
+      '<div style="font-size:9px;color:'+c.color+';opacity:0.7;">'+fiqd(net)+'</div>'+
+      '</div>';
+  });
+  wHtml+='<div class="wallet-card" style="background:#F5F3FF;border-color:#7C3AED;">'+
+    '<div style="font-size:10px;font-weight:700;color:#6D28D9;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">Value Wallet</div>'+
+    '<div class="wallet-val" style="color:#6D28D9;">'+fu2(valueWallet)+'</div>'+
+    '<div class="wallet-sub" style="color:#6D28D9;">Shared equally</div>'+
+    '<div style="margin-top:6px;font-size:10px;color:#6D28D9;">'+fu2(vPP)+'/partner</div>'+
+    '<div style="font-size:9px;color:#6D28D9;opacity:0.7;">'+fiqd(vPP)+'/partner</div>'+
+    '</div>';
+  wHtml+='</div>';
+
+  // partner summary cards
+  var psHtml='<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px;">';
+  PARTNERS.forEach(function(p,i){
+    var c=pColors[i];
+    var gross=wallets[p];
+    var net=gross+vPP-expPP;
+    psHtml+='<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:14px;">'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'+
+      '<div style="width:36px;height:36px;border-radius:50%;background:'+c.bg+';color:'+c.color+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">'+p.split(' ').pop().slice(0,2).toUpperCase()+'</div>'+
+      '<div><div style="font-size:13px;font-weight:700;color:var(--s800);">'+p+'</div><div style="font-size:10px;color:var(--s400);">Partner · 1/3 Value wallet</div></div></div>'+
+      '<div style="display:flex;justify-content:space-between;padding:5px 8px;background:var(--b50);border-radius:6px;margin-bottom:4px;font-size:11px;"><span style="color:var(--s500);">Own procedures</span><span style="font-weight:700;color:var(--b700);">'+fu2(gross)+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;padding:5px 8px;background:#F5F3FF;border-radius:6px;margin-bottom:4px;font-size:11px;"><span style="color:var(--s500);">Value wallet (1/3)</span><span style="font-weight:700;color:#6D28D9;">'+fu2(vPP)+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;padding:5px 8px;background:var(--r50);border-radius:6px;margin-bottom:8px;font-size:11px;"><span style="color:var(--s500);">Expenses (1/3)</span><span style="font-weight:700;color:var(--r600);">-'+fu2(expPP)+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid var(--s100);"><span style="font-size:12px;font-weight:700;">Net this month</span><span style="font-size:16px;font-weight:700;color:'+(net>=0?'var(--g700)':'var(--r600)')+';">'+fu2(net)+'</span></div>'+
+      '</div>';
+  });
+  psHtml+='</div>';
+
+  // regular dentist payout summary
+  var drSummary='<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:hidden;">'+
+    '<div style="padding:11px 14px;border-bottom:1px solid var(--s200);font-size:12px;font-weight:700;color:var(--s700);">Regular dentist payouts — '+monthLabel(finState.month,finState.year)+'</div>'+
+    '<table class="fin-tbl"><thead><tr><th>Dentist</th><th>Own rate</th><th>Ref rate</th><th>Procedures</th><th>Total payout</th><th>To Value wallet</th></tr></thead><tbody>';
+
+  REG_DENTISTS.forEach(function(dr){
+    var rates=getDrRates(dr);
+    var myProcs=procs.filter(function(p){return p.treating_dentist===dr;});
+    var payout=myProcs.reduce(function(s,p){return s+calcDistribution(p).treaterGets;},0);
+    var toValue=myProcs.filter(function(p){return !p.referrer||PARTNERS.indexOf(p.referrer)<0;})
+      .reduce(function(s,p){return s+calcDistribution(p).valueGets;},0);
+    drSummary+='<tr>'+
+      '<td style="font-weight:600;">'+dr+'</td>'+
+      '<td><span style="font-weight:700;color:var(--b700);">'+rates.ownPct+'%</span></td>'+
+      '<td><span style="font-weight:700;color:var(--a700);">'+rates.refPct+'%</span></td>'+
+      '<td>'+myProcs.length+'</td>'+
+      '<td style="font-weight:700;color:var(--g700);">'+fu2(payout)+'<br><span style="font-size:9px;color:var(--s400);font-weight:400;">'+fiqd(payout)+'</span></td>'+
+      '<td style="color:#6D28D9;">'+fu2(toValue)+'</td>'+
+      '</tr>';
+  });
+  drSummary+='</tbody></table></div>';
+
+  return wHtml+psHtml+drSummary;
+}
+
+// ── PROCEDURE LOG TAB ─────────────────────────────────────────────
+function buildProcLogTab(){
+  var procs=getMonthProcs();
+  if(!procs.length) return '<div class="empty-state"><div style="font-size:13px;color:var(--s400);">No procedures recorded this month</div></div>';
+  var html='<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:hidden;">'+
+    '<table class="fin-tbl"><thead><tr><th>Date</th><th>Patient</th><th>Procedure</th><th>Treating</th><th>Referred by</th><th>Fee</th><th>Rate used</th><th>Treating gets</th><th>Ref gets</th><th>Value gets</th></tr></thead><tbody>';
+  procs.forEach(function(p){
+    var d=calcDistribution(p);
+    var rateLabel=d.type==='partner'?'100%':d.pct+'%'+(d.type==='referred'?' (ref)':' (own)');
+    html+='<tr>'+
+      '<td style="color:var(--s400);font-size:10px;">'+(p.date||'—')+'</td>'+
+      '<td>'+(p.patient_name||'—')+'</td>'+
+      '<td style="color:var(--s500);">'+(p.procedure_name||'—')+'</td>'+
+      '<td style="font-weight:600;">'+(p.treating_dentist||'—')+'</td>'+
+      '<td style="color:var(--s400);">'+(p.referrer||'—')+'</td>'+
+      '<td style="font-weight:600;">'+fu2(p.fee)+'</td>'+
+      '<td style="font-size:10px;font-weight:600;color:'+(d.type==='referred'?'var(--a700)':'var(--b600)')+';">'+rateLabel+'</td>'+
+      '<td style="color:var(--g700);font-weight:700;">'+fu2(d.treaterGets)+'</td>'+
+      '<td style="color:#6D28D9;font-weight:700;">'+(d.referrerGets>0?fu2(d.referrerGets):'—')+'</td>'+
+      '<td style="color:var(--b600);">'+(d.valueGets>0?fu2(d.valueGets):'—')+'</td>'+
+      '</tr>';
+  });
+  html+='</tbody></table></div>';
+  return html;
+}
+
+// ── DENTISTS TAB ──────────────────────────────────────────────────
+function buildDentistsTab(){
+  var procs=getMonthProcs();
+  var paidMap=JSON.parse(localStorage.getItem('vdc-dr-paid-'+finState.year+'-'+finState.month)||'{}');
+
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--s700);">Regular dentist rates &amp; payroll — '+monthLabel(finState.month,finState.year)+'</div>'+
+    '<button class="btn btnp btnsm" onclick="openAddDrModal()">+ Add dentist</button>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px;">';
+
+  REG_DENTISTS.forEach(function(dr){
+    var rates=getDrRates(dr);
+    var myProcs=procs.filter(function(p){return p.treating_dentist===dr;});
+    var payout=myProcs.reduce(function(s,p){return s+calcDistribution(p).treaterGets;},0);
+    var ownCount=myProcs.filter(function(p){return !p.referrer||PARTNERS.indexOf(p.referrer)<0;}).length;
+    var refCount=myProcs.filter(function(p){return p.referrer&&PARTNERS.indexOf(p.referrer)>=0;}).length;
+    var isPaid=paidMap[dr]||false;
+
+    html+='<div class="dr-rate-card">'+
+      '<div class="dr-rate-header">'+
+      '<div class="dr-av" style="background:var(--b50);color:var(--b700);">'+dr.replace('Dr. ','').slice(0,2).toUpperCase()+'</div>'+
+      '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--s800);">'+dr+'</div>'+
+      '<div style="font-size:10px;color:var(--s400);">'+ownCount+' own · '+refCount+' referred</div></div>'+
+      '<button class="btn btnsm" style="font-size:10px;" onclick="openEditDrRates(\''+dr+'\')">Edit rates</button>'+
+      '</div>'+
+      '<div class="rate-box">'+
+      '<div style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--s400);background:var(--s50);border-bottom:1px solid var(--s100);">Private % rates</div>'+
+      '<div class="rate-row">'+
+      '<div style="font-size:11px;color:var(--s600);flex:1;">Own patient rate</div>'+
+      '<div class="rate-bar-wrap"><div class="rate-bar" style="width:'+rates.ownPct+'%;background:var(--b600);"></div></div>'+
+      '<div style="font-size:14px;font-weight:700;color:var(--b700);">'+rates.ownPct+'%</div>'+
+      '</div>'+
+      '<div class="rate-row" style="background:var(--a50);">'+
+      '<div style="font-size:11px;color:var(--a700);flex:1;">Referred patient rate</div>'+
+      '<div class="rate-bar-wrap"><div class="rate-bar" style="width:'+rates.refPct+'%;background:var(--a600);"></div></div>'+
+      '<div style="font-size:14px;font-weight:700;color:var(--a700);">'+rates.refPct+'%</div>'+
+      '</div></div>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--s100);">'+
+      '<div><div style="font-size:10px;color:var(--s400);margin-bottom:2px;">Monthly payout</div>'+
+      '<div style="font-size:16px;font-weight:700;">'+fu2(payout)+'</div>'+
+      '<div style="font-size:10px;color:var(--s400);">'+fiqd(payout)+'</div></div>'+
+      '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">'+
+      (isPaid?'<span class="badge bg">&#10003; Paid</span>':'<span class="badge br">Unpaid</span>')+
+      '<button class="btn btnsm" style="font-size:10px;" onclick="toggleDrPaid(\''+dr+'\')">'+
+      (isPaid?'Undo':'Mark paid')+'</button>'+
+      '</div></div>'+
+      '</div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+function toggleDrPaid(dr){
+  var key='vdc-dr-paid-'+finState.year+'-'+finState.month;
+  var paidMap=JSON.parse(localStorage.getItem(key)||'{}');
+  paidMap[dr]=!paidMap[dr];
+  localStorage.setItem(key,JSON.stringify(paidMap));
+  renderFinTab();
+}
+
+// ── SUBSTAFF TAB ──────────────────────────────────────────────────
+function buildSubstaffTab(){
+  var staff=finState.substaff;
+  var total=staff.reduce(function(s,e){return s+Number(e.salary_usd||0);},0);
+  var paidMap=JSON.parse(localStorage.getItem('vdc-sub-paid-'+finState.year+'-'+finState.month)||'{}');
+  var unpaid=staff.filter(function(s){return !paidMap[s.id];}).reduce(function(t,s){return t+Number(s.salary_usd||0);},0);
+
+  var html=
+    '<div class="stats-row">'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">&#128101;</div><div class="stat-lbl">Total staff</div><div class="stat-val">'+staff.length+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">&#128176;</div><div class="stat-lbl">Total salaries</div><div class="stat-val">'+fu2(total)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--r50);">&#9888;</div><div class="stat-lbl">Unpaid this month</div><div class="stat-val" style="color:var(--r600);">'+fu2(unpaid)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--a50);">&#9876;</div><div class="stat-lbl">Per partner (1/3)</div><div class="stat-val">'+fu2(total/3)+'</div></div>'+
+    '</div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--s700);">Staff members</div>'+
+    '<button class="btn btnp btnsm" onclick="openAddSubModal2()">+ Add staff member</button>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px;">';
+
+  var icons={Receptionist:'&#128202;',Assistant:'&#129459;',Cleaner:'&#129529;','Lab Technician':'&#128300;','Sterilization Tech':'&#129514;',Other:'&#128100;'};
+  staff.forEach(function(s){
+    var isPaid=paidMap[s.id]||false;
+    html+='<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:13px;display:flex;align-items:center;gap:12px;position:relative;">'+
+      '<div style="width:38px;height:38px;border-radius:50%;background:var(--s100);color:var(--s600);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">'+(icons[s.role]||'&#128100;')+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--s800);">'+(s.name||'')+'</div>'+
+      '<div style="font-size:10px;color:var(--s400);">'+(s.role||'')+(s.notes?' · '+s.notes:'')+'</div>'+
+      '<div style="font-size:13px;font-weight:700;color:var(--g700);margin-top:3px;">'+fu2(s.salary_usd||0)+'/mo</div>'+
+      '<div style="font-size:10px;color:var(--s400);">'+fiqd(s.salary_usd||0)+'</div>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">'+
+      (isPaid?'<span class="badge bg">&#10003; Paid</span>':'<span class="badge br">Unpaid</span>')+
+      '<button class="btn btnsm" style="font-size:10px;" onclick="toggleSubPaid(\''+s.id+'\')">'+
+      (isPaid?'Undo':'Mark paid')+'</button>'+
+      '</div>'+
+      '</div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+function toggleSubPaid(id){
+  var key='vdc-sub-paid-'+finState.year+'-'+finState.month;
+  var paidMap=JSON.parse(localStorage.getItem(key)||'{}');
+  paidMap[id]=!paidMap[id];
+  localStorage.setItem(key,JSON.stringify(paidMap));
+  renderFinTab();
+}
+
+// ── EXPENSES TAB ──────────────────────────────────────────────────
+function buildExpensesTab(){
+  var exps=getMonthExpenses();
+  var total=exps.reduce(function(s,e){return s+Number(e.amount||0);},0);
+  var perPartner=total/3;
+
+  var catTotals={};
+  exps.forEach(function(e){catTotals[e.category]=(catTotals[e.category]||0)+Number(e.amount||0);});
+  var catMax=Math.max.apply(null,Object.values(catTotals).concat([1]));
+  var catColors={'Staff salaries':'#2563EB','Materials':'#0D9488','Utilities':'#D97706','Rent':'#DC2626','Lab fees':'#7C3AED','Equipment':'#DB2777','Other':'#64748B'};
+
+  var html=
+    '<div class="stats-row">'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--r50);">&#128176;</div><div class="stat-lbl">Total expenses</div><div class="stat-val" style="color:var(--r600);">'+fu2(total)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--a50);">&#9876;</div><div class="stat-lbl">Per partner (1/3)</div><div class="stat-val">'+fu2(perPartner)+'</div><div style="font-size:10px;color:var(--s400);margin-top:2px;">'+fiqd(perPartner)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--b50);">&#128202;</div><div class="stat-lbl">Categories</div><div class="stat-val">'+Object.keys(catTotals).length+'</div></div>'+
+    '<div class="stat-card"><div class="stat-icon" style="background:var(--g50);">&#128203;</div><div class="stat-lbl">Records</div><div class="stat-val">'+exps.length+'</div></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">'+
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:14px;">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--s700);margin-bottom:12px;">By category</div>'+
+    Object.entries(catTotals).sort(function(a,b){return b[1]-a[1];}).map(function(e){
+      var pct=Math.round(e[1]/catMax*100);
+      var col=catColors[e[0]]||'#64748B';
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'+
+        '<div style="font-size:11px;color:'+col+';min-width:100px;">'+e[0]+'</div>'+
+        '<div style="flex:1;height:6px;background:var(--s100);border-radius:3px;overflow:hidden;">'+
+        '<div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:3px;"></div></div>'+
+        '<div style="font-size:11px;font-weight:600;min-width:55px;text-align:right;">'+fu2(e[1])+'</div></div>';
+    }).join('')+
+    '</div>'+
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:14px;">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--s700);margin-bottom:12px;">Partner share (each pays 1/3)</div>'+
+    ['#2563EB','#0D9488','#7C3AED'].map(function(col,i){
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'+
+        '<div style="font-size:11px;min-width:100px;"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+col+';margin-right:4px;"></span>'+PARTNERS[i]+'</div>'+
+        '<div style="flex:1;height:6px;background:var(--s100);border-radius:3px;overflow:hidden;">'+
+        '<div style="width:33%;height:100%;background:'+col+';border-radius:3px;"></div></div>'+
+        '<div style="font-size:11px;font-weight:600;min-width:55px;text-align:right;">'+fu2(perPartner)+'</div></div>';
+    }).join('')+
+    '</div></div>'+
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:hidden;">'+
+    '<div style="padding:11px 14px;border-bottom:1px solid var(--s200);display:flex;align-items:center;justify-content:space-between;">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--s700);">Expense records</div>'+
+    '<button class="btn btnp btnsm" onclick="openAddExpModal()">+ Add expense</button>'+
+    '</div>'+
+    (exps.length?
+      '<table class="fin-tbl"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Total (USD)</th><th>Per partner (1/3)</th></tr></thead><tbody>'+
+      exps.map(function(e){
+        return '<tr><td style="color:var(--s400);font-size:10px;">'+(e.date||'—')+'</td>'+
+          '<td><span class="badge bs">'+(e.category||'—')+'</span></td>'+
+          '<td style="color:var(--s500);">'+(e.description||'—')+'</td>'+
+          '<td style="font-weight:600;">'+fu2(e.amount)+'</td>'+
+          '<td style="color:var(--r600);">'+fu2(Number(e.amount||0)/3)+' each</td></tr>';
+      }).join('')+'</tbody></table>' :
+      '<div class="empty-state" style="padding:30px 20px;"><div style="font-size:13px;color:var(--s400);">No expenses recorded this month</div></div>')+
+    '</div>';
+  return html;
+}
+
+// ── DR RATE EDIT MODAL ────────────────────────────────────────────
+function openEditDrRates(dr){
+  var rates=getDrRates(dr);
+  document.getElementById('dr-rate-name').textContent=dr;
+  document.getElementById('dr-rate-dr').value=dr;
+  document.getElementById('dr-own-pct').value=rates.ownPct;
+  document.getElementById('dr-ref-pct').value=rates.refPct;
+  document.getElementById('dr-own-bar').style.width=rates.ownPct+'%';
+  document.getElementById('dr-ref-bar').style.width=rates.refPct+'%';
+  document.getElementById('dr-rate-modal').classList.add('open');
+}
+function saveDrRateModal(){
+  var dr=document.getElementById('dr-rate-dr').value;
+  var own=parseInt(document.getElementById('dr-own-pct').value)||35;
+  var ref=parseInt(document.getElementById('dr-ref-pct').value)||20;
+  if(own<1||own>100||ref<1||ref>100){showToast('Rates must be between 1 and 100','error');return;}
+  finState.dentistRates[dr]={ownPct:own,refPct:ref};
+  saveDrRates();
+  document.getElementById('dr-rate-modal').classList.remove('open');
+  showToast('Rates updated for '+dr);
+  renderFinTab();
+}
+window.addEventListener('load',function(){
+  var m=document.getElementById('dr-rate-modal');
+  if(m)m.addEventListener('click',function(e){if(e.target===this)m.classList.remove('open');});
+  var m2=document.getElementById('fin-exp-modal');
+  if(m2)m2.addEventListener('click',function(e){if(e.target===this)m2.classList.remove('open');});
+  var m3=document.getElementById('fin-sub-modal');
+  if(m3)m3.addEventListener('click',function(e){if(e.target===this)m3.classList.remove('open');});
+});
+
+// ── ADD EXPENSE MODAL ─────────────────────────────────────────────
+function openAddExpModal(){
+  ['fin-exp-cat','fin-exp-desc','fin-exp-amt','fin-exp-date'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.value='';
+  });
+  var de=document.getElementById('fin-exp-date');
+  if(de)de.value=new Date().toISOString().split('T')[0];
+  var m=document.getElementById('fin-exp-modal');if(m)m.classList.add('open');
+}
+async function saveExpense2(){
+  var cat=(document.getElementById('fin-exp-cat')||{}).value;
+  var desc=(document.getElementById('fin-exp-desc')||{}).value||'';
+  var amt=parseFloat((document.getElementById('fin-exp-amt')||{}).value)||0;
+  var date=(document.getElementById('fin-exp-date')||{}).value||new Date().toISOString().split('T')[0];
+  if(!amt){showToast('Please enter an amount','error');return;}
+  var res=await db.from('expenses').insert([{category:cat,description:desc,amount:amt,date:date,type:'one-time'}]);
+  if(res.error){showToast('Failed to save expense','error');return;}
+  showToast('Expense recorded');
+  var m=document.getElementById('fin-exp-modal');if(m)m.classList.remove('open');
+  var eRes=await db.from('expenses').select('*');
+  finState.expenses=eRes.data||[];
+  renderFinTab();
+}
+
+// ── ADD SUBSTAFF MODAL ────────────────────────────────────────────
+function openAddSubModal2(){
+  ['fin-sub-name','fin-sub-usd','fin-sub-iqd','fin-sub-notes'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.value='';
+  });
+  var m=document.getElementById('fin-sub-modal');if(m)m.classList.add('open');
+}
+function finSubUSD(){var v=parseFloat((document.getElementById('fin-sub-usd')||{}).value)||0;var el=document.getElementById('fin-sub-iqd');if(el)el.value=v?Math.round(v*IQD_RATE2):'';}
+function finSubIQD(){var v=parseFloat((document.getElementById('fin-sub-iqd')||{}).value)||0;var el=document.getElementById('fin-sub-usd');if(el)el.value=v?+(v/IQD_RATE2).toFixed(2):'';}
+async function saveSubStaff2(){
+  var name=(document.getElementById('fin-sub-name')||{}).value||'';
+  if(!name){showToast('Enter a name','error');return;}
+  var usd=parseFloat((document.getElementById('fin-sub-usd')||{}).value)||0;
+  var iqd=parseFloat((document.getElementById('fin-sub-iqd')||{}).value)||Math.round(usd*IQD_RATE2);
+  var role=(document.getElementById('fin-sub-role')||{}).value||'Other';
+  var notes=(document.getElementById('fin-sub-notes')||{}).value||'';
+  var res=await db.from('substaff').insert([{name:name,role:role,salary_usd:usd,salary_iqd:iqd,notes:notes}]);
+  if(res.error){showToast('Failed to save','error');return;}
+  showToast('Staff member added');
+  var m=document.getElementById('fin-sub-modal');if(m)m.classList.remove('open');
+  var sRes=await db.from('substaff').select('*');
+  finState.substaff=sRes.data||[];
+  renderFinTab();
+}
+</script>
+
+<!-- DR RATE EDIT MODAL -->
+<div class="mbg" id="dr-rate-modal">
+  <div class="modal">
+    <div class="mtit">Edit rates — <span id="dr-rate-name"></span></div>
+    <div class="msub">Both rates are private — visible only to this dentist and admin</div>
+    <input type="hidden" id="dr-rate-dr">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Own patient rate (%)</label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input class="finp" type="number" id="dr-own-pct" min="1" max="100" style="max-width:80px;" oninput="document.getElementById('dr-own-bar').style.width=Math.min(100,this.value||0)+'%'">
+          <div style="flex:1;height:6px;background:var(--s100);border-radius:3px;overflow:hidden;"><div id="dr-own-bar" style="height:100%;background:var(--b600);border-radius:3px;width:35%;"></div></div>
+        </div>
+        <div style="font-size:10px;color:var(--s400);margin-top:3px;">When treating their own patients</div>
+      </div>
+      <div class="fgrp"><label class="flbl">Referred patient rate (%)</label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input class="finp" type="number" id="dr-ref-pct" min="1" max="100" style="max-width:80px;" oninput="document.getElementById('dr-ref-bar').style.width=Math.min(100,this.value||0)+'%'">
+          <div style="flex:1;height:6px;background:var(--s100);border-radius:3px;overflow:hidden;"><div id="dr-ref-bar" style="height:100%;background:var(--a600);border-radius:3px;width:20%;"></div></div>
+        </div>
+        <div style="font-size:10px;color:var(--s400);margin-top:3px;">When a partner refers a patient to them</div>
+      </div>
+    </div>
+    <div class="mac">
+      <button class="mbtn" onclick="document.getElementById('dr-rate-modal').classList.remove('open')">Cancel</button>
+      <button class="mbtn mbtnp" onclick="saveDrRateModal()">Save rates</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD EXPENSE MODAL -->
+<div class="mbg" id="fin-exp-modal">
+  <div class="modal">
+    <div class="mtit">Add expense</div>
+    <div class="msub">Split equally between the 3 partners</div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Category</label>
+        <select class="finp" id="fin-exp-cat">
+          <option>Staff salaries</option><option>Materials</option><option>Utilities</option>
+          <option>Rent</option><option>Lab fees</option><option>Equipment</option><option>Other</option>
+        </select>
+      </div>
+      <div class="fgrp"><label class="flbl">Date</label>
+        <input class="finp" type="date" id="fin-exp-date">
+      </div>
+    </div>
+    <div class="fgrp"><label class="flbl">Description</label>
+      <input class="finp" id="fin-exp-desc" placeholder="e.g. March rent">
+    </div>
+    <div class="fgrp"><label class="flbl">Amount (USD) <span class="req">*</span></label>
+      <input class="finp" type="number" id="fin-exp-amt" placeholder="0" min="0">
+    </div>
+    <div class="mac">
+      <button class="mbtn" onclick="document.getElementById('fin-exp-modal').classList.remove('open')">Cancel</button>
+      <button class="mbtn mbtnp" onclick="saveExpense2()">Save expense</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD SUBSTAFF MODAL -->
+<div class="mbg" id="fin-sub-modal">
+  <div class="modal">
+    <div class="mtit">Add staff member</div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Full name <span class="req">*</span></label>
+        <input class="finp" id="fin-sub-name" placeholder="e.g. Rania Khalil">
+      </div>
+      <div class="fgrp"><label class="flbl">Role</label>
+        <select class="finp" id="fin-sub-role">
+          <option>Receptionist</option><option>Assistant</option><option>Cleaner</option>
+          <option>Lab Technician</option><option>Sterilization Tech</option><option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Salary (USD)</label>
+        <input class="finp" type="number" id="fin-sub-usd" placeholder="0" oninput="finSubUSD()">
+      </div>
+      <div class="fgrp"><label class="flbl">Salary (IQD)</label>
+        <input class="finp" type="number" id="fin-sub-iqd" placeholder="0" oninput="finSubIQD()">
+      </div>
+    </div>
+    <div class="fgrp"><label class="flbl">Notes</label>
+      <input class="finp" id="fin-sub-notes" placeholder="e.g. Part-time">
+    </div>
+    <div class="mac">
+      <button class="mbtn" onclick="document.getElementById('fin-sub-modal').classList.remove('open')">Cancel</button>
+      <button class="mbtn mbtnp" onclick="saveSubStaff2()">Add</button>
     </div>
   </div>
 </div>
