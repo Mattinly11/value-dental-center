@@ -541,12 +541,21 @@ function renderPatientList(){
 }
 function ptCardGrid(p){
   var c=ptColor(p.name||''),age=calcAge(p.dob),in2=ini(p.name||'?'),meta='';
-  if(p.phone)meta+='<div class="pt-meta-row"><span style="color:var(--s400);">&#128222;</span> '+p.phone+'</div>';
-  if(p.primary_dentist)meta+='<div class="pt-meta-row"><span class="dr-dot"></span>'+p.primary_dentist+'</div>';
-  if(p.medical_notes)meta+='<div class="pt-meta-row" style="color:var(--s400);font-style:italic;font-size:10px;">"'+p.medical_notes.slice(0,60)+(p.medical_notes.length>60?'...':'')+'"</div>';
-  return '<div class="pt-card" onclick="openEditPtModal(\''+p.id+'\')"><div class="pt-card-header"><div class="pt-av" style="background:'+c.bg+';color:'+c.color+';">'+in2+'</div><div><div class="pt-name">'+p.name+'</div><div class="pt-id">'+(age?age+' yrs':'')+(p.gender?' · '+p.gender:'')+'</div></div><div style="margin-left:auto;">'+statusBadge(p.status)+'</div></div><div class="pt-meta">'+meta+'</div>'+
+  if(p.phone) meta+='<div class="pt-meta-row"><span style="color:var(--s400);">&#128222;</span> '+p.phone+'</div>';
+  if(p.primary_dentist) meta+='<div class="pt-meta-row"><span class="dr-dot"></span>'+p.primary_dentist+'</div>';
+  if(p.medical_notes) meta+='<div class="pt-meta-row" style="color:var(--s400);font-style:italic;font-size:10px;">"'+p.medical_notes.slice(0,60)+(p.medical_notes.length>60?'...':'')+'&quot;</div>';
+  var eid=p.id.replace(/"/g,'&quot;');
+  var ename=p.name.replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  return '<div class="pt-card" onclick="openEditPtModal(event)" data-id="'+eid+'">'+
+    '<div class="pt-card-header">'+
+    '<div class="pt-av" style="background:'+c.bg+';color:'+c.color+';">'+in2+'</div>'+
+    '<div><div class="pt-name">'+p.name+'</div>'+
+    '<div class="pt-id">'+(age?age+' yrs':'')+(p.gender?' &middot; '+p.gender:'')+'</div></div>'+
+    '<div style="margin-left:auto;">'+statusBadge(p.status)+'</div></div>'+
+    '<div class="pt-meta">'+meta+'</div>'+
     '<div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--s100);">'+
-    '<button class="btn btnsm" style="font-size:10px;flex:1;" onclick="event.stopPropagation();goToTxFromPt(\''+p.id+'\',\''+p.name.replace(/'/g,"\\'")+'\')" >&#10022; Treatments</button>'+
+    '<button class="btn btnsm" style="font-size:10px;flex:1;" onclick="event.stopPropagation();goToTxFromPt2(this)" data-id="'+eid+'" data-name="'+ename+'">&#10022; Treatments</button>'+
+    '<button class="btn btnsm" style="font-size:10px;flex:1;" onclick="event.stopPropagation();goToBillingFromPt2(this)" data-name="'+ename+'">&#128180; Billing</button>'+
     '</div>'+
     '</div>';
 }
@@ -557,13 +566,24 @@ function ptCardList(p){
 function setView(v){viewMode=v;localStorage.setItem('vdc-view',v);renderPatientList();}
 function onSearch(v){searchQuery=v;renderPatientList();}
 function goToTxFromPt(id,name){showSection('treatments');setTimeout(function(){renderTreatments(id,name);},50);}
+function goToTxFromPt2(btn){var id=btn.dataset.id,name=btn.dataset.name;showSection('treatments');setTimeout(function(){renderTreatments(id,name);},50);}
+function goToBillingFromPt2(btn){var name=btn.dataset.name;showSection('billing');setTimeout(function(){var s=document.getElementById('bill-search');if(s){s.value=name;filterInvoices('all');}},100);}
+function goToBillingFromPt(name){
+  showSection('billing');
+  setTimeout(function(){
+    // filter billing to show only this patient
+    var s=document.getElementById('bill-search');
+    if(s){s.value=name;filterInvoices('all');}
+  },100);
+}
 function openAddPtModal(){
   document.getElementById('pt-modal-title').textContent='Add new patient';
   ['pt-id','pt-name','pt-dob','pt-phone','pt-email','pt-notes'].forEach(function(id){document.getElementById(id).value='';});
   document.getElementById('pt-gender').value='';document.getElementById('pt-status').value='new';document.getElementById('pt-dentist').value='';
   document.getElementById('pt-delete-btn').style.display='none';document.getElementById('pt-modal').classList.add('open');
 }
-function openEditPtModal(id){
+function openEditPtModal(idOrEvent){
+  var id = (idOrEvent && idOrEvent.target) ? idOrEvent.currentTarget.dataset.id : idOrEvent;
   var p=allPatients.find(function(x){return x.id===id;});if(!p)return;
   document.getElementById('pt-modal-title').textContent='Edit patient';
   document.getElementById('pt-id').value=p.id;document.getElementById('pt-name').value=p.name||'';document.getElementById('pt-dob').value=p.dob||'';
@@ -1196,17 +1216,10 @@ function buildDentalChart() {
   // UPPER JAW
   html += '<div style="margin-bottom:6px;">';
   html += '<div style="font-size:10px;font-weight:600;color:var(--s400);text-align:center;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Upper jaw</div>';
-  html += '<div style="display:flex;justify-content:center;gap:3px;margin-bottom:2px;">';
-  // upper right (patient's right = display left)
+  html += '<div style="display:flex;justify-content:center;gap:3px;margin-bottom:4px;">';
   fdi.upper[0].forEach(function(n) { html += toothBtn(n, 'upper'); });
   html += '<div style="width:12px;"></div>';
   fdi.upper[1].forEach(function(n) { html += toothBtn(n, 'upper'); });
-  html += '</div>';
-  // tooth numbers top
-  html += '<div style="display:flex;justify-content:center;gap:3px;">';
-  fdi.upper[0].forEach(function(n) { html += '<div style="width:32px;text-align:center;font-size:8px;color:var(--s400);">' + n + '</div>'; });
-  html += '<div style="width:12px;"></div>';
-  fdi.upper[1].forEach(function(n) { html += '<div style="width:32px;text-align:center;font-size:8px;color:var(--s400);">' + n + '</div>'; });
   html += '</div>';
   html += '</div>';
 
@@ -1216,13 +1229,7 @@ function buildDentalChart() {
 
   // LOWER JAW
   html += '<div>';
-  // tooth numbers bottom
-  html += '<div style="display:flex;justify-content:center;gap:3px;margin-bottom:2px;">';
-  fdi.lower[0].forEach(function(n) { html += '<div style="width:32px;text-align:center;font-size:8px;color:var(--s400);">' + n + '</div>'; });
-  html += '<div style="width:12px;"></div>';
-  fdi.lower[1].forEach(function(n) { html += '<div style="width:32px;text-align:center;font-size:8px;color:var(--s400);">' + n + '</div>'; });
-  html += '</div>';
-  html += '<div style="display:flex;justify-content:center;gap:3px;">';
+  html += '<div style="display:flex;justify-content:center;gap:3px;margin-top:4px;">';
   fdi.lower[0].forEach(function(n) { html += toothBtn(n, 'lower'); });
   html += '<div style="width:12px;"></div>';
   fdi.lower[1].forEach(function(n) { html += toothBtn(n, 'lower'); });
@@ -1242,20 +1249,22 @@ function buildDentalChart() {
 function toothBtn(n, jaw) {
   var state = txState.teeth[n];
   var selected = txState.selectedTeeth[n];
-  var bg = 'white', border = 'var(--s300)', color = 'var(--s700)', shadow = '';
-  if (selected) { bg = '#3B82F6'; border = '#2563EB'; color = 'white'; shadow = '0 0 0 2px #BFDBFE'; }
-  else if (state === 'completed') { bg = '#10B981'; border = '#059669'; color = 'white'; }
+  var bg = 'white', border = '#CBD5E1', color = '#334155', shadow = '';
+  if (selected)                    { bg = '#3B82F6'; border = '#2563EB'; color = 'white'; shadow = '0 0 0 2px #BFDBFE'; }
+  else if (state === 'completed')  { bg = '#10B981'; border = '#059669'; color = 'white'; }
   else if (state === 'inprogress') { bg = '#8B5CF6'; border = '#7C3AED'; color = 'white'; }
-  else if (state === 'planned') { bg = '#FCD34D'; border = '#F59E0B'; color = '#78350F'; }
-
+  else if (state === 'planned')    { bg = '#FCD34D'; border = '#F59E0B'; color = '#78350F'; }
   var isUpper = jaw === 'upper';
-  var borderRadius = isUpper ? '6px 6px 3px 3px' : '3px 3px 6px 6px';
-
-  return '<button onclick="toggleTooth(' + n + ')" style="width:32px;height:36px;border-radius:' + borderRadius + ';' +
-    'border:1.5px solid ' + border + ';background:' + bg + ';color:' + color + ';' +
-    'font-size:9px;font-weight:700;cursor:pointer;' +
+  var br = isUpper ? '7px 7px 3px 3px' : '3px 3px 7px 7px';
+  var stateIcon = selected ? '&#10003;' : (state === 'completed' ? '&#10003;' : (state === 'inprogress' ? '~' : (state === 'planned' ? '!' : '')));
+  return '<button onclick="toggleTooth(' + n + ')" title="Tooth ' + n + (state ? ' - ' + state : '') + '"' +
+    ' style="width:34px;height:44px;border-radius:' + br + ';border:1.5px solid ' + border + ';background:' + bg + ';color:' + color + ';' +
+    'font-size:9px;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 1px;gap:1px;' +
     (shadow ? 'box-shadow:' + shadow + ';' : '') +
-    'transition:all 0.1s;">' + (txState.isPrimary ? '' : '') + '</button>';
+    'transition:all 0.1s;">' +
+    (stateIcon ? '<span style="font-size:8px;line-height:1;">' + stateIcon + '</span>' : '') +
+    '<span style="font-size:9px;font-weight:800;line-height:1;">' + n + '</span>' +
+    '</button>';
 }
 
 function toggleTooth(n) {
@@ -1397,6 +1406,9 @@ async function saveProcedure() {
   showToast(txState.editingProcId ? 'Procedure updated' : 'Procedure recorded');
   closeTxModal();
   renderTreatments(txState.patientId, txState.patientName);
+  // update topbar add button in case patient changed
+  var btn = document.getElementById('add-proc-btn');
+  if(btn){btn.disabled=false;btn.style.opacity='1';}
 }
 
 async function deleteProcedure() {
@@ -1771,8 +1783,8 @@ async function saveVisit(apptId, patientName, dentist) {
   var invStatus = bal<=0 ? 'paid' : paidAmt>0 ? 'partial' : 'unpaid';
 
   // find patient id
-  var ptRes = await db.from('patients').select('id').eq('name',patientName).single();
-  var patientId = ptRes.data ? ptRes.data.id : null;
+  var ptRes = await db.from('patients').select('id,name').ilike('name', patientName);
+  var patientId = (ptRes.data && ptRes.data.length > 0) ? ptRes.data[0].id : null;
 
   // Save each procedure to procedures table
   var procNames = [];
