@@ -556,7 +556,7 @@ function doLogin(){
     document.getElementById('app').style.display='block';
     document.getElementById('sf-name').textContent=u.charAt(0).toUpperCase()+u.slice(1);
     document.getElementById('sf-av').textContent=u.slice(0,2).toUpperCase();
-    goTo('patients');
+    goTo('dashboard');
   }else{var e=document.getElementById('li-err');e.style.display='block';setTimeout(function(){e.style.display='none';},3000);}
 }
 function doLogout(){sessionStorage.removeItem('vdc-user');location.reload();}
@@ -564,7 +564,7 @@ window.onload=function(){
   var u=sessionStorage.getItem('vdc-user');
   if(u){document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';
     document.getElementById('sf-name').textContent=u.charAt(0).toUpperCase()+u.slice(1);
-    document.getElementById('sf-av').textContent=u.slice(0,2).toUpperCase();goTo('patients');}
+    document.getElementById('sf-av').textContent=u.slice(0,2).toUpperCase();goTo('dashboard');}
 };
 
 // NAVIGATION
@@ -583,6 +583,8 @@ function goTo(s){
   else if(s==='billing')renderBilling();
   else if(s==='finance')renderFinance();
   else if(s==='labs')renderLabs();
+  else if(s==='dashboard')renderDashboard();
+  else if(s==='files')renderFiles();
   else if(s==='settings')renderSettings();
   else document.getElementById('pg-content').innerHTML='<div style="text-align:center;padding:80px 20px;"><div style="font-size:48px;margin-bottom:16px;">🚧</div><h2 style="font-size:18px;font-weight:700;color:var(--s700);margin-bottom:8px;">'+(T[s]||s)+' — Coming soon</h2><p style="font-size:13px;color:var(--s400);">This section is being built.</p></div>';
 }
