@@ -1606,6 +1606,290 @@ function renderSettings(){
     '<div class="set-row"><div style="font-size:12px;font-weight:600;">Receptionist</div><div style="font-size:12px;color:var(--s500);">reception / vdc2026desk</div></div>'+
     '</div>';
 }
+
+// ══════════════════════ LABS ══════════════════════════════════════
+var LAB_PROCS=['Crown (PFM)','Crown (zirconia)','Crown (metal)','Implant crown','Bridge (PFM)','Bridge (zirconia)','Veneer','Denture (full)','Denture (partial)'];
+var allLabs=[],allSvcs=[],procLabCache=[],procSvcCache=[];
+
+async function renderLabs(){
+  document.getElementById('pg-actions').innerHTML='<button class="btn btnp" onclick="openAddLab()">+ Add lab</button>';
+  document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading labs...</div>';
+  var lr=await db.from('labs').select('*').order('name');
+  var sr=await db.from('lab_services').select('*').order('name');
+  allLabs=lr.data||[];allSvcs=sr.data||[];
+  buildLabsUI();
+}
+function buildLabsUI(){
+  if(!allLabs.length){
+    document.getElementById('pg-content').innerHTML=
+      '<div style="text-align:center;padding:80px 20px;"><div style="font-size:48px;margin-bottom:16px;">&#128300;</div>'+
+      '<div style="font-size:14px;font-weight:700;color:var(--s600);margin-bottom:6px;">No labs yet</div>'+
+      '<div style="font-size:12px;color:var(--s400);">Click &quot;+ Add lab&quot; to add your first lab</div></div>';
+    return;
+  }
+  var html='<div class="stats-row">'+allLabs.map(function(lab){
+    var svcs=allSvcs.filter(function(s){return s.lab_id===lab.id;});
+    return statC('var(--p50)','&#128300;',lab.name,svcs.length+' service'+(svcs.length!==1?'s':''));
+  }).join('')+'</div>'+
+  allLabs.map(function(lab){
+    var svcs=allSvcs.filter(function(s){return s.lab_id===lab.id;});
+    return '<div class="vdc-card" style="margin-bottom:14px;">'+
+      '<div class="vdc-card-hdr">'+
+      '<div><div class="vdc-card-title">&#128300; '+lab.name+'</div>'+
+      (lab.notes?'<div style="font-size:10px;color:var(--s400);margin-top:2px;">'+lab.notes+'</div>':'')+
+      '</div>'+
+      '<div style="display:flex;gap:6px;">'+
+      '<button class="btn btnsm" onclick="openAddSvc(\''+lab.id+'\',\''+lab.name+'\')">+ Add service</button>'+
+      '<button class="btn btnsm" onclick="openEditLab(\''+lab.id+'\')">Edit lab</button>'+
+      '</div></div>'+
+      '<div class="vdc-card-body">'+
+      (svcs.length?
+        '<table class="tbl"><thead><tr><th>Service</th><th>Price (USD)</th><th>Price (IQD)</th><th>Related procedure</th><th></th></tr></thead><tbody>'+
+        svcs.map(function(s){
+          return '<tr><td style="font-weight:600;">'+s.name+'</td>'+
+            '<td style="font-weight:700;color:var(--b700);">'+fu(s.price)+'</td>'+
+            '<td style="font-size:10px;color:var(--s400);">'+fiQD(s.price)+'</td>'+
+            '<td>'+(s.related_procedure?'<span class="badge bs">'+s.related_procedure+'</span>':'<span style="color:var(--s400);">General</span>')+'</td>'+
+            '<td><button class="btn btnxs" onclick="openEditSvc(\''+s.id+'\')">Edit</button></td></tr>';
+        }).join('')+'</tbody></table>':
+        '<div style="font-size:12px;color:var(--s400);padding:8px 0;">No services yet</div>')+
+      '</div></div>';
+  }).join('');
+  document.getElementById('pg-content').innerHTML=html;
+}
+function openAddLab(){
+  document.getElementById('lab-mtit').textContent='Add lab';
+  ['lab-id','lab-name','lab-notes'].forEach(function(i){document.getElementById(i).value='';});
+  document.getElementById('lab-del-btn').style.display='none';
+  openMdl('lab-modal');
+}
+function openEditLab(id){
+  var lab=allLabs.find(function(l){return l.id===id;});if(!lab)return;
+  document.getElementById('lab-mtit').textContent='Edit lab';
+  document.getElementById('lab-id').value=lab.id;
+  document.getElementById('lab-name').value=lab.name||'';
+  document.getElementById('lab-notes').value=lab.notes||'';
+  document.getElementById('lab-del-btn').style.display='inline-flex';
+  openMdl('lab-modal');
+}
+async function saveLab(){
+  var name=document.getElementById('lab-name').value.trim();if(!name){showToast('Enter lab name','error');return;}
+  var id=document.getElementById('lab-id').value;
+  var payload={name:name,notes:document.getElementById('lab-notes').value.trim()||null};
+  var r=id?await db.from('labs').update(payload).eq('id',id):await db.from('labs').insert([payload]);
+  if(r.error){showToast('Failed to save','error');return;}
+  showToast(id?'Lab updated':'Lab added');closeMdl('lab-modal');renderLabs();
+}
+async function deleteLab(){
+  var id=document.getElementById('lab-id').value;
+  if(!id||!confirm('Delete this lab and all its services?'))return;
+  await db.from('lab_services').delete().eq('lab_id',id);
+  await db.from('labs').delete().eq('id',id);
+  showToast('Lab deleted');closeMdl('lab-modal');renderLabs();
+}
+function openAddSvc(labId,labName){
+  document.getElementById('svc-mtit').textContent='Add service — '+labName;
+  ['svc-id','svc-name','svc-price'].forEach(function(i){document.getElementById(i).value='';});
+  document.getElementById('svc-lab-id').value=labId;
+  document.getElementById('svc-proc').value='';
+  document.getElementById('svc-del-btn').style.display='none';
+  openMdl('svc-modal');
+}
+function openEditSvc(id){
+  var s=allSvcs.find(function(x){return x.id===id;});if(!s)return;
+  document.getElementById('svc-mtit').textContent='Edit service';
+  document.getElementById('svc-id').value=s.id;
+  document.getElementById('svc-lab-id').value=s.lab_id;
+  document.getElementById('svc-name').value=s.name||'';
+  document.getElementById('svc-price').value=s.price||'';
+  document.getElementById('svc-proc').value=s.related_procedure||'';
+  document.getElementById('svc-del-btn').style.display='inline-flex';
+  openMdl('svc-modal');
+}
+async function saveSvc(){
+  var name=document.getElementById('svc-name').value.trim();
+  var price=parseFloat(document.getElementById('svc-price').value)||0;
+  if(!name){showToast('Enter service name','error');return;}
+  var id=document.getElementById('svc-id').value;
+  var labId=document.getElementById('svc-lab-id').value;
+  var payload={lab_id:labId,name:name,price:price,related_procedure:document.getElementById('svc-proc').value||null};
+  var r=id?await db.from('lab_services').update(payload).eq('id',id):await db.from('lab_services').insert([payload]);
+  if(r.error){showToast('Failed to save','error');return;}
+  showToast(id?'Service updated':'Service added');closeMdl('svc-modal');renderLabs();
+}
+async function deleteSvc(){
+  var id=document.getElementById('svc-id').value;
+  if(!id||!confirm('Delete this service?'))return;
+  await db.from('lab_services').delete().eq('id',id);
+  showToast('Deleted');closeMdl('svc-modal');renderLabs();
+}
+
+// ── LAB INSIDE PROCEDURE MODAL ────────────────────────────────────
+async function loadLabsForProc(){
+  var lr=await db.from('labs').select('*').order('name');
+  var sr=await db.from('lab_services').select('*').order('name');
+  procLabCache=lr.data||[];procSvcCache=sr.data||[];
+  var sel=document.getElementById('proc-lab');
+  if(!sel)return;
+  sel.innerHTML='<option value="">No lab</option>'+
+    procLabCache.map(function(l){return '<option value="'+l.id+'">'+l.name+'</option>';}).join('');
+}
+function onProcNameChange(name){
+  var needsLab=LAB_PROCS.indexOf(name)>=0;
+  var labSec=document.getElementById('proc-lab-section');
+  if(labSec)labSec.style.display=needsLab?'block':'none';
+  if(!needsLab){
+    var pl=document.getElementById('proc-lab');var ps=document.getElementById('proc-lab-svc');var pf=document.getElementById('proc-lab-fee');
+    if(pl)pl.value='';
+    if(ps)ps.innerHTML='<option value="">Select service...</option>';
+    if(pf)pf.value='';
+    updateProcNet();return;
+  }
+  autoMatchLabSvc(name);
+}
+async function onProcLabChange(labId){
+  var svcSel=document.getElementById('proc-lab-svc');if(!svcSel)return;
+  if(!labId){svcSel.innerHTML='<option value="">Select service...</option>';
+    var pf=document.getElementById('proc-lab-fee');if(pf)pf.value='';updateProcNet();return;}
+  var svcs=procSvcCache.filter(function(s){return s.lab_id===labId;});
+  svcSel.innerHTML='<option value="">Select service...</option>'+
+    svcs.map(function(s){return '<option value="'+s.id+'" data-price="'+s.price+'" data-proc="'+(s.related_procedure||'')+'">'+s.name+' ('+fu(s.price)+')</option>';}).join('');
+  var procName=document.getElementById('proc-name').value;
+  if(procName){var match=svcs.find(function(s){return s.related_procedure===procName;});
+    if(match){svcSel.value=match.id;var pf=document.getElementById('proc-lab-fee');if(pf)pf.value=match.price||'';updateProcNet();}}
+}
+function onProcSvcChange(svcId){
+  var svcSel=document.getElementById('proc-lab-svc');
+  var opt=svcSel?Array.from(svcSel.options).find(function(o){return o.value===svcId;}):null;
+  if(opt&&opt.dataset.price){var pf=document.getElementById('proc-lab-fee');if(pf)pf.value=opt.dataset.price;updateProcNet();}
+}
+function autoMatchLabSvc(procName){
+  var matchSvc=procSvcCache.find(function(s){return s.related_procedure===procName;});
+  if(matchSvc){var labSel=document.getElementById('proc-lab');if(labSel){labSel.value=matchSvc.lab_id;onProcLabChange(matchSvc.lab_id);}}
+}
+function updateProcNet(){
+  var fee=parseFloat((document.getElementById('proc-fee')||{}).value)||0;
+  var labFee=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
+  var net=fee-labFee;
+  var disp=document.getElementById('proc-net-disp');
+  if(labFee>0&&fee>0){
+    if(disp)disp.style.display='flex';
+    var pf=document.getElementById('pnd-fee'),pl=document.getElementById('pnd-lab'),pn=document.getElementById('pnd-net');
+    if(pf)pf.textContent=fu(fee);if(pl)pl.textContent='-'+fu(labFee);
+    if(pn){pn.textContent=fu(net);pn.style.color=net>=0?'var(--g700)':'var(--r600)';}
+  }else{if(disp)disp.style.display='none';}
+}
+
+// ══════════════════════ DASHBOARD ════════════════════════════════
+async function renderDashboard(){
+  document.getElementById('pg-actions').innerHTML='';
+  document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading dashboard...</div>';
+  var today=fd(new Date()),thisMonth=today.slice(0,7);
+  var results=await Promise.all([
+    db.from('appointments').select('*').eq('date',today),
+    db.from('invoices').select('*'),
+    db.from('payments').select('*'),
+    db.from('patients').select('*').order('created_at',{ascending:false}),
+    db.from('procedures').select('*').order('date',{ascending:false})
+  ]);
+  var todayAppts=results[0].data||[],invs=results[1].data||[],pays=results[2].data||[];
+  var pts=results[3].data||[],procs=results[4].data||[];
+  var todayPaid=pays.filter(function(p){return(p.date||'').slice(0,10)===today;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
+  var monthPaid=pays.filter(function(p){return(p.date||'').slice(0,7)===thisMonth;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
+  var totalDue=invs.reduce(function(s,inv){
+    var pd=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
+    return s+Math.max(0,Number(inv.fee||0)-pd);
+  },0);
+  var comp=todayAppts.filter(function(a){return a.status==='completed';}).length;
+  var inp=todayAppts.filter(function(a){return a.status==='inprogress';}).length;
+  var cin=todayAppts.filter(function(a){return a.status==='checkedin';}).length;
+  var upco=todayAppts.filter(function(a){return a.status==='open'||a.status==='confirmed';}).length;
+  var html=
+    '<div class="stats-row">'+
+    statC('var(--b50)','&#128197;','Today\'s appointments',todayAppts.length)+
+    statC('var(--g50)','&#128176;','Collected today',fu(todayPaid),fiQD(todayPaid))+
+    statC('var(--p50)','&#128200;','Collected this month',fu(monthPaid),fiQD(monthPaid))+
+    statC('var(--r50)','&#9888;','Outstanding balance',fu(totalDue))+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">'+
+    // Today schedule
+    '<div class="vdc-card">'+
+    '<div class="vdc-card-hdr"><div class="vdc-card-title">&#128197; Today\'s schedule</div>'+
+    '<button class="btn btnsm btnxs" onclick="goTo(\'appointments\')">Full schedule</button></div>'+
+    '<div class="vdc-card-body">'+
+    (todayAppts.length?
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'+
+      [{label:'Upcoming',val:upco,bg:'#F0F9FF',c:'#0C4A6E'},{label:'Checked in',val:cin,bg:'#FFFBEB',c:'#78350F'},{label:'In progress',val:inp,bg:'#EDE9FE',c:'#3B0764'},{label:'Completed',val:comp,bg:'#DCFCE7',c:'#14532D'}].map(function(s){
+        return '<div style="padding:5px 10px;border-radius:20px;background:'+s.bg+';color:'+s.c+';font-size:11px;font-weight:600;">'+s.val+' '+s.label+'</div>';
+      }).join('')+'</div>'+
+      todayAppts.slice(0,6).map(function(a){
+        var sc=STATUSES[a.status]||STATUSES.open;
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--s100);">'+
+          '<div style="font-size:16px;flex-shrink:0;">'+sc.emoji+'</div>'+
+          '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:var(--s800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(a.patient_name||'?')+'</div>'+
+          '<div style="font-size:10px;color:var(--s400);">'+(a.start_time||'')+' · '+(a.dentist||'')+' · '+(a.room||'')+'</div></div>'+
+          '<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:'+sc.bg+';color:'+sc.color+';white-space:nowrap;">'+sc.label+'</span></div>';
+      }).join('')+
+      (todayAppts.length>6?'<div style="font-size:11px;color:var(--s400);text-align:center;padding-top:8px;">+'+(todayAppts.length-6)+' more</div>':'')
+      :'<div style="text-align:center;padding:24px 0;font-size:13px;color:var(--s400);">No appointments today</div>')+
+    '</div></div>'+
+    // Right column
+    '<div style="display:flex;flex-direction:column;gap:14px;">'+
+    // Revenue
+    '<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">&#128200; Revenue — '+new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})+'</div></div>'+
+    '<div class="vdc-card-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
+    '<div style="background:var(--g50);border-radius:var(--radsm);padding:12px;border:1px solid var(--g100);"><div style="font-size:10px;color:var(--g700);font-weight:600;margin-bottom:4px;">COLLECTED</div>'+
+    '<div style="font-size:20px;font-weight:700;color:var(--g700);">'+fu(monthPaid)+'</div><div style="font-size:10px;color:var(--s400);margin-top:2px;">'+fiQD(monthPaid)+'</div></div>'+
+    '<div style="background:var(--r50);border-radius:var(--radsm);padding:12px;border:1px solid var(--r100);"><div style="font-size:10px;color:var(--r600);font-weight:600;margin-bottom:4px;">OUTSTANDING</div>'+
+    '<div style="font-size:20px;font-weight:700;color:var(--r600);">'+fu(totalDue)+'</div><div style="font-size:10px;color:var(--s400);margin-top:2px;">'+fiQD(totalDue)+'</div></div>'+
+    '</div></div></div>'+
+    // Recent patients
+    '<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">&#128100; Recent patients</div>'+
+    '<button class="btn btnsm btnxs" onclick="goTo(\'patients\')">All patients</button></div>'+
+    '<div class="vdc-card-body">'+
+    (pts.length?pts.slice(0,5).map(function(p){
+      var c=ptCol(p.name||''),a=age(p.dob);
+      return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--s100);cursor:pointer;" onclick="openProf(\''+p.id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">'+
+        '<div style="width:32px;height:32px;border-radius:50%;background:'+c.bg+';color:'+c.c+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">'+ini(p.name||'?')+'</div>'+
+        '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:var(--s800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+p.name+'</div>'+
+        '<div style="font-size:10px;color:var(--s400);">'+(a?a+' yrs · ':'')+(p.primary_dentist||'No dentist')+'</div></div>'+
+        stBadge(p.status)+'</div>';
+    }).join(''):'<div style="text-align:center;padding:16px 0;font-size:13px;color:var(--s400);">No patients yet</div>')+
+    '</div></div>'+
+    '</div></div>'+ // end right col + grid
+    // Recent procedures
+    '<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">&#10022; Recent procedures</div></div>'+
+    '<div class="vdc-card-body">'+
+    (procs.length?
+      '<table class="tbl"><thead><tr><th>Date</th><th>Patient</th><th>Procedure</th><th>Dentist</th><th>Fee</th><th>Status</th></tr></thead><tbody>'+
+      procs.slice(0,6).map(function(pr){
+        var sc={planned:'ba',inprogress:'bp',completed:'bg'};
+        return '<tr style="cursor:pointer;" onclick="openPtByName(\''+( pr.patient_name||'').replace(/'/g,'&#39;')+'\')">'+'<td style="font-size:10px;color:var(--s400);">'+(pr.date||'—')+'</td>'+
+          '<td style="font-weight:600;">'+(pr.patient_name||'—')+'</td>'+
+          '<td>'+(pr.procedure_name||'—')+'</td><td>'+(pr.treating_dentist||'—')+'</td>'+
+          '<td style="font-weight:700;color:var(--b700);">'+fu(pr.fee)+'</td>'+
+          '<td><span class="badge '+(sc[pr.status]||'bs')+'">'+(pr.status||'—')+'</span></td></tr>';
+      }).join('')+'</tbody></table>':
+      '<div style="text-align:center;padding:16px 0;font-size:13px;color:var(--s400);">No procedures yet</div>')+
+    '</div></div>';
+  document.getElementById('pg-content').innerHTML=html;
+}
+
+async function openPtByName(name){
+  if(!name)return;
+  var r=await db.from('patients').select('id,name').ilike('name',name);
+  if(r.data&&r.data.length>0)openProf(r.data[0].id,r.data[0].name);
+  else showToast('Patient not found','error');
+}
+
+// ══════════════════════ X-RAYS & FILES ═══════════════════════════
+function renderFiles(){
+  document.getElementById('pg-content').innerHTML=
+    '<div style="text-align:center;padding:80px 20px;">'+
+    '<div style="font-size:48px;margin-bottom:16px;">&#128247;</div>'+
+    '<h2 style="font-size:18px;font-weight:700;color:var(--s700);margin-bottom:8px;">X-rays & Files — Coming soon</h2>'+
+    '<p style="font-size:13px;color:var(--s400);">Patient file uploads with image viewer will be built next.</p></div>';
+}
 </script>
 
 <!-- LAB MODAL -->
