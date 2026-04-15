@@ -1446,7 +1446,7 @@ function buildFinUI(){
   document.getElementById('pg-content').innerHTML=html;buildFinTab();
 }
 function setFinM(m,y){finM=m;finY=y;buildFinUI();}
-function setFinT(t){finTab=t;buildFinTab();}
+function setFinT(t){finTab=t;buildFinUI();}
 function getMP(){return finProcs.filter(function(p){if(!p.date)return false;var d=new Date(p.date);return d.getMonth()===finM&&d.getFullYear()===finY;});}
 function getME(){return finExps.filter(function(e){if(!e.date)return false;var d=new Date(e.date);return d.getMonth()===finM&&d.getFullYear()===finY;});}
 function calcDist(proc){
@@ -1641,6 +1641,7 @@ async function renderLabs(){
   buildLabsUI();
 }
 function buildLabsUI(){
+  document.getElementById('pg-actions').innerHTML='<button class="btn btnp" onclick="openAddLab()">+ Add lab</button>';
   if(!allLabs.length){
     document.getElementById('pg-content').innerHTML=
       '<div style="text-align:center;padding:80px 20px;"><div style="font-size:48px;margin-bottom:16px;">&#128300;</div>'+
@@ -1648,35 +1649,56 @@ function buildLabsUI(){
       '<div style="font-size:12px;color:var(--s400);">Click &quot;+ Add lab&quot; to add your first lab</div></div>';
     return;
   }
-  var html='<div class="stats-row">'+allLabs.map(function(lab){
-    var svcs=allSvcs.filter(function(s){return s.lab_id===lab.id;});
-    return statC('var(--p50)','&#128300;',lab.name,svcs.length+' service'+(svcs.length!==1?'s':''));
-  }).join('')+'</div>'+
-  allLabs.map(function(lab){
-    var svcs=allSvcs.filter(function(s){return s.lab_id===lab.id;});
-    return '<div class="vdc-card" style="margin-bottom:14px;">'+
-      '<div class="vdc-card-hdr">'+
-      '<div><div class="vdc-card-title">&#128300; '+lab.name+'</div>'+
-      (lab.notes?'<div style="font-size:10px;color:var(--s400);margin-top:2px;">'+lab.notes+'</div>':'')+
-      '</div>'+
-      '<div style="display:flex;gap:6px;">'+
-      '<button class="btn btnsm" onclick="openAddSvc(\''+lab.id+'\',\''+lab.name+'\')">+ Add service</button>'+
-      '<button class="btn btnsm" onclick="openEditLab(\''+lab.id+'\')">Edit lab</button>'+
-      '</div></div>'+
-      '<div class="vdc-card-body">'+
-      (svcs.length?
-        '<table class="tbl"><thead><tr><th>Service</th><th>Price (USD)</th><th>Price (IQD)</th><th>Related procedure</th><th></th></tr></thead><tbody>'+
-        svcs.map(function(s){
-          return '<tr><td style="font-weight:600;">'+s.name+'</td>'+
-            '<td style="font-weight:700;color:var(--b700);">'+fu(s.price)+'</td>'+
-            '<td style="font-size:10px;color:var(--s400);">'+fiQD(s.price)+'</td>'+
-            '<td>'+(s.related_procedure?'<span class="badge bs">'+s.related_procedure+'</span>':'<span style="color:var(--s400);">General</span>')+'</td>'+
-            '<td><button class="btn btnxs" onclick="openEditSvc(\''+s.id+'\')">Edit</button></td></tr>';
-        }).join('')+'</tbody></table>':
-        '<div style="font-size:12px;color:var(--s400);padding:8px 0;">No services yet</div>')+
-      '</div></div>';
-  }).join('');
+  var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">'+
+    allLabs.map(function(lab){
+      var svcs=allSvcs.filter(function(s){return s.lab_id===lab.id;});
+      var card='<div data-labid="'+lab.id+'" style="background:white;border-radius:var(--rad);border:1.5px solid var(--s200);padding:24px 20px;cursor:pointer;transition:all 0.12s;">'+
+        '<div style="font-size:28px;margin-bottom:10px;">&#128300;</div>'+
+        '<div style="font-size:16px;font-weight:700;color:var(--s800);margin-bottom:4px;">'+lab.name+'</div>'+
+        (lab.notes?'<div style="font-size:11px;color:var(--s400);margin-bottom:10px;">'+lab.notes+'</div>':'<div style="margin-bottom:10px;"></div>')+
+        '<span style="display:inline-flex;padding:3px 10px;border-radius:20px;background:var(--p50);color:var(--p700);font-size:11px;font-weight:600;border:1px solid var(--p100);">'+
+        svcs.length+' service'+(svcs.length!==1?'s':'')+'</span>'+
+        '</div>';
+      return card;
+    }).join('')+'</div>';
   document.getElementById('pg-content').innerHTML=html;
+  // attach click via event delegation to avoid inline onclick quote issues
+  document.getElementById('pg-content').addEventListener('click',function(e){
+    var card=e.target.closest('[data-labid]');
+    if(card)openLabDetail(card.dataset.labid);
+  },{once:true});
+}
+function openLabDetail(labId){
+  var lab=allLabs.find(function(l){return l.id===labId;});if(!lab)return;
+  var svcs=allSvcs.filter(function(s){return s.lab_id===labId;});
+  var actionsEl=document.getElementById('pg-actions');
+  actionsEl.innerHTML='';
+  var backBtn=document.createElement('button');backBtn.className='btn';backBtn.textContent='\u2190 All labs';backBtn.onclick=renderLabs;
+  var addBtn=document.createElement('button');addBtn.className='btn btnsm';addBtn.textContent='+ Add service';addBtn.onclick=function(){openAddSvc(lab.id,lab.name);};
+  var editBtn=document.createElement('button');editBtn.className='btn btnsm';editBtn.textContent='Edit lab';editBtn.onclick=function(){openEditLab(lab.id);};
+  actionsEl.appendChild(backBtn);actionsEl.appendChild(addBtn);actionsEl.appendChild(editBtn);
+  document.getElementById('pg-title').textContent=lab.name;
+  document.getElementById('pg-sub').textContent=(lab.notes||'Lab services & pricing');
+  var html='<div class="vdc-card">'+
+    '<div class="vdc-card-hdr"><div class="vdc-card-title">Services &amp; prices</div></div>'+
+    '<div class="vdc-card-body">'+
+    (svcs.length?
+      '<table class="tbl"><thead><tr><th>Service</th><th>Price (USD)</th><th>Price (IQD)</th><th>Related procedure</th><th></th></tr></thead><tbody>'+
+      svcs.map(function(s){
+        return '<tr><td style="font-weight:600;">'+s.name+'</td>'+
+          '<td style="font-weight:700;color:var(--b700);">'+fu(s.price)+'</td>'+
+          '<td style="font-size:11px;color:var(--s400);">'+fiQD(s.price)+'</td>'+
+          '<td>'+(s.related_procedure?'<span class="badge bs">'+s.related_procedure+'</span>':'<span style="color:var(--s400);">General</span>')+'</td>'+
+          '<td><button class="btn btnxs" data-svcid="'+s.id+'">Edit</button></td></tr>';
+      }).join('')+'</tbody></table>':
+      '<div style="text-align:center;padding:30px 0;font-size:13px;color:var(--s400);">No services yet</div>')+
+    '</div></div>';
+  document.getElementById('pg-content').innerHTML=html;
+  // event delegation for edit buttons
+  document.getElementById('pg-content').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-svcid]');
+    if(btn)openEditSvc(btn.dataset.svcid);
+  });
 }
 function openAddLab(){
   document.getElementById('lab-mtit').textContent='Add lab';
@@ -1699,7 +1721,12 @@ async function saveLab(){
   var payload={name:name,notes:document.getElementById('lab-notes').value.trim()||null};
   var r=id?await db.from('labs').update(payload).eq('id',id):await db.from('labs').insert([payload]);
   if(r.error){showToast('Failed to save','error');return;}
-  showToast(id?'Lab updated':'Lab added');closeMdl('lab-modal');renderLabs();
+  var savedId=id||((r.data&&r.data[0])?r.data[0].id:null);
+  showToast(id?'Lab updated':'Lab added');closeMdl('lab-modal');
+  var lr2=await db.from('labs').select('*').order('name');
+  var sr2=await db.from('lab_services').select('*').order('name');
+  allLabs=lr2.data||[];allSvcs=sr2.data||[];
+  if(id)openLabDetail(id);else buildLabsUI();
 }
 async function deleteLab(){
   var id=document.getElementById('lab-id').value;
@@ -1736,13 +1763,22 @@ async function saveSvc(){
   var payload={lab_id:labId,name:name,price:price,related_procedure:document.getElementById('svc-proc').value||null};
   var r=id?await db.from('lab_services').update(payload).eq('id',id):await db.from('lab_services').insert([payload]);
   if(r.error){showToast('Failed to save','error');return;}
-  showToast(id?'Service updated':'Service added');closeMdl('svc-modal');renderLabs();
+  showToast(id?'Service updated':'Service added');closeMdl('svc-modal');
+  var lr3=await db.from('labs').select('*').order('name');
+  var sr3=await db.from('lab_services').select('*').order('name');
+  allLabs=lr3.data||[];allSvcs=sr3.data||[];
+  openLabDetail(document.getElementById('svc-lab-id').value);
 }
 async function deleteSvc(){
   var id=document.getElementById('svc-id').value;
   if(!id||!confirm('Delete this service?'))return;
   await db.from('lab_services').delete().eq('id',id);
-  showToast('Deleted');closeMdl('svc-modal');renderLabs();
+  var delLabId=document.getElementById('svc-lab-id').value;
+  showToast('Deleted');closeMdl('svc-modal');
+  var lr4=await db.from('labs').select('*').order('name');
+  var sr4=await db.from('lab_services').select('*').order('name');
+  allLabs=lr4.data||[];allSvcs=sr4.data||[];
+  openLabDetail(delLabId);
 }
 
 // ── LAB INSIDE PROCEDURE MODAL ────────────────────────────────────
