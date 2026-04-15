@@ -900,6 +900,13 @@ async function openAddProc(pid){
   document.getElementById('proc-ref').value='';document.getElementById('proc-status').value='completed';
   document.getElementById('proc-date').value=fd(new Date());
   document.getElementById('proc-del-btn').style.display='none';
+  // reset lab fields
+  var labSec=document.getElementById('proc-lab-section');if(labSec)labSec.style.display='none';
+  var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
+  var plf=document.getElementById('proc-lab-fee');if(plf)plf.value='';
+  document.getElementById('proc-name').value='';
+  // load labs from database
+  await loadLabsForProc();
   renderProcChart();openMdl('proc-modal');
 }
 async function openEditProc(id){
@@ -919,6 +926,20 @@ async function openEditProc(id){
   document.getElementById('proc-status').value=pr.status||'completed';
   document.getElementById('proc-notes').value=pr.notes||'';
   document.getElementById('proc-del-btn').style.display='inline-flex';
+  // load labs then restore lab fields
+  await loadLabsForProc();
+  var labSec=document.getElementById('proc-lab-section');
+  if(pr.lab_id){
+    if(labSec)labSec.style.display='block';
+    var pl=document.getElementById('proc-lab');if(pl)pl.value=pr.lab_id;
+    await onProcLabChange(pr.lab_id);
+    var ps=document.getElementById('proc-lab-svc');if(ps&&pr.lab_service_id)ps.value=pr.lab_service_id;
+    var pf=document.getElementById('proc-lab-fee');if(pf)pf.value=pr.lab_fee||'';
+    updateProcNet();
+  } else {
+    if(labSec)labSec.style.display='none';
+    var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
+  }
   renderProcChart();openMdl('proc-modal');
 }
 async function saveProc(){
@@ -1764,8 +1785,20 @@ function onProcSvcChange(svcId){
   if(opt&&opt.dataset.price){var pf=document.getElementById('proc-lab-fee');if(pf)pf.value=opt.dataset.price;updateProcNet();}
 }
 function autoMatchLabSvc(procName){
+  // find a service that matches this procedure across all labs
   var matchSvc=procSvcCache.find(function(s){return s.related_procedure===procName;});
-  if(matchSvc){var labSel=document.getElementById('proc-lab');if(labSel){labSel.value=matchSvc.lab_id;onProcLabChange(matchSvc.lab_id);}}
+  if(matchSvc){
+    var labSel=document.getElementById('proc-lab');
+    if(labSel){labSel.value=matchSvc.lab_id;onProcLabChange(matchSvc.lab_id);}
+  } else {
+    // no match found - just show lab dropdown empty so user can choose manually
+    var labSel=document.getElementById('proc-lab');
+    if(labSel)labSel.value='';
+    var svcSel=document.getElementById('proc-lab-svc');
+    if(svcSel)svcSel.innerHTML='<option value="">Select service...</option>';
+    var pf=document.getElementById('proc-lab-fee');if(pf)pf.value='';
+    updateProcNet();
+  }
 }
 function updateProcNet(){
   var fee=parseFloat((document.getElementById('proc-fee')||{}).value)||0;
