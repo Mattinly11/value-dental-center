@@ -206,6 +206,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         <a class="ni" id="nav-appointments" onclick="goTo('appointments')"><div class="ni-ic">&#9719;</div>Appointments</a>
         <a class="ni" id="nav-billing" onclick="goTo('billing')"><div class="ni-ic">&#128180;</div>Billing</a>
         <a class="ni" id="nav-finance" onclick="goTo('finance')"><div class="ni-ic">&#128188;</div>Staff &amp; Finance</a>
+        <a class="ni" id="nav-labs" onclick="goTo('labs')"><div class="ni-ic">&#128300;</div>Labs</a>
         <a class="ni" id="nav-files" onclick="goTo('files')"><div class="ni-ic">&#9638;</div>X-rays &amp; Files</a>
         <a class="ni" id="nav-settings" onclick="goTo('settings')"><div class="ni-ic">&#9881;</div>Settings</a>
       </div>
@@ -349,7 +350,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     </div>
     <div class="fg">
       <div class="fgrp"><label class="flbl">Procedure <span class="req">*</span></label>
-        <select class="finp" id="proc-name">
+        <select class="finp" id="proc-name" onchange="onProcNameChange(this.value)">
           <option value="">Select procedure...</option>
           <option>Consultation</option><option>Scaling &amp; polishing</option><option>Composite filling</option><option>Amalgam filling</option>
           <option>Root canal treatment</option><option>Crown (PFM)</option><option>Crown (zirconia)</option><option>Crown (metal)</option>
@@ -366,8 +367,28 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       <div class="fgrp"><label class="flbl">Referred by (partner only)</label>
         <select class="finp" id="proc-ref"><option value="">No referral</option><option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option></select></div>
     </div>
+    <!-- LAB SECTION - shown auto for crown/bridge/implant/veneer -->
+    <div id="proc-lab-section" style="display:none;background:var(--p50);border:1px solid var(--p100);border-radius:var(--radsm);padding:12px 14px;margin-bottom:13px;">
+      <div style="font-size:11px;font-weight:700;color:var(--p700);margin-bottom:8px;">&#128300; Lab work</div>
+      <div class="fg" style="margin-bottom:0;">
+        <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab</label>
+          <select class="finp" id="proc-lab" onchange="onProcLabChange(this.value)"><option value="">Select lab...</option></select></div>
+        <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab service</label>
+          <select class="finp" id="proc-lab-svc" onchange="onProcSvcChange(this.value)"><option value="">Select service...</option></select></div>
+        <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab fee (USD)</label>
+          <input class="finp" type="number" id="proc-lab-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
+      </div>
+    </div>
+    <!-- NET DISPLAY -->
+    <div id="proc-net-disp" style="display:none;background:var(--g50);border:1px solid var(--g100);border-radius:var(--radsm);padding:10px 14px;margin-bottom:13px;">
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <div><div style="font-size:10px;color:var(--s400);">Procedure fee</div><div style="font-size:14px;font-weight:700;" id="pnd-fee">/bin/sh</div></div>
+        <div><div style="font-size:10px;color:var(--s400);">Lab fee</div><div style="font-size:14px;font-weight:700;color:var(--r600);" id="pnd-lab">-/bin/sh</div></div>
+        <div><div style="font-size:10px;color:var(--s400);">Net (for split)</div><div style="font-size:14px;font-weight:700;color:var(--g700);" id="pnd-net">/bin/sh</div></div>
+      </div>
+    </div>
     <div class="fg">
-      <div class="fgrp"><label class="flbl">Fee (USD) <span class="req">*</span></label><input class="finp" type="number" id="proc-fee" placeholder="0" min="0"></div>
+      <div class="fgrp"><label class="flbl">Fee (USD) <span class="req">*</span></label><input class="finp" type="number" id="proc-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
       <div class="fgrp"><label class="flbl">Status</label>
         <select class="finp" id="proc-status"><option value="planned">Planned</option><option value="inprogress">In progress</option><option value="completed" selected>Completed</option></select></div>
     </div>
@@ -552,7 +573,7 @@ function goTo(s){
   var nav=document.getElementById('nav-'+s);if(nav)nav.classList.add('act');
   if(waitInt){clearInterval(waitInt);waitInt=null;}
   if(nowInt){clearInterval(nowInt);nowInt=null;}
-  var T={dashboard:'Dashboard',patients:'Patients',appointments:'Appointments',billing:'Billing',finance:'Staff & Finance',files:'X-rays & Files',settings:'Settings'};
+  var T={dashboard:'Dashboard',patients:'Patients',appointments:'Appointments',billing:'Billing',finance:'Staff & Finance',labs:'Labs',files:'X-rays & Files',settings:'Settings'};
   var S={patients:'Manage patients & clinical records',appointments:'Daily schedule & room management',billing:'Financial overview — all patients',finance:'Payroll & partner wallets',settings:'Clinic preferences'};
   document.getElementById('pg-title').textContent=T[s]||s;
   document.getElementById('pg-sub').textContent=S[s]||'';
@@ -561,6 +582,7 @@ function goTo(s){
   else if(s==='appointments')renderAppointments();
   else if(s==='billing')renderBilling();
   else if(s==='finance')renderFinance();
+  else if(s==='labs')renderLabs();
   else if(s==='settings')renderSettings();
   else document.getElementById('pg-content').innerHTML='<div style="text-align:center;padding:80px 20px;"><div style="font-size:48px;margin-bottom:16px;">🚧</div><h2 style="font-size:18px;font-weight:700;color:var(--s700);margin-bottom:8px;">'+(T[s]||s)+' — Coming soon</h2><p style="font-size:13px;color:var(--s400);">This section is being built.</p></div>';
 }
@@ -900,6 +922,11 @@ async function openEditProc(id){
 async function saveProc(){
   var name=document.getElementById('proc-name').value;if(!name){showToast('Select a procedure','error');return;}
   var fee=parseFloat(document.getElementById('proc-fee').value)||0;
+  var labFee=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
+  var netFee=fee-labFee;
+  var labId=(document.getElementById('proc-lab')||{}).value||null;
+  var labSvcId=(document.getElementById('proc-lab-svc')||{}).value||null;
+  var labName=labId?(procLabCache.find(function(l){return l.id===labId;})||{}).name||null:null;
   var pid=document.getElementById('proc-pid').value;
   var pname=document.getElementById('proc-pname').value;
   var id=document.getElementById('proc-id').value;
@@ -908,7 +935,9 @@ async function saveProc(){
     date:document.getElementById('proc-date').value||null,
     treating_dentist:document.getElementById('proc-dr').value||null,
     referrer:document.getElementById('proc-ref').value||null,
-    fee:fee,net_fee:fee,status:document.getElementById('proc-status').value||'completed',
+    fee:fee,lab_fee:labFee,net_fee:netFee,
+    lab_id:labId||null,lab_service_id:labSvcId||null,lab_name:labName||null,
+    status:document.getElementById('proc-status').value||'completed',
     notes:document.getElementById('proc-notes').value.trim()||null,
     teeth:teeth.length>0?teeth:null,category:'general'};
   var r=id?await db.from('procedures').update(payload).eq('id',id):await db.from('procedures').insert([payload]).select().single();
@@ -920,7 +949,8 @@ async function saveProc(){
       patient_id:pid,patient_name:pname,
       procedure_id:newP?newP.id:null,
       procedure_name:name,treating_dentist:payload.treating_dentist,
-      fee:fee,net_fee:fee,teeth:teeth.length>0?teeth:null,
+      fee:fee,lab_fee:labFee,net_fee:netFee,lab_name:labName||null,
+      teeth:teeth.length>0?teeth:null,
       date:payload.date,status:'unpaid',referrer:payload.referrer
     }]);
   }
@@ -1575,5 +1605,52 @@ function renderSettings(){
     '</div>';
 }
 </script>
+
+<!-- LAB MODAL -->
+<div class="mbg" id="lab-modal">
+  <div class="modal">
+    <div class="mtit" id="lab-mtit">Add lab</div>
+    <div class="msub">Add a dental lab you work with</div>
+    <input type="hidden" id="lab-id">
+    <div class="fgrp"><label class="flbl">Lab name <span class="req">*</span></label><input class="finp" id="lab-name" placeholder="e.g. Foton"></div>
+    <div class="fgrp"><label class="flbl">Contact / notes</label><input class="finp" id="lab-notes" placeholder="Phone, address..."></div>
+    <div class="mac">
+      <button class="btn btnr" id="lab-del-btn" style="display:none;margin-right:auto;" onclick="deleteLab()">Delete lab</button>
+      <button class="btn" onclick="closeMdl('lab-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveLab()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- LAB SERVICE MODAL -->
+<div class="mbg" id="svc-modal">
+  <div class="modal">
+    <div class="mtit" id="svc-mtit">Add service</div>
+    <input type="hidden" id="svc-id">
+    <input type="hidden" id="svc-lab-id">
+    <div class="fgrp"><label class="flbl">Service name <span class="req">*</span></label><input class="finp" id="svc-name" placeholder="e.g. Zirconia crown"></div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Price (USD) <span class="req">*</span></label><input class="finp" type="number" id="svc-price" placeholder="0" min="0"></div>
+      <div class="fgrp"><label class="flbl">Related procedure</label>
+        <select class="finp" id="svc-proc">
+          <option value="">General (any procedure)</option>
+          <option value="Crown (PFM)">Crown (PFM)</option>
+          <option value="Crown (zirconia)">Crown (zirconia)</option>
+          <option value="Crown (metal)">Crown (metal)</option>
+          <option value="Implant crown">Implant crown</option>
+          <option value="Bridge (PFM)">Bridge (PFM)</option>
+          <option value="Bridge (zirconia)">Bridge (zirconia)</option>
+          <option value="Veneer">Veneer</option>
+          <option value="Denture (full)">Denture (full)</option>
+          <option value="Denture (partial)">Denture (partial)</option>
+        </select></div>
+    </div>
+    <div class="mac">
+      <button class="btn btnr" id="svc-del-btn" style="display:none;margin-right:auto;" onclick="deleteSvc()">Delete</button>
+      <button class="btn" onclick="closeMdl('svc-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveSvc()">Save service</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
