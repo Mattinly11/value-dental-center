@@ -203,6 +203,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       <div class="snav">
         <a class="ni" id="nav-dashboard" onclick="goTo('dashboard')"><div class="ni-ic">&#8962;</div>Dashboard</a>
         <a class="ni" id="nav-patients" onclick="goTo('patients')"><div class="ni-ic">&#9673;</div>Patients</a>
+        <a class="ni" id="nav-procedures" onclick="goTo('procedures')"><div class="ni-ic">&#10010;</div>Procedures</a>
         <a class="ni" id="nav-appointments" onclick="goTo('appointments')"><div class="ni-ic">&#9719;</div>Appointments</a>
         <a class="ni" id="nav-billing" onclick="goTo('billing')"><div class="ni-ic">&#128180;</div>Billing</a>
         <a class="ni" id="nav-finance" onclick="goTo('finance')"><div class="ni-ic">&#128188;</div>Staff &amp; Finance</a>
@@ -243,7 +244,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       <div class="fgrp"><label class="flbl">Phone</label><input class="finp" id="pt-phone" placeholder="07XX XXX XXXX"></div>
     </div>
     <div class="fg">
-      <div class="fgrp"><label class="flbl">Status</label><select class="finp" id="pt-status"><option value="active">Active</option><option value="new">New</option><option value="inactive">Inactive</option></select></div>
+      <div class="fgrp"><label class="flbl">Status</label><select class="finp" id="pt-status"><option value="new">New</option><option value="active">Active</option><option value="inprogress">In progress</option><option value="followup">Follow-up needed</option><option value="completed">Completed</option><option value="inactive">Inactive</option></select></div>
       <div class="fgrp"><label class="flbl">Primary dentist</label>
         <select class="finp" id="pt-dr"><option value="">Select...</option><option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option><option>Dr. Mateen</option><option>Dr. Ibrahim</option><option>Dr. Mahmoud</option><option>Dr. Niwar</option><option>Dr. Dilveen</option></select></div>
     </div>
@@ -350,15 +351,10 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     </div>
     <div class="fg">
       <div class="fgrp"><label class="flbl">Procedure <span class="req">*</span></label>
-        <select class="finp" id="proc-name" onchange="onProcNameChange(this.value)">
+        <select class="finp" id="proc-name" onchange="onProcNameChange(this.value);onProcDefSelect(this.value)">
           <option value="">Select procedure...</option>
-          <option>Consultation</option><option>Scaling &amp; polishing</option><option>Composite filling</option><option>Amalgam filling</option>
-          <option>Root canal treatment</option><option>Crown (PFM)</option><option>Crown (zirconia)</option><option>Crown (metal)</option>
-          <option>Extraction (simple)</option><option>Extraction (surgical)</option><option>Implant placement</option><option>Implant crown</option>
-          <option>Bridge (PFM)</option><option>Bridge (zirconia)</option><option>Veneer</option><option>Bleaching</option>
-          <option>Denture (full)</option><option>Denture (partial)</option><option>Gingivectomy</option><option>Bone graft</option>
-          <option>Sinus lift</option><option>Other</option>
-        </select></div>
+        </select>
+        <div id="proc-def-hint" style="display:none;margin-top:5px;padding:6px 10px;background:var(--a50);border-radius:var(--radsm);border:1px solid var(--a100);font-size:11px;color:var(--a700);"></div></div>
       <div class="fgrp"><label class="flbl">Date</label><input class="finp" type="date" id="proc-date"></div>
     </div>
     <div class="fg">
@@ -377,6 +373,12 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
           <select class="finp" id="proc-lab-svc" onchange="onProcSvcChange(this.value)"><option value="">Select service...</option></select></div>
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab fee (USD)</label>
           <input class="finp" type="number" id="proc-lab-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
+      </div>
+      <!-- Implant fixture price -->
+      <div id="proc-fixture-wrap" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--p200);">
+        <label class="flbl">Implant fixture price (USD)</label>
+        <input class="finp" type="number" id="proc-fixture-fee" placeholder="0" min="0" oninput="updateProcNet()">
+        <div style="font-size:10px;color:var(--s400);margin-top:3px;">Deducted from procedure fee before any split</div>
       </div>
     </div>
     <!-- NET DISPLAY -->
@@ -514,6 +516,7 @@ var currentDate=new Date();
 var waitInt=null,nowInt=null,dragging=null,resizing=null,detailApptId=null;
 var allPts=[],allAppts=[];
 var profState={pid:null,pname:null,tab:'info'};
+var currentSection='patients';
 var procSelTeeth={},procIsPrim=false;
 var finTab='overview',finM=new Date().getMonth(),finY=new Date().getFullYear();
 var finProcs=[],finExps=[],finSubs=[];
@@ -545,7 +548,19 @@ function getDR(dr){if(!drRates[dr])drRates[dr]={ownPct:35,refPct:20};return drRa
 function saveRates(){localStorage.setItem('vdc-dr-rates',JSON.stringify(drRates));}
 function statC(bg,ic,lbl,val,sub){return '<div class="stat-card"><div class="stat-icon" style="background:'+bg+';">'+ic+'</div><div class="stat-lbl">'+lbl+'</div><div class="stat-val">'+val+'</div>'+(sub?'<div style="font-size:10px;color:var(--s400);margin-top:2px;">'+sub+'</div>':'')+'</div>';}
 function iRow(lbl,val){return '<div style="background:var(--s50);border-radius:var(--radsm);padding:10px 12px;"><div style="font-size:10px;color:var(--s400);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px;">'+lbl+'</div><div style="font-size:13px;font-weight:600;color:var(--s800);">'+val+'</div></div>';}
-function stBadge(s){var m={active:'bg',new:'bb',inactive:'ba'};return '<span class="badge '+(m[s]||'bb')+'">'+(s||'active')+'</span>';}
+function stBadge(s){
+  var styles={
+    active:    'background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;',
+    new:       'background:#DBEAFE;color:#1D4ED8;border:1px solid #93C5FD;',
+    inprogress:'background:#EDE9FE;color:#6D28D9;border:1px solid #C4B5FD;',
+    followup:  'background:#FEF3C7;color:#B45309;border:1px solid #FCD34D;',
+    completed: 'background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;',
+    inactive:  'background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;'
+  };
+  var labels={active:'Active',new:'New',inprogress:'In progress',followup:'Follow-up needed',completed:'Completed',inactive:'Inactive'};
+  var style=styles[s]||'background:#DBEAFE;color:#1D4ED8;border:1px solid #93C5FD;';
+  return '<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;'+style+'">'+(labels[s]||s||'New')+'</span>';
+}
 
 // AUTH
 function doLogin(){
@@ -560,7 +575,7 @@ function doLogin(){
   }else{var e=document.getElementById('li-err');e.style.display='block';setTimeout(function(){e.style.display='none';},3000);}
 }
 function doLogout(){sessionStorage.removeItem('vdc-user');location.reload();}
-window.onload=function(){
+window.onload=function(){_attachChipDelegation();
   var u=sessionStorage.getItem('vdc-user');
   if(u){document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';
     document.getElementById('sf-name').textContent=u.charAt(0).toUpperCase()+u.slice(1);
@@ -573,15 +588,28 @@ function goTo(s){
   var nav=document.getElementById('nav-'+s);if(nav)nav.classList.add('act');
   if(waitInt){clearInterval(waitInt);waitInt=null;}
   if(nowInt){clearInterval(nowInt);nowInt=null;}
-  var T={dashboard:'Dashboard',patients:'Patients',appointments:'Appointments',billing:'Billing',finance:'Staff & Finance',labs:'Labs',files:'X-rays & Files',settings:'Settings'};
+  var T={dashboard:'Dashboard',patients:'Patients',procedures:'Procedures',appointments:'Appointments',billing:'Billing',finance:'Staff & Finance',labs:'Labs',files:'X-rays & Files',settings:'Settings'};
   var S={patients:'Manage patients & clinical records',appointments:'Daily schedule & room management',billing:'Financial overview — all patients',finance:'Payroll & partner wallets',settings:'Clinic preferences'};
   document.getElementById('pg-title').textContent=T[s]||s;
   document.getElementById('pg-sub').textContent=S[s]||'';
   document.getElementById('pg-actions').innerHTML='';
+  // add refresh button to topbar sub-area
+  var rfEl=document.getElementById('topbar-refresh');
+  if(!rfEl){
+    var tb=document.querySelector('.topbar');
+    if(tb){var rfDiv=document.createElement('button');rfDiv.id='topbar-refresh';rfDiv.title='Refresh';
+      rfDiv.style.cssText='background:none;border:1px solid var(--s200);border-radius:var(--radsm);width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--s500);display:flex;align-items:center;justify-content:center;';
+      rfDiv.innerHTML='&#8635;';rfDiv.onclick=function(){currentSection&&goTo(currentSection);};
+      tb.insertBefore(rfDiv,tb.querySelector('#pg-actions'));rfEl=rfDiv;}
+  }
+  currentSection=s;
   if(s==='patients')renderPatients();
+  else if(s==='procedures')renderProceduresAdmin();
+  else if(s==='procedures')renderProcedures();
   else if(s==='appointments')renderAppointments();
   else if(s==='billing')renderBilling();
   else if(s==='finance')renderFinance();
+  else if(s==='proccatalog')renderProcCatalog();
   else if(s==='labs')renderLabs();
   else if(s==='dashboard')renderDashboard();
   else if(s==='files')renderFiles();
@@ -594,30 +622,88 @@ function closeMdl(id){var m=document.getElementById(id);if(m)m.classList.remove(
 document.addEventListener('click',function(e){if(e.target.classList.contains('mbg'))e.target.classList.remove('open');});
 // ══════════════════════ PATIENTS LIST ════════════════════════════
 var ptView=localStorage.getItem('vdc-view')||'grid',ptQ='';
+var ptFilterDr='',ptFilterStatus='',ptSort='name';
 async function renderPatients(){
-  document.getElementById('pg-actions').innerHTML=
-    '<div style="display:flex;gap:8px;align-items:center;">'+
-    '<input class="finp" id="pt-srch" placeholder="Search patients..." style="width:220px;padding:7px 12px;" value="'+ptQ+'" oninput="ptSearch(this.value)">'+
-    '<div style="display:flex;background:var(--s100);border-radius:var(--radsm);padding:2px;gap:1px;">'+
-    '<button class="btn btnsm" onclick="setPtV(\'grid\')" style="'+(ptView==='grid'?'background:white;':'')+'">&#8862;</button>'+
-    '<button class="btn btnsm" onclick="setPtV(\'list\')" style="'+(ptView==='list'?'background:white;':'')+'">&#9776;</button>'+
-    '</div><button class="btn btnp" onclick="openAddPt()">+ Add patient</button></div>';
+  document.getElementById('pg-actions').innerHTML='<button class="btn btnp" onclick="openAddPt()">+ Add patient</button>';
   document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading...</div>';
-  var r=await db.from('patients').select('*').order('created_at',{ascending:false});
+  var r=await db.from('patients').select('*').order('name');
   if(r.error){showToast('Failed to load','error');return;}
   allPts=r.data||[];buildPtList();
 }
 function buildPtList(){
   var q=ptQ.toLowerCase();
-  var list=q?allPts.filter(function(p){return(p.name||'').toLowerCase().includes(q)||(p.phone||'').includes(q)||(p.primary_dentist||'').toLowerCase().includes(q);}):allPts;
-  var active=allPts.filter(function(p){return p.status==='active';}).length;
-  var html='<div class="stats-row">'+statC('var(--b50)','&#128101;','Total patients',allPts.length)+statC('var(--g50)','&#9989;','Active',active)+statC('var(--b50)','&#127381;','New',allPts.filter(function(p){return p.status==='new';}).length)+statC('var(--a50)','&#128269;','Showing',list.length)+'</div>';
-  if(!list.length){html+='<div style="text-align:center;padding:60px 20px;color:var(--s400);"><div style="font-size:36px;margin-bottom:12px;">&#128100;</div><div style="font-size:14px;font-weight:600;margin-bottom:6px;">'+(q?'No patients found':'No patients yet')+'</div><div style="font-size:12px;">'+(q?'Try a different search':'Click "+ Add patient" to start')+'</div></div>';}
+  var list=allPts.slice();
+  // apply filters
+  if(q)list=list.filter(function(p){return(p.name||'').toLowerCase().includes(q)||(p.phone||'').includes(q)||(p.primary_dentist||'').toLowerCase().includes(q);});
+  if(ptFilterDr)list=list.filter(function(p){return(p.primary_dentist||'')=== ptFilterDr;});
+  if(ptFilterStatus)list=list.filter(function(p){return(p.status||'')=== ptFilterStatus;});
+  // sort
+  if(ptSort==='name')list.sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
+  else if(ptSort==='dentist')list.sort(function(a,b){return(a.primary_dentist||'').localeCompare(b.primary_dentist||'');});
+  else if(ptSort==='status')list.sort(function(a,b){return(a.status||'').localeCompare(b.status||'');});
+  // status counts
+  var sCounts={};
+  ['active','new','inprogress','followup','completed','inactive'].forEach(function(s){sCounts[s]=allPts.filter(function(p){return p.status===s;}).length;});
+  // filter bar
+  var ALL_DRS_OPT=['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen','Dr. Mateen','Dr. Ibrahim','Dr. Mahmoud','Dr. Niwar','Dr. Dilveen'];
+  var filterBar=
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">'+
+    '<input class="finp" id="pt-srch" placeholder="&#128269; Search name, phone..." style="flex:1;min-width:160px;padding:6px 10px;" value="'+ptQ+'" oninput="ptSearch(this.value)">'+
+    '<select class="finp" id="pt-dr-filter" style="flex:1;min-width:150px;padding:6px 10px;" onchange="ptFilterChange()">'+
+    '<option value="">All dentists</option>'+ALL_DRS_OPT.map(function(d){return'<option value="'+d+'"'+(ptFilterDr===d?' selected':'')+'>'+d+'</option>';}).join('')+
+    '</select>'+
+    '<select class="finp" id="pt-status-filter" style="flex:1;min-width:150px;padding:6px 10px;" onchange="ptFilterChange()">'+
+    '<option value="">All statuses</option>'+
+    [['new','New'],['active','Active'],['inprogress','In progress'],['followup','Follow-up needed'],['completed','Completed'],['inactive','Inactive']].map(function(s){return'<option value="'+s[0]+'"'+(ptFilterStatus===s[0]?' selected':'')+'>'+s[1]+' ('+( sCounts[s[0]]||0)+')</option>';}).join('')+
+    '</select>'+
+    '<select class="finp" id="pt-sort" style="width:140px;padding:6px 10px;" onchange="ptFilterChange()">'+
+    '<option value="name"'+(ptSort==='name'?' selected':'')+'>Sort: Name</option>'+
+    '<option value="dentist"'+(ptSort==='dentist'?' selected':'')+'>Sort: Dentist</option>'+
+    '<option value="status"'+(ptSort==='status'?' selected':'')+'>Sort: Status</option>'+
+    '</select>'+
+    '<div style="display:flex;background:var(--s100);border-radius:var(--radsm);padding:2px;gap:1px;flex-shrink:0;">'+
+    '<button class="btn btnsm" onclick="setPtV(\"grid\")" style="'+(ptView==='grid'?'background:white;':'')+'">&#8862;</button>'+
+    '<button class="btn btnsm" onclick="setPtV(\"list\")" style="'+(ptView==='list'?'background:white;':'')+'">&#9776;</button>'+
+    '</div></div>';
+  // status quick-filter chips
+  var chips=
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">'+
+    [['','All patients',allPts.length,'var(--s100)','var(--s600)'],
+     ['new','New',sCounts.new,'#DBEAFE','#1D4ED8'],
+     ['active','Active',sCounts.active,'#DCFCE7','#15803D'],
+     ['inprogress','In progress',sCounts.inprogress,'#EDE9FE','#6D28D9'],
+     ['followup','Follow-up needed',sCounts.followup,'#FEF3C7','#B45309'],
+     ['completed','Completed',sCounts.completed,'#F1F5F9','#475569'],
+     ['inactive','Inactive',sCounts.inactive,'#FEE2E2','#DC2626']
+    ].map(function(c){
+      var active=ptFilterStatus===c[0];
+      return '<button data-chip="'+c[0]+'" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid '+(active?c[3]:'var(--s200)')+';background:'+(active?c[3]:'white')+';color:'+(active?c[4]:'var(--s500)')+';">'+ c[1]+' <span style="opacity:0.7;">('+ c[2]+')</span></button>';
+    }).join('')+'</div>';
+  var html=filterBar+chips+
+    '<div class="stats-row">'+
+    statC('var(--b50)','&#128101;','Total patients',allPts.length)+
+    statC('var(--g50)','&#128100;','Active',sCounts.active)+
+    statC('var(--a50)','&#128338;','In progress',sCounts.inprogress)+
+    statC('var(--r50)','&#9888;','Follow-up needed',sCounts.followup)+
+    '</div>';
+  if(!list.length){html+='<div style="text-align:center;padding:40px 20px;color:var(--s400);"><div style="font-size:36px;margin-bottom:12px;">&#128100;</div><div style="font-size:14px;font-weight:600;margin-bottom:6px;">No patients match</div><div style="font-size:12px;">Try adjusting your filters</div></div>';}
   else if(ptView==='grid'){html+='<div class="pt-grid">'+list.map(ptCardG).join('')+'</div>';}
   else{html+='<div class="pt-list-wrap"><div class="pt-list-row pt-hdr"><div>Patient</div><div>Phone</div><div>Dentist</div><div>Status</div><div>Age</div></div>'+list.map(ptCardL).join('')+'</div>';}
   document.getElementById('pg-content').innerHTML=html;
-  if(q)setTimeout(function(){var i=document.getElementById('pt-srch');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},10);
 }
+function _attachChipDelegation(){
+  document.addEventListener('click',function(e){
+    var c=e.target.closest('[data-chip]');if(c)setStatusChip(c.dataset.chip);
+    var b=e.target.closest('[data-billchip]');if(b)setBillChip(b.dataset.billchip);
+  });
+}
+function ptFilterChange(){
+  ptFilterDr=(document.getElementById('pt-dr-filter')||{}).value||'';
+  ptFilterStatus=(document.getElementById('pt-status-filter')||{}).value||'';
+  ptSort=(document.getElementById('pt-sort')||{}).value||'name';
+  buildPtList();
+}
+function setStatusChip(s){ptFilterStatus=s;buildPtList();}
 function ptCardG(p){
   var c=ptCol(p.name||''),a=age(p.dob),av=ini(p.name||'?');
   return '<div class="pt-card" onclick="openProf(\''+p.id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">'+
@@ -900,13 +986,31 @@ async function openAddProc(pid){
   document.getElementById('proc-ref').value='';document.getElementById('proc-status').value='completed';
   document.getElementById('proc-date').value=fd(new Date());
   document.getElementById('proc-del-btn').style.display='none';
-  // reset lab fields
+  // reset lab/fixture fields
   var labSec=document.getElementById('proc-lab-section');if(labSec)labSec.style.display='none';
   var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
   var plf=document.getElementById('proc-lab-fee');if(plf)plf.value='';
-  document.getElementById('proc-name').value='';
-  // load labs from database
+  var pff=document.getElementById('proc-fixture-fee');if(pff)pff.value='';
+  var pfw=document.getElementById('proc-fixture-wrap');if(pfw)pfw.style.display='none';
+  var pdh=document.getElementById('proc-def-hint');if(pdh)pdh.style.display='none';
+  var pfee=document.getElementById('proc-fee');if(pfee){pfee.readOnly=false;pfee.style.background='';}
+  // load procedure definitions and labs
+  await loadProcDefs();
   await loadLabsForProc();
+  // populate select from definitions
+  var sel=document.getElementById('proc-name');
+  if(sel){
+    var cats={};
+    allProcDefs.forEach(function(p){if(!cats[p.category||'Other'])cats[p.category||'Other']=[];cats[p.category||'Other'].push(p);});
+    sel.innerHTML='<option value=>Select procedure...</option>';
+    Object.keys(cats).sort().forEach(function(cat){
+      var og=document.createElement('optgroup');og.label=cat;
+      cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+(p.currency==='IQD'?p.price.toLocaleString()+' IQD':fu(p.price))+')';og.appendChild(o);});
+      sel.appendChild(og);
+    });
+    if(!allProcDefs.length){['Consultation','Scaling & polishing','Composite filling','Root canal treatment','Crown (PFM)','Crown (zirconia)','Extraction','Implant placement','Implant crown','Bridge (zirconia)','Veneer','Other'].forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});}
+    sel.value='';
+  }
   renderProcChart();openMdl('proc-modal');
 }
 async function openEditProc(id){
@@ -943,9 +1047,12 @@ async function openEditProc(id){
   renderProcChart();openMdl('proc-modal');
 }
 async function saveProc(){
-  var name=document.getElementById('proc-name').value;if(!name){showToast('Select a procedure','error');return;}
+  var rawVal=document.getElementById('proc-name').value;if(!rawVal){showToast('Select a procedure','error');return;}
+  var name=getProcDisplayName()||rawVal;
   var fee=parseFloat(document.getElementById('proc-fee').value)||0;
-  var labFee=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
+  var labFeeBase=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
+  var fixtureFeeAmt=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
+  var labFee=labFeeBase+fixtureFeeAmt;
   var netFee=fee-labFee;
   var labId=(document.getElementById('proc-lab')||{}).value||null;
   var labSvcId=(document.getElementById('proc-lab-svc')||{}).value||null;
@@ -1361,12 +1468,17 @@ function editApptDetail(){
   buildSG('am-status-grid',a.status||'open','selAS');openMdl('am-modal');
 }
 // ══════════════════════ BILLING OVERVIEW ═════════════════════════
+var billFilterDr='',billFilterStatus='';
+var allInvs=[],allPays=[];
 async function renderBilling(){
   document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading...</div>';
   var ir=await db.from('invoices').select('*').order('created_at',{ascending:false});
-  var invs=ir.data||[];
   var pr=await db.from('payments').select('*');
-  var pays=pr.data||[];
+  allInvs=ir.data||[];allPays=pr.data||[];
+  buildBillingUI();
+}
+function buildBillingUI(){
+  var invs=allInvs,pays=allPays;
   var today=fd(new Date()),thisM=today.slice(0,7);
   var todayPaid=pays.filter(function(p){return(p.date||'').slice(0,10)===today;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
   var monthPaid=pays.filter(function(p){return(p.date||'').slice(0,7)===thisM;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
@@ -1374,46 +1486,94 @@ async function renderBilling(){
     var pd=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
     return s+Math.max(0,Number(inv.fee||0)-pd);
   },0);
-  // group by patient
+  // group by patient with dentist info
   var byPt={};
   invs.forEach(function(inv){
     var k=inv.patient_name||'Unknown';
-    if(!byPt[k])byPt[k]={name:k,pid:inv.patient_id,invs:[],billed:0,paid:0};
+    if(!byPt[k])byPt[k]={name:k,pid:inv.patient_id,dentist:inv.treating_dentist||'',invs:[],billed:0,paid:0};
     var pd=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
     byPt[k].invs.push(inv);byPt[k].billed+=Number(inv.fee||0);byPt[k].paid+=pd;
+    // update dentist from most recent invoice if not set
+    if(!byPt[k].dentist&&inv.treating_dentist)byPt[k].dentist=inv.treating_dentist;
   });
-  var ptList=Object.values(byPt).sort(function(a,b){return(b.billed-b.paid)-(a.billed-a.paid);});
+  var ptList=Object.values(byPt);
+  // apply filters
+  if(billFilterDr)ptList=ptList.filter(function(pt){return pt.dentist===billFilterDr||pt.invs.some(function(i){return i.treating_dentist===billFilterDr;});});
+  if(billFilterStatus==='unpaid')ptList=ptList.filter(function(pt){return(pt.billed-pt.paid)>0&&pt.paid===0;});
+  else if(billFilterStatus==='partial')ptList=ptList.filter(function(pt){return(pt.billed-pt.paid)>0&&pt.paid>0;});
+  else if(billFilterStatus==='paid')ptList=ptList.filter(function(pt){return(pt.billed-pt.paid)<=0;});
+  // sort by outstanding balance desc
+  ptList.sort(function(a,b){return(b.billed-b.paid)-(a.billed-a.paid);});
+  var unpaidCount=Object.values(byPt).filter(function(pt){return(pt.billed-pt.paid)>0&&pt.paid===0;}).length;
+  var partialCount=Object.values(byPt).filter(function(pt){return(pt.billed-pt.paid)>0&&pt.paid>0;}).length;
+  var paidCount=Object.values(byPt).filter(function(pt){return(pt.billed-pt.paid)<=0;}).length;
+  var ALL_DRS_OPT=['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen','Dr. Mateen','Dr. Ibrahim','Dr. Mahmoud','Dr. Niwar','Dr. Dilveen'];
+  var filterBar=
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">'+
+    '<input class="finp" id="bill-srch" placeholder="&#128269; Search patient..." style="flex:1;min-width:160px;padding:6px 10px;" oninput="billSearch(this.value)">'+
+    '<select class="finp" id="bill-dr-filter" style="flex:1;min-width:150px;padding:6px 10px;" onchange="billFilterChange()">'+
+    '<option value="">All dentists</option>'+ALL_DRS_OPT.map(function(d){return'<option value="'+d+'"'+(billFilterDr===d?' selected':'')+'>'+d+'</option>';}).join('')+
+    '</select>'+
+    '</div>';
+  // payment status chips
+  var chips=
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">'+
+    [['','All patients',Object.keys(byPt).length,'var(--s100)','var(--s600)'],
+     ['unpaid','Unpaid',unpaidCount,'#FEE2E2','#DC2626'],
+     ['partial','Partial',partialCount,'#FEF3C7','#B45309'],
+     ['paid','All paid',paidCount,'#DCFCE7','#15803D']
+    ].map(function(c){
+      var act=billFilterStatus===c[0];
+      return '<button data-billchip="'+c[0]+'" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid '+(act?c[3]:'var(--s200)')+';background:'+(act?c[3]:'white')+';color:'+(act?c[4]:'var(--s500)')+';">'+ c[1]+' <span style="opacity:0.7;">('+ c[2]+')</span></button>';
+    }).join('')+'</div>';
   var html=
     '<div class="stats-row">'+
     statC('var(--b50)','&#128197;','Collected today',fu(todayPaid),fiQD(todayPaid))+
     statC('var(--g50)','&#128176;','Collected this month',fu(monthPaid),fiQD(monthPaid))+
     statC('var(--r50)','&#9888;','Total outstanding',fu(totalDue))+
-    statC('var(--b50)','&#128100;','Patients billed',ptList.length)+
-    '</div>'+
-    '<div style="margin-bottom:12px;"><input class="finp" id="bill-srch" placeholder="Search patient..." style="max-width:280px;" oninput="filterBill(this.value)"></div>'+
+    statC('var(--b50)','&#128100;','Patients billed',Object.keys(byPt).length)+
+    '</div>'+filterBar+chips+
     '<div id="bill-list">';
-  html+=ptList.map(function(pt){
-    var c=ptCol(pt.name),bal=pt.billed-pt.paid;
-    return '<div class="vdc-card" style="cursor:pointer;margin-bottom:10px;" onclick="openPtBilling(\''+pt.pid+'\',\''+pt.name.replace(/'/g,'&#39;')+'\')">'+
-      '<div class="vdc-card-body">'+
-      '<div style="display:flex;align-items:center;gap:12px;">'+
-      '<div style="width:38px;height:38px;border-radius:50%;background:'+c.bg+';color:'+c.c+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">'+ini(pt.name)+'</div>'+
-      '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--s800);">'+pt.name+'</div>'+
-      '<div style="font-size:11px;color:var(--s400);margin-top:2px;">'+pt.invs.length+' invoice'+(pt.invs.length!==1?'s':'')+'</div></div>'+
-      '<div style="text-align:right;">'+
-      '<div style="font-size:13px;font-weight:700;">'+fu(pt.billed)+' billed</div>'+
-      '<div style="font-size:12px;font-weight:600;color:var(--g700);">'+fu(pt.paid)+' paid</div>'+
-      (bal>0?'<div style="font-size:12px;font-weight:700;color:var(--r600);">'+fu(bal)+' due</div>':'<span class="badge bg" style="margin-top:4px;">All paid</span>')+
-      '</div></div></div>';
-  }).join('');
+  if(!ptList.length){
+    html+='<div style="text-align:center;padding:40px 20px;color:var(--s400);font-size:13px;">No patients match this filter</div>';
+  } else {
+    html+=ptList.map(function(pt){
+      var c=ptCol(pt.name),bal=pt.billed-pt.paid;
+      var stStyle=bal<=0?'background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;':pt.paid>0?'background:#FEF3C7;color:#B45309;border:1px solid #FCD34D;':'background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;';
+      var stLabel=bal<=0?'All paid':pt.paid>0?'Partial':'Unpaid';
+      return '<div class="vdc-card" style="cursor:pointer;margin-bottom:10px;" data-pid="'+pt.pid+'" data-pname="'+pt.name.replace(/"/g,'&quot;')+'">'+
+        '<div class="vdc-card-body">'+
+        '<div style="display:flex;align-items:center;gap:12px;">'+
+        '<div style="width:38px;height:38px;border-radius:50%;background:'+c.bg+';color:'+c.c+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">'+ini(pt.name)+'</div>'+
+        '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:var(--s800);">'+pt.name+'</div>'+
+        '<div style="font-size:11px;color:var(--s400);margin-top:2px;">'+pt.invs.length+' invoice'+(pt.invs.length!==1?'s':'')+
+        (pt.dentist?' · '+pt.dentist:'')+'</div></div>'+
+        '<div style="text-align:right;flex-shrink:0;">'+
+        '<div style="font-size:13px;font-weight:700;color:var(--s800);">'+fu(pt.billed)+' billed</div>'+
+        '<div style="font-size:12px;font-weight:600;color:var(--g700);">'+fu(pt.paid)+' paid</div>'+
+        (bal>0?'<div style="font-size:12px;font-weight:700;color:var(--r600);">'+fu(bal)+' due</div>':'')+
+        '<span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;margin-top:3px;'+stStyle+'">'+stLabel+'</span>'+
+        '</div></div></div>';
+    }).join('');
+  }
   html+='</div>';
   document.getElementById('pg-content').innerHTML=html;
+  // event delegation for patient clicks
+  document.getElementById('bill-list').addEventListener('click',function(e){
+    var card=e.target.closest('[data-pid]');
+    if(card)openPtBilling(card.dataset.pid,card.dataset.pname);
+  });
 }
-function filterBill(q){
-  document.querySelectorAll('#bill-list .vdc-card').forEach(function(c){
+function billSearch(q){
+  document.querySelectorAll('#bill-list [data-pid]').forEach(function(c){
     c.style.display=(!q||(c.textContent||'').toLowerCase().includes(q.toLowerCase()))?'block':'none';
   });
 }
+function billFilterChange(){
+  billFilterDr=(document.getElementById('bill-dr-filter')||{}).value||'';
+  buildBillingUI();
+}
+function setBillChip(s){billFilterStatus=s;buildBillingUI();}
 async function openPtBilling(pid,pname){
   if(!pid){showToast('Patient not found','error');return;}
   profState.tab='billing';
@@ -1782,6 +1942,76 @@ async function deleteSvc(){
 }
 
 // ── LAB INSIDE PROCEDURE MODAL ────────────────────────────────────
+var clinicProcCache=[];
+async function loadClinicProcedures(){
+  var r=await db.from('clinic_procedures').select('*').order('category').order('name');
+  clinicProcCache=r.data||[];
+  var sel=document.getElementById('proc-name');
+  if(!sel)return;
+  if(clinicProcCache.length){
+    // populate from database
+    var grouped={};
+    clinicProcCache.forEach(function(p){
+      var c=p.category||'other';if(!grouped[c])grouped[c]=[];grouped[c].push(p);
+    });
+    var catLabels={restorative:'Restorative',surgical:'Surgical',prosthetic:'Prosthetic',implant:'Implant',
+      orthodontic:'Orthodontic',preventive:'Preventive',cosmetic:'Cosmetic',endodontic:'Endodontic',
+      periodontic:'Periodontic',other:'Other'};
+    var opts='<option value="">Select procedure...</option>';
+    Object.keys(grouped).sort().forEach(function(cat){
+      opts+='<optgroup label="'+(catLabels[cat]||cat)+'">';
+      grouped[cat].forEach(function(p){
+        opts+='<option value="'+p.id+'" data-name="'+p.name.replace(/"/g,'&quot;')+'" data-price="'+p.price+'" data-currency="'+(p.currency||'USD')+'" data-lab="'+(p.lab_involved?'1':'0')+'" data-fixture="'+(p.fixture_price||0)+'" data-override="'+(p.price_override?'1':'0')+'" data-lagsvc="'+(p.suggested_lab_svc||'')+'">'+p.name+'</option>';
+      });
+      opts+='</optgroup>';
+    });
+    sel.innerHTML=opts;
+    sel.onchange=function(){onProcSelectChange(this);};
+  }
+}
+
+function onProcSelectChange(sel){
+  var opt=sel.options[sel.selectedIndex];
+  if(!opt||!opt.value)return;
+  // auto-fill price
+  var price=opt.dataset.price,currency=opt.dataset.currency||'USD';
+  var feeEl=document.getElementById('proc-fee');
+  if(feeEl){
+    feeEl.value=price;
+    feeEl.readOnly=opt.dataset.override==='0';
+    feeEl.style.background=opt.dataset.override==='0'?'var(--s100)':'';
+    feeEl.title=opt.dataset.override==='0'?'Price locked by admin':'';
+  }
+  // auto-fill fixture cost
+  var fix=parseFloat(opt.dataset.fixture)||0;
+  if(fix>0){
+    var fixEl=document.getElementById('proc-lab-fee');
+    // fixture treated like lab fee
+    var labSec=document.getElementById('proc-lab-section');if(labSec)labSec.style.display='block';
+    if(fixEl)fixEl.value=fix;
+    updateProcNet();
+  }
+  // auto-suggest lab
+  if(opt.dataset.lab==='1'){
+    var labSec=document.getElementById('proc-lab-section');if(labSec)labSec.style.display='block';
+    if(opt.dataset.lagsvc&&opt.dataset.lagsvc!==''){
+      // find and select the lab for this service
+      var found=procSvcCache.find(function(s){return s.id===opt.dataset.lagsvc;});
+      if(found){
+        var labSel=document.getElementById('proc-lab');
+        if(labSel){labSel.value=found.lab_id;onProcLabChange(found.lab_id)
+          .then(function(){var ps=document.getElementById('proc-lab-svc');if(ps)ps.value=found.id;onProcSvcChange(found.id);});}
+      }
+    } else {
+      // use procedure name to auto-match
+      onProcNameChange(opt.dataset.name||'');
+    }
+  } else {
+    onProcNameChange(opt.dataset.name||'');
+  }
+  updateProcNet();
+}
+
 async function loadLabsForProc(){
   var lr=await db.from('labs').select('*').order('name');
   var sr=await db.from('lab_services').select('*').order('name');
@@ -1839,12 +2069,15 @@ function autoMatchLabSvc(procName){
 function updateProcNet(){
   var fee=parseFloat((document.getElementById('proc-fee')||{}).value)||0;
   var labFee=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
-  var net=fee-labFee;
+  var fixtureFee=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
+  var totalDeductions=labFee+fixtureFee;
+  var net=fee-totalDeductions;
   var disp=document.getElementById('proc-net-disp');
-  if(labFee>0&&fee>0){
+  if(totalDeductions>0&&fee>0){
     if(disp)disp.style.display='flex';
     var pf=document.getElementById('pnd-fee'),pl=document.getElementById('pnd-lab'),pn=document.getElementById('pnd-net');
-    if(pf)pf.textContent=fu(fee);if(pl)pl.textContent='-'+fu(labFee);
+    if(pf)pf.textContent=fu(fee);
+    if(pl)pl.textContent='-'+fu(totalDeductions)+(fixtureFee>0?' (lab+fixture)':'');
     if(pn){pn.textContent=fu(net);pn.style.color=net>=0?'var(--g700)':'var(--r600)';}
   }else{if(disp)disp.style.display='none';}
 }
@@ -2004,6 +2237,217 @@ function renderFiles(){
       <button class="btn btnr" id="svc-del-btn" style="display:none;margin-right:auto;" onclick="deleteSvc()">Delete</button>
       <button class="btn" onclick="closeMdl('svc-modal')">Cancel</button>
       <button class="btn btnp" onclick="saveSvc()">Save service</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROCEDURE CATALOG MODAL -->
+<div class="mbg" id="pcat-modal">
+  <div class="modal modal-wide">
+    <div class="mtit" id="pcat-mtit">Add procedure</div>
+    <div class="msub">This will appear in the procedure list when recording treatments</div>
+    <input type="hidden" id="pcat-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Procedure name <span class="req">*</span></label>
+        <input class="finp" id="pcat-name" placeholder="e.g. Crown (zirconia)"></div>
+      <div class="fgrp"><label class="flbl">Default price <span class="req">*</span></label>
+        <div style="display:flex;gap:8px;">
+          <input class="finp" type="number" id="pcat-price" placeholder="0" min="0" style="flex:1;" oninput="pcatUpdateIQD()">
+          <select class="finp" id="pcat-currency" style="width:90px;" onchange="pcatUpdateIQD()">
+            <option value="USD">USD</option>
+            <option value="IQD">IQD</option>
+          </select>
+        </div>
+        <div style="font-size:10px;color:var(--s400);margin-top:3px;" id="pcat-convert"></div>
+      </div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Lab involved?</label>
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="pcat-lab-yes" class="btn btnsm" onclick="pcatSetLab(true)" style="flex:1;">Yes — lab required</button>
+          <button type="button" id="pcat-lab-no" class="btn btnsm btnp" onclick="pcatSetLab(false)" style="flex:1;">No lab</button>
+        </div>
+        <input type="hidden" id="pcat-lab" value="false">
+      </div>
+      <div class="fgrp"><label class="flbl">Price override allowed?</label>
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="pcat-ovr-yes" class="btn btnsm btnp" onclick="pcatSetOverride(true)" style="flex:1;">Yes — dentist can change</button>
+          <button type="button" id="pcat-ovr-no" class="btn btnsm" onclick="pcatSetOverride(false)" style="flex:1;">No — price is locked</button>
+        </div>
+        <input type="hidden" id="pcat-override" value="true">
+      </div>
+    </div>
+    <div class="fgrp" id="pcat-fixture-wrap" style="display:none;">
+      <label class="flbl">Implant fixture price (USD) <span style="font-size:10px;color:var(--s400);">— deducted before split, like lab fee</span></label>
+      <input class="finp" type="number" id="pcat-fixture" placeholder="0" min="0">
+    </div>
+    <div class="fgrp"><label class="flbl">Notes / instructions for staff</label>
+      <textarea class="finp" id="pcat-notes" rows="2" placeholder="e.g. Requires pre-op X-ray, two appointments needed..."></textarea>
+    </div>
+    <div class="mac">
+      <button class="btn btnr" id="pcat-del-btn" style="display:none;margin-right:auto;" onclick="deleteProcCat()">Delete</button>
+      <button class="btn" onclick="closeMdl('pcat-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveProcCat()">Save procedure</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROCEDURE MANAGEMENT MODAL -->
+<div class="mbg" id="procmgmt-modal">
+  <div class="modal modal-wide">
+    <div class="mtit" id="procmgmt-title">Add procedure</div>
+    <div class="msub">This procedure will be available to all dentists when recording treatments</div>
+    <input type="hidden" id="pm-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Procedure name <span class="req">*</span></label>
+        <input class="finp" id="pm-name" placeholder="e.g. Zirconia Crown"></div>
+      <div class="fgrp"><label class="flbl">Category</label>
+        <select class="finp" id="pm-cat">
+          <option value="restorative">Restorative</option>
+          <option value="surgical">Surgical</option>
+          <option value="prosthetic">Prosthetic</option>
+          <option value="implant">Implant</option>
+          <option value="orthodontic">Orthodontic</option>
+          <option value="preventive">Preventive</option>
+          <option value="cosmetic">Cosmetic</option>
+          <option value="endodontic">Endodontic</option>
+          <option value="periodontic">Periodontic</option>
+          <option value="other">Other</option>
+        </select></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Default price <span class="req">*</span></label>
+        <input class="finp" type="number" id="pm-price" placeholder="0" min="0" oninput="updatePMNet()"></div>
+      <div class="fgrp"><label class="flbl">Currency</label>
+        <div style="display:flex;gap:6px;margin-top:2px;">
+          <button type="button" id="pm-usd-btn" class="btn btnsm btnp" onclick="setPMCurrency('USD')">USD $</button>
+          <button type="button" id="pm-iqd-btn" class="btn btnsm" onclick="setPMCurrency('IQD')">IQD</button>
+        </div>
+        <input type="hidden" id="pm-currency" value="USD">
+        <div style="font-size:10px;color:var(--s400);margin-top:4px;" id="pm-price-converted"></div>
+      </div>
+    </div>
+    <!-- Lab involvement -->
+    <div style="background:var(--s50);border-radius:var(--radsm);border:1px solid var(--s200);padding:12px 14px;margin-bottom:13px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:700;color:var(--s700);">&#128300; Lab involvement</div>
+        <div style="display:flex;gap:6px;">
+          <button type="button" id="pm-lab-yes" class="btn btnsm" onclick="setPMLab(true)">Yes</button>
+          <button type="button" id="pm-lab-no" class="btn btnsm btnp" onclick="setPMLab(false)">No</button>
+        </div>
+      </div>
+      <div id="pm-lab-fields" style="display:none;">
+        <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Suggested lab service (optional)</label>
+          <select class="finp" id="pm-lab-svc-suggest">
+            <option value="">No specific suggestion</option>
+          </select>
+          <div style="font-size:10px;color:var(--s400);margin-top:3px;">When this procedure is selected, this lab service will be auto-suggested</div>
+        </div>
+      </div>
+    </div>
+    <!-- Implant fixture -->
+    <div style="background:var(--b50);border-radius:var(--radsm);border:1px solid var(--b100);padding:12px 14px;margin-bottom:13px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:700;color:var(--b700);">&#128279; Implant fixture cost</div>
+        <div style="display:flex;gap:6px;">
+          <button type="button" id="pm-impl-yes" class="btn btnsm" onclick="setPMImpl(true)">Yes</button>
+          <button type="button" id="pm-impl-no" class="btn btnsm btnp" onclick="setPMImpl(false)">No</button>
+        </div>
+      </div>
+      <div id="pm-impl-fields" style="display:none;">
+        <div class="fg" style="margin-bottom:0;">
+          <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Fixture price (USD)</label>
+            <input class="finp" type="number" id="pm-fixture-price" placeholder="0" min="0" oninput="updatePMNet()"></div>
+          <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Fixture brand / notes</label>
+            <input class="finp" id="pm-fixture-notes" placeholder="e.g. Straumann BL 4.1mm"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Net display -->
+    <div id="pm-net-display" style="display:none;background:var(--g50);border:1px solid var(--g100);border-radius:var(--radsm);padding:10px 14px;margin-bottom:13px;">
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <div><div style="font-size:10px;color:var(--s400);">Procedure price</div><div style="font-size:14px;font-weight:700;" id="pm-nd-price">$0</div></div>
+        <div><div style="font-size:10px;color:var(--s400);">Fixture cost</div><div style="font-size:14px;font-weight:700;color:var(--r600);" id="pm-nd-fix">-$0</div></div>
+        <div><div style="font-size:10px;color:var(--s400);">Net (for split)</div><div style="font-size:14px;font-weight:700;color:var(--g700);" id="pm-nd-net">$0</div></div>
+      </div>
+    </div>
+    <!-- Price override -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--a50);border-radius:var(--radsm);border:1px solid var(--a100);margin-bottom:13px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--a700);">Allow price override</div>
+        <div style="font-size:10px;color:var(--a600);margin-top:2px;">If ON, dentists can change the price when recording this procedure</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button type="button" id="pm-override-yes" class="btn btnsm btnp" onclick="setPMOverride(true)">Allow</button>
+        <button type="button" id="pm-override-no" class="btn btnsm" onclick="setPMOverride(false)">Lock price</button>
+      </div>
+    </div>
+    <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Clinical notes / instructions</label>
+      <textarea class="finp" id="pm-notes" rows="2" placeholder="Internal notes for staff about this procedure..."></textarea></div>
+    <div class="mac">
+      <button class="btn btnr" id="pm-del-btn" style="display:none;margin-right:auto;" onclick="deleteProcMgmt()">Delete</button>
+      <button class="btn" onclick="closeMdl('procmgmt-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveProcMgmt()">Save procedure</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROCEDURE ADMIN MODAL -->
+<div class="mbg" id="padm-modal">
+  <div class="modal modal-wide">
+    <div class="mtit" id="padm-title">Add procedure</div>
+    <div class="msub">This procedure will appear in the procedure list when recording clinical work</div>
+    <input type="hidden" id="padm-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Procedure name <span class="req">*</span></label>
+        <input class="finp" id="padm-name" placeholder="e.g. Crown (zirconia)"></div>
+      <div class="fgrp"><label class="flbl">Category</label>
+        <select class="finp" id="padm-cat">
+          <option value="Restorative">Restorative</option>
+          <option value="Prosthetic">Prosthetic</option>
+          <option value="Surgical">Surgical</option>
+          <option value="Implant">Implant</option>
+          <option value="Orthodontic">Orthodontic</option>
+          <option value="Preventive">Preventive</option>
+          <option value="Cosmetic">Cosmetic</option>
+          <option value="Periodontal">Periodontal</option>
+          <option value="Endodontic">Endodontic</option>
+          <option value="Other">Other</option>
+        </select></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Default price <span class="req">*</span></label>
+        <div style="display:flex;gap:8px;">
+          <input class="finp" type="number" id="padm-price" placeholder="0" min="0" style="flex:1;">
+          <select class="finp" id="padm-currency" style="width:90px;">
+            <option value="USD">USD</option>
+            <option value="IQD">IQD</option>
+          </select>
+        </div></div>
+      <div class="fgrp"><label class="flbl">Price override</label>
+        <select class="finp" id="padm-override">
+          <option value="yes">Allowed — dentist can change price per case</option>
+          <option value="no">Locked — price cannot be changed</option>
+        </select></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Lab involved?</label>
+        <select class="finp" id="padm-lab" onchange="toggleImplantField()">
+          <option value="no">No lab</option>
+          <option value="yes">Yes — requires lab work</option>
+        </select></div>
+      <div class="fgrp" id="padm-implant-wrap" style="display:none;">
+        <label class="flbl">Implant fixture price (USD)</label>
+        <input class="finp" type="number" id="padm-fixture" placeholder="0" min="0">
+        <div style="font-size:10px;color:var(--s400);margin-top:3px;">Deducted from procedure fee before any split, same as lab fee</div>
+      </div>
+    </div>
+    <div class="fgrp"><label class="flbl">Clinical notes / instructions</label>
+      <textarea class="finp" id="padm-notes" rows="2" placeholder="Internal notes for staff, e.g. requires X-ray before, needs 2 appointments..."></textarea></div>
+    <div class="mac">
+      <button class="btn btnr" id="padm-del-btn" style="display:none;margin-right:auto;" onclick="deleteProcAdmin()">Delete</button>
+      <button class="btn" onclick="closeMdl('padm-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveProcAdmin()">Save procedure</button>
     </div>
   </div>
 </div>
