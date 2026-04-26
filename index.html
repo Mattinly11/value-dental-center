@@ -171,6 +171,12 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .set-sec{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:20px;margin-bottom:16px;}
 .set-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--s100);}
 .set-row:last-child{border:none;padding-bottom:0;}
+/* GLOW ANIMATIONS */
+@keyframes glow-green{0%,100%{box-shadow:0 0 6px 2px #22c55e80;}50%{box-shadow:0 0 14px 5px #22c55eb0;}}
+@keyframes glow-dollar{0%,100%{box-shadow:0 0 6px 2px #f59e0b80;}50%{box-shadow:0 0 14px 5px #f59e0bb0;}}
+.record-proc-btn{position:absolute;bottom:22px;right:3px;background:#16a34a;color:white;border:none;border-radius:5px;font-size:9px;font-weight:800;padding:2px 5px;cursor:pointer;z-index:20;animation:glow-green 1.5s infinite;white-space:nowrap;}
+.dollar-btn{position:absolute;bottom:4px;right:3px;width:18px;height:18px;border-radius:50%;background:#f59e0b;color:white;border:none;font-size:10px;font-weight:800;cursor:pointer;z-index:20;display:flex;align-items:center;justify-content:center;animation:glow-dollar 1.5s infinite;}
+.dollar-btn.paid{background:#16a34a;animation:none;}
 </style>
 </head>
 <body>
@@ -280,7 +286,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       <div class="fgrp"><label class="flbl">End <span class="req">*</span></label><input class="finp" type="time" id="am-end" step="300"></div>
     </div>
     <div class="fgrp"><label class="flbl">Procedure type</label>
-      <select class="finp" id="am-proc"><option value="">Select...</option><option>Consultation</option><option>Scaling &amp; polishing</option><option>Composite filling</option><option>Root canal treatment</option><option>Crown (PFM)</option><option>Crown (zirconia)</option><option>Extraction</option><option>Implant placement</option><option>Implant crown</option><option>Bridge (zirconia)</option><option>Veneer</option><option>Bleaching</option><option>Other</option></select></div>
+      <select class="finp" id="am-proc"><option value="">Select procedure...</option></select></div>
     <div class="fgrp"><label class="flbl">Status</label>
       <div id="am-status-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
       <input type="hidden" id="am-status" value="open"></div>
@@ -333,6 +339,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <input type="hidden" id="proc-id">
     <input type="hidden" id="proc-pid">
     <input type="hidden" id="proc-pname">
+    <input type="hidden" id="proc-appt-id">
     <!-- Dental Chart -->
     <div style="margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
@@ -985,6 +992,7 @@ async function openAddProc(pid){
   document.getElementById('proc-ref').value='';document.getElementById('proc-status').value='completed';
   document.getElementById('proc-date').value=fd(new Date());
   document.getElementById('proc-del-btn').style.display='none';
+  var apptIdEl=document.getElementById('proc-appt-id');if(apptIdEl)apptIdEl.value='';
   // reset lab/fixture fields
   var labSec=document.getElementById('proc-lab-section');if(labSec)labSec.style.display='none';
   var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
@@ -1007,7 +1015,7 @@ async function openAddProc(pid){
       cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+(p.currency==='IQD'?p.price.toLocaleString()+' IQD':fu(p.price))+')';og.appendChild(o);});
       sel.appendChild(og);
     });
-    if(!allProcDefs.length){['Consultation','Scaling & polishing','Composite filling','Root canal treatment','Crown (PFM)','Crown (zirconia)','Extraction','Implant placement','Implant crown','Bridge (zirconia)','Veneer','Other'].forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});}
+    if(!allProcDefs.length){var o=document.createElement('option');o.value='Other';o.textContent='Other (no procedures defined yet)';sel.appendChild(o);}
     sel.value='';
   }
   renderProcChart();openMdl('proc-modal');
@@ -1074,14 +1082,19 @@ async function saveProc(){
   // Create invoice immediately if new
   if(!id){
     var newP=r.data;
+    var apptId2=document.getElementById('proc-appt-id').value||null;
     await db.from('invoices').insert([{
       patient_id:pid,patient_name:pname,
       procedure_id:newP?newP.id:null,
       procedure_name:name,treating_dentist:payload.treating_dentist,
       fee:fee,lab_fee:labFee,net_fee:netFee,lab_name:labName||null,
       teeth:teeth.length>0?teeth:null,
-      date:payload.date,status:'unpaid',referrer:payload.referrer
+      date:payload.date,status:'unpaid',referrer:payload.referrer,
+      appointment_id:apptId2
     }]);
+    // reload appointment invoices so $ icon appears immediately
+    await loadApptInvoices();
+    buildSched();
   }
   showToast(id?'Procedure updated':'Procedure saved & invoice created');
   closeMdl('proc-modal');loadClinical(pid);
@@ -1153,6 +1166,8 @@ async function savePayment(){
   var ns=totalPaid>=totalFee?'paid':totalPaid>0?'partial':'unpaid';
   await db.from('invoices').update({status:ns}).eq('id',invId);
   showToast('Payment recorded!');closeMdl('pay-modal');
+  // reload $ icons on schedule if visible
+  if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
   if(profState.tab==='billing')loadBillingTab(pid,pname);
 }
 // ══════════════════════ APPOINTMENTS ═════════════════════════════
@@ -1165,6 +1180,8 @@ async function renderAppointments(){
   if(!pr.error)allPts=pr.data||[];
   var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
   if(!ar.error)allAppts=ar.data||[];
+  // load invoices for today's appointments to show $ buttons
+  await loadApptInvoices();
   buildSched();
 }
 function loadHours(){document.getElementById('ho-open').value=clinicOpen;document.getElementById('ho-close').value=clinicClose;}
@@ -1225,12 +1242,25 @@ function buildSched(){
       var sb='<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:4px;background:'+sc.border+'30;color:'+sc.color+';border:1px solid '+sc.border+';white-space:nowrap;flex-shrink:0;">'+sc.emoji+' '+sc.label+'</span>';
       var db2=a.dentist?'<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:4px;background:rgba(0,0,0,0.07);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">'+a.dentist+'</span>':'';
       var pb=a.procedure_type?'<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:4px;background:rgba(0,0,0,0.07);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%;">'+a.procedure_type+'</span>':'';
-      h+='<div class="appt-block '+sc.cls+'" id="ab-'+a.id+'" data-id="'+a.id+'" style="top:'+top+'px;height:'+height+'px;" onclick="event.stopPropagation();openApptDetail(\''+a.id+'\')">'+
+      // check if invoice exists for this appointment
+      var hasInv=apptInvoices[a.id];
+      var invPaid=hasInv&&hasInv.paid;
+      var dollarBtn='';
+      var recProcBtn='';
+      if(a.status==='completed'){
+        if(hasInv){
+          dollarBtn='<button class="dollar-btn'+(invPaid?' paid':'')+'" data-apptid="'+a.id+'" data-invid="'+hasInv.id+'" onclick="event.stopPropagation();clickDollar(event)">'+(invPaid?'✓':'$')+'</button>';
+        } else {
+          recProcBtn='<button class="record-proc-btn" data-apptid="'+a.id+'" onclick="event.stopPropagation();clickRecordProc(event)">⚡ Record</button>';
+        }
+      }
+      h+='<div class="appt-block '+sc.cls+'" id="ab-'+a.id+'" data-id="'+a.id+'" style="top:'+top+'px;height:'+height+'px;position:absolute;" onclick="event.stopPropagation();openApptDetail(\''+a.id+'\')">'+
         '<div style="display:flex;flex-direction:column;height:100%;gap:1px;">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:3px;"><span style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">'+(a.patient_name||'?')+'</span>'+sb+'</div>'+
         '<div style="display:flex;justify-content:space-between;gap:3px;">'+db2+pb+'</div>'+
         ((wt||noteH)?'<div style="display:flex;align-items:center;gap:4px;margin-top:2px;">'+wt+noteH+'</div>':'')+
-        '</div><div class="resize-handle" onmousedown="startResize(event,\''+a.id+'\')"></div></div>';
+        '</div>'+recProcBtn+dollarBtn+
+        '<div class="resize-handle" onmousedown="startResize(event,\''+a.id+'\')"></div></div>';
     });
     return h+'</div>';
   }).join('');
@@ -1362,10 +1392,17 @@ function buildSG(containerId,cur,fn){
 }
 
 // APPOINTMENT MODAL
-function openNewAppt(){
+async function openNewAppt(){
   document.getElementById('am-mtit').textContent='Book appointment';
   ['am-id','am-patient','am-notes'].forEach(function(i){document.getElementById(i).value='';});
-  document.getElementById('am-dr').value='';document.getElementById('am-room').value='';document.getElementById('am-proc').value='';
+  document.getElementById('am-dr').value='';document.getElementById('am-room').value='';
+  // load procedure definitions into appointment proc select
+  await loadProcDefs();
+  var apSel=document.getElementById('am-proc');
+  if(apSel){
+    apSel.innerHTML='<option value="">Select procedure...</option>';
+    allProcDefs.forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name;apSel.appendChild(o);});
+  }
   document.getElementById('am-date').value=fd(currentDate);document.getElementById('am-start').value=clinicOpen;
   document.getElementById('am-end').value=m2t(t2m(clinicOpen)+30);document.getElementById('am-status').value='open';
   document.getElementById('am-del-btn').style.display='none';
@@ -1445,7 +1482,9 @@ async function updateAS(ns){
   showToast(STATUSES[ns].emoji+' '+STATUSES[ns].label);
   closeMdl('ad-modal');detailApptId=null;
   var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
-  if(!ar.error)allAppts=ar.data||[];buildSched();
+  if(!ar.error)allAppts=ar.data||[];
+  await loadApptInvoices();
+  buildSched();
 }
 async function delApptDetail(){
   if(!detailApptId||!confirm('Cancel this appointment?'))return;
@@ -1789,6 +1828,13 @@ function renderSettings(){
 
 // ══════════════════════ LABS ══════════════════════════════════════
 var LAB_PROCS=['Crown (PFM)','Crown (zirconia)','Crown (metal)','Implant crown','Bridge (PFM)','Bridge (zirconia)','Veneer','Denture (full)','Denture (partial)'];
+function getLabProcs(){
+  // use procedure_definitions if loaded, otherwise fall back to hardcoded list
+  if(allProcDefs.length){
+    return allProcDefs.filter(function(p){return p.lab_involved==='yes';}).map(function(p){return p.name;});
+  }
+  return LAB_PROCS;
+}
 var allLabs=[],allSvcs=[],procLabCache=[],procSvcCache=[];
 
 async function renderLabs(){
@@ -2021,7 +2067,7 @@ async function loadLabsForProc(){
     procLabCache.map(function(l){return '<option value="'+l.id+'">'+l.name+'</option>';}).join('');
 }
 function onProcNameChange(name){
-  var needsLab=LAB_PROCS.indexOf(name)>=0;
+  var needsLab=getLabProcs().indexOf(name)>=0;
   var labSec=document.getElementById('proc-lab-section');
   if(labSec)labSec.style.display=needsLab?'block':'none';
   if(!needsLab){
@@ -2400,6 +2446,151 @@ function onProcDefSelect(name){
     if(def.notes){hint.textContent='📋 '+def.notes;hint.style.display='block';}
     else hint.style.display='none';
   }
+}
+
+
+// ══════ APPOINTMENT INVOICE TRACKING ═════════════════════════════
+var apptInvoices = {}; // apptId -> {id, fee, paid, status}
+
+async function loadApptInvoices(){
+  apptInvoices = {};
+  if(!allAppts.length) return;
+  var apptIds = allAppts.map(function(a){return a.id;});
+  // load invoices linked to these appointments
+  var ir = await db.from('invoices').select('*').in('appointment_id', apptIds);
+  var invs = ir.data || [];
+  // load payments for these invoices
+  var invIds = invs.map(function(i){return i.id;});
+  var pays = [];
+  if(invIds.length){
+    var pr = await db.from('payments').select('*').in('invoice_id', invIds);
+    pays = pr.data || [];
+  }
+  invs.forEach(function(inv){
+    var pd = pays.filter(function(p){return p.invoice_id===inv.id;})
+      .reduce(function(s,p){return s+Number(p.amount||0);},0);
+    var bal = Number(inv.fee||0) - pd;
+    apptInvoices[inv.appointment_id] = {
+      id: inv.id, fee: Number(inv.fee||0),
+      paidAmt: pd, balance: bal,
+      paid: bal <= 0,
+      status: inv.status,
+      procedure_name: inv.procedure_name,
+      patient_name: inv.patient_name,
+      patient_id: inv.patient_id
+    };
+  });
+}
+
+// Called when dentist clicks "⚡ Record" on a completed appointment
+function clickRecordProc(e){
+  var btn = e.target.closest('[data-apptid]');
+  if(!btn) return;
+  var apptId = btn.dataset.apptid;
+  var appt = allAppts.find(function(a){return a.id===apptId;});
+  if(!appt) return;
+  openAddProcFromAppt(appt);
+}
+
+// Called when receptionist clicks "$" on a completed appointment
+function clickDollar(e){
+  var btn = e.target.closest('[data-invid]');
+  if(!btn) return;
+  var invId = btn.dataset.invid;
+  var apptId = btn.dataset.apptid;
+  var inv = apptInvoices[apptId];
+  if(!inv) return;
+  if(inv.paid){showToast('This invoice is fully paid ✓');return;}
+  openPayModalFromAppt(invId, inv);
+}
+
+// Open procedure recording pre-filled from appointment
+async function openAddProcFromAppt(appt){
+  procSelTeeth = {}; procIsPrim = false;
+  document.getElementById('proc-mtit').textContent = 'Record procedure';
+  document.getElementById('proc-msub').textContent = 'Patient: ' + (appt.patient_name||'');
+  document.getElementById('proc-id').value = '';
+  document.getElementById('proc-pid').value = appt.patient_id || '';
+  document.getElementById('proc-pname').value = appt.patient_name || '';
+  // store appt id so invoice links to it
+  document.getElementById('proc-appt-id').value = appt.id;
+  ['proc-dr','proc-notes','proc-fee'].forEach(function(i){
+    var el=document.getElementById(i);if(el)el.value='';
+  });
+  document.getElementById('proc-ref').value = '';
+  document.getElementById('proc-status').value = 'completed';
+  document.getElementById('proc-date').value = appt.date || fd(new Date());
+  // pre-fill dentist from appointment
+  if(appt.dentist){var dr=document.getElementById('proc-dr');if(dr)dr.value=appt.dentist;}
+  document.getElementById('proc-del-btn').style.display = 'none';
+  // reset lab/fixture
+  var labSec=document.getElementById('proc-lab-section');if(labSec)labSec.style.display='none';
+  var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
+  var plf=document.getElementById('proc-lab-fee');if(plf)plf.value='';
+  var pff=document.getElementById('proc-fixture-fee');if(pff)pff.value='';
+  var pfw=document.getElementById('proc-fixture-wrap');if(pfw)pfw.style.display='none';
+  var pdh=document.getElementById('proc-def-hint');if(pdh)pdh.style.display='none';
+  var pfee=document.getElementById('proc-fee');if(pfee){pfee.readOnly=false;pfee.style.background='';}
+  await loadProcDefs();
+  await loadLabsForProc();
+  // populate procedure select, pre-select from appointment if available
+  var sel=document.getElementById('proc-name');
+  if(sel){
+    var cats={};
+    allProcDefs.forEach(function(p){if(!cats[p.category||'Other'])cats[p.category||'Other']=[];cats[p.category||'Other'].push(p);});
+    sel.innerHTML='<option value="">Select procedure...</option>';
+    Object.keys(cats).sort().forEach(function(cat){
+      var og=document.createElement('optgroup');og.label=cat;
+      cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+(p.currency==='IQD'?p.price.toLocaleString()+' IQD':fu(p.price))+')';og.appendChild(o);});
+      sel.appendChild(og);
+    });
+    // pre-select procedure type from appointment
+    if(appt.procedure_type && sel.querySelector('option[value="'+appt.procedure_type+'"]')){
+      sel.value=appt.procedure_type;
+      onProcNameChange(appt.procedure_type);
+      onProcDefSelect(appt.procedure_type);
+    }
+  }
+  renderProcChart();
+  openMdl('proc-modal');
+}
+
+// Open payment modal directly from $ icon
+async function openPayModalFromAppt(invId, invSummary){
+  var r = await db.from('invoices').select('*').eq('id',invId).single();
+  var inv = r.data; if(!inv) return;
+  var pr = await db.from('payments').select('*').eq('invoice_id',invId);
+  var pays = pr.data || [];
+  var paid = pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
+  var bal = Number(inv.fee||0) - paid;
+  document.getElementById('pay-inv-id').value = invId;
+  document.getElementById('pay-pid').value = inv.patient_id || '';
+  document.getElementById('pay-pname').value = inv.patient_name || '';
+  document.getElementById('pay-msub').textContent = (inv.procedure_name||'Procedure') + ' · ' + (inv.date||'');
+  document.getElementById('pay-amt').value = bal > 0 ? bal.toFixed(2) : '';
+  document.getElementById('pay-date').value = fd(new Date());
+  document.getElementById('pay-method').value = 'Cash';
+  document.querySelectorAll('.pay-btn').forEach(function(b){b.classList.remove('sel');});
+  var firstBtn=document.querySelector('.pay-btn');if(firstBtn)firstBtn.classList.add('sel');
+  // build detail
+  var payRows = pays.length ? '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--s100);">'+
+    '<div style="font-size:10px;font-weight:600;color:var(--s400);margin-bottom:4px;">PAYMENT HISTORY</div>'+
+    pays.map(function(py){return '<div style="font-size:11px;color:var(--s600);display:flex;justify-content:space-between;padding:2px 0;">'+(py.date||'')+(py.method?' · '+py.method:'')+'<strong style="color:var(--g700);">'+fu(py.amount)+'</strong></div>';}).join('')+
+    '</div>' : '';
+  document.getElementById('pay-detail').innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'+
+    '<div style="font-weight:700;color:var(--s800);">'+(inv.procedure_name||'—')+'</div>'+
+    '<span class="badge '+(bal<=0?'bg':paid>0?'ba':'br')+'">'+(bal<=0?'Paid':paid>0?'Partial':'Unpaid')+'</span></div>'+
+    (inv.teeth&&inv.teeth.length?'<div style="font-size:11px;color:var(--s500);margin-bottom:6px;">Teeth: '+inv.teeth.join(', ')+'</div>':'')+
+    (inv.treating_dentist?'<div style="font-size:11px;color:var(--s500);margin-bottom:6px;">Dentist: '+inv.treating_dentist+'</div>':'')+
+    '<div style="display:flex;gap:16px;font-size:11px;color:var(--s500);">'+
+    '<div>Total: <strong style="color:var(--s800);">'+fu(inv.fee)+'</strong></div>'+
+    (inv.lab_fee>0?'<div>Lab: <strong style="color:var(--r600);">-'+fu(inv.lab_fee)+'</strong></div>':'')+
+    '<div>Paid: <strong style="color:var(--g700);">'+fu(paid)+'</strong></div>'+
+    '<div>Balance: <strong style="color:'+(bal>0?'var(--r600)':'var(--g700)')+';">'+fu(bal)+'</strong></div>'+
+    '</div>'+payRows;
+  updatePayBal();
+  openMdl('pay-modal');
 }
 
 </script>
