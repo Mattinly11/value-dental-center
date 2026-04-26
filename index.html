@@ -2191,6 +2191,217 @@ function renderFiles(){
     '<h2 style="font-size:18px;font-weight:700;color:var(--s700);margin-bottom:8px;">X-rays & Files — Coming soon</h2>'+
     '<p style="font-size:13px;color:var(--s400);">Patient file uploads with image viewer will be built next.</p></div>';
 }
+
+// ══════════════════════ PROCEDURES ADMIN ═════════════════════════
+var allProcDefs=[];
+
+async function renderProceduresAdmin(){
+  document.getElementById('pg-actions').innerHTML='<button class="btn btnp" onclick="openAddProcAdmin()">+ Add procedure</button>';
+  document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading procedures...</div>';
+  try{
+    var r=await db.from('procedure_definitions').select('*').order('category').order('name');
+    if(r.error){
+      document.getElementById('pg-content').innerHTML=
+        '<div style="text-align:center;padding:60px 20px;">'+
+        '<div style="font-size:36px;margin-bottom:12px;">⚠️</div>'+
+        '<div style="font-size:14px;font-weight:700;color:var(--r600);margin-bottom:8px;">Table not found</div>'+
+        '<div style="font-size:12px;color:var(--s400);margin-bottom:16px;">Run the SQL setup in Supabase first</div>'+
+        '<div style="background:var(--s50);border-radius:var(--radsm);padding:12px;font-size:11px;font-family:monospace;color:var(--s600);text-align:left;max-width:500px;margin:0 auto;">'+
+        'CREATE TABLE procedure_definitions (<br>'+
+        '&nbsp;&nbsp;id uuid DEFAULT gen_random_uuid() PRIMARY KEY,<br>'+
+        '&nbsp;&nbsp;name text NOT NULL,<br>'+
+        '&nbsp;&nbsp;category text DEFAULT Other,<br>'+
+        '&nbsp;&nbsp;price numeric DEFAULT 0,<br>'+
+        '&nbsp;&nbsp;currency text DEFAULT USD,<br>'+
+        '&nbsp;&nbsp;price_override text DEFAULT yes,<br>'+
+        '&nbsp;&nbsp;lab_involved text DEFAULT no,<br>'+
+        '&nbsp;&nbsp;fixture_price numeric DEFAULT 0,<br>'+
+        '&nbsp;&nbsp;notes text,<br>'+
+        '&nbsp;&nbsp;created_at timestamptz DEFAULT now()<br>'+
+        ');<br>'+
+        'ALTER TABLE procedure_definitions ENABLE ROW LEVEL SECURITY;<br>'+
+        'CREATE POLICY "Allow all" ON procedure_definitions FOR ALL USING (true) WITH CHECK (true);'+
+        '</div></div>';
+      return;
+    }
+    allProcDefs=r.data||[];
+    buildProcAdminUI();
+  }catch(e){
+    document.getElementById('pg-content').innerHTML='<div style="text-align:center;padding:60px 20px;color:var(--r600);">Error loading procedures: '+e.message+'</div>';
+  }
+}
+
+function buildProcAdminUI(){
+  if(!allProcDefs.length){
+    document.getElementById('pg-content').innerHTML=
+      '<div style="text-align:center;padding:80px 20px;">'+
+      '<div style="font-size:48px;margin-bottom:16px;">&#10010;</div>'+
+      '<div style="font-size:14px;font-weight:700;color:var(--s600);margin-bottom:6px;">No procedures yet</div>'+
+      '<div style="font-size:12px;color:var(--s400);">Click &quot;+ Add procedure&quot; to build your list</div></div>';
+    return;
+  }
+  var cats={};
+  allProcDefs.forEach(function(p){var c=p.category||'Other';if(!cats[c])cats[c]=[];cats[c].push(p);});
+  var total=allProcDefs.length;
+  var labCnt=allProcDefs.filter(function(p){return p.lab_involved==='yes';}).length;
+  var fixCnt=allProcDefs.filter(function(p){return p.fixture_price>0;}).length;
+  var html=
+    '<div class="stats-row">'+
+    statC('var(--b50)','&#10010;','Total procedures',total)+
+    statC('var(--p50)','&#128300;','Lab involved',labCnt)+
+    statC('var(--a50)','&#129454;','With fixture price',fixCnt)+
+    statC('var(--g50)','&#128202;','Categories',Object.keys(cats).length)+
+    '</div>';
+  Object.keys(cats).sort().forEach(function(cat){
+    var procs=cats[cat];
+    html+='<div class="vdc-card" style="margin-bottom:14px;">'+
+      '<div class="vdc-card-hdr">'+
+      '<div style="display:flex;align-items:center;gap:8px;">'+
+      '<div class="vdc-card-title">'+cat+'</div>'+
+      '<span style="font-size:10px;color:var(--s400);">('+procs.length+')</span>'+
+      '</div></div>'+
+      '<div class="vdc-card-body" style="padding:0;">'+
+      '<table class="tbl"><thead><tr>'+
+      '<th>Name</th><th>Default price</th><th>Lab</th><th>Fixture fee</th><th>Override</th><th>Notes</th><th></th>'+
+      '</tr></thead><tbody>'+
+      procs.map(function(p){
+        var price=p.currency==='IQD'?p.price.toLocaleString()+' IQD':fu(p.price);
+        var priceUSD=p.currency==='IQD'?'≈'+fu(p.price/1310):'';
+        return '<tr>'+
+          '<td style="font-weight:700;color:var(--s800);">'+p.name+'</td>'+
+          '<td><div style="font-weight:700;color:var(--b700);">'+price+'</div>'+
+          (priceUSD?'<div style="font-size:10px;color:var(--s400);">'+priceUSD+'</div>':'')+
+          '</td>'+
+          '<td>'+(p.lab_involved==='yes'?'<span class="badge bp">&#128300; Yes</span>':'<span style="color:var(--s400);font-size:11px;">No</span>')+'</td>'+
+          '<td>'+(p.fixture_price>0?'<span style="font-weight:600;color:var(--a700);">'+fu(p.fixture_price)+'</span>':'<span style="color:var(--s400);">—</span>')+'</td>'+
+          '<td>'+(p.price_override==='no'?'<span class="badge br">Locked</span>':'<span class="badge bg">Editable</span>')+'</td>'+
+          '<td style="font-size:10px;color:var(--s400);font-style:italic;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(p.notes||'—')+'</td>'+
+          '<td><button class="btn btnxs" data-padm-id="'+p.id+'">Edit</button></td>'+
+          '</tr>';
+      }).join('')+'</tbody></table></div></div>';
+  });
+  document.getElementById('pg-content').innerHTML=html;
+  document.getElementById('pg-content').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-padm-id]');
+    if(btn)openEditProcAdmin(btn.dataset.padmId);
+  });
+}
+
+function toggleImplantField(){
+  var v=document.getElementById('padm-lab').value;
+  var w=document.getElementById('padm-implant-wrap');
+  if(w)w.style.display=v==='yes'?'block':'none';
+}
+
+function openAddProcAdmin(){
+  document.getElementById('padm-title').textContent='Add procedure';
+  document.getElementById('padm-id').value='';
+  document.getElementById('padm-name').value='';
+  document.getElementById('padm-cat').value='Restorative';
+  document.getElementById('padm-price').value='';
+  document.getElementById('padm-currency').value='USD';
+  document.getElementById('padm-override').value='yes';
+  document.getElementById('padm-lab').value='no';
+  document.getElementById('padm-fixture').value='';
+  document.getElementById('padm-notes').value='';
+  document.getElementById('padm-del-btn').style.display='none';
+  toggleImplantField();
+  openMdl('padm-modal');
+}
+
+function openEditProcAdmin(id){
+  var p=allProcDefs.find(function(x){return x.id===id;});if(!p)return;
+  document.getElementById('padm-title').textContent='Edit procedure';
+  document.getElementById('padm-id').value=p.id;
+  document.getElementById('padm-name').value=p.name||'';
+  document.getElementById('padm-cat').value=p.category||'Other';
+  document.getElementById('padm-price').value=p.price||'';
+  document.getElementById('padm-currency').value=p.currency||'USD';
+  document.getElementById('padm-override').value=p.price_override||'yes';
+  document.getElementById('padm-lab').value=p.lab_involved||'no';
+  document.getElementById('padm-fixture').value=p.fixture_price||'';
+  document.getElementById('padm-notes').value=p.notes||'';
+  document.getElementById('padm-del-btn').style.display='inline-flex';
+  toggleImplantField();
+  openMdl('padm-modal');
+}
+
+async function saveProcAdmin(){
+  var name=document.getElementById('padm-name').value.trim();
+  if(!name){showToast('Enter procedure name','error');return;}
+  var id=document.getElementById('padm-id').value;
+  var payload={
+    name:name,
+    category:document.getElementById('padm-cat').value,
+    price:parseFloat(document.getElementById('padm-price').value)||0,
+    currency:document.getElementById('padm-currency').value,
+    price_override:document.getElementById('padm-override').value,
+    lab_involved:document.getElementById('padm-lab').value,
+    fixture_price:parseFloat(document.getElementById('padm-fixture').value)||0,
+    notes:document.getElementById('padm-notes').value.trim()||null
+  };
+  var r=id
+    ?await db.from('procedure_definitions').update(payload).eq('id',id)
+    :await db.from('procedure_definitions').insert([payload]);
+  if(r.error){showToast('Failed to save','error');console.error(r.error);return;}
+  showToast(id?'Procedure updated':'Procedure added');
+  closeMdl('padm-modal');
+  allProcDefs=[];
+  renderProceduresAdmin();
+}
+
+async function deleteProcAdmin(){
+  var id=document.getElementById('padm-id').value;
+  if(!id||!confirm('Delete this procedure?'))return;
+  var r=await db.from('procedure_definitions').delete().eq('id',id);
+  if(r.error){showToast('Failed to delete','error');return;}
+  showToast('Deleted');
+  closeMdl('padm-modal');
+  allProcDefs=[];
+  renderProceduresAdmin();
+}
+
+async function loadProcDefs(){
+  if(allProcDefs.length)return;
+  try{
+    var r=await db.from('procedure_definitions').select('*').order('category').order('name');
+    allProcDefs=r.data||[];
+  }catch(e){allProcDefs=[];}
+}
+
+function onProcDefSelect(name){
+  var def=allProcDefs.find(function(p){return p.name===name;});
+  if(!def)return;
+  var feeEl=document.getElementById('proc-fee');
+  if(feeEl){
+    var priceUSD=def.currency==='IQD'?(def.price/1310).toFixed(2):def.price;
+    feeEl.value=priceUSD;
+    feeEl.readOnly=def.price_override==='no';
+    feeEl.style.background=def.price_override==='no'?'var(--s100)':'';
+    feeEl.title=def.price_override==='no'?'Price locked by admin':'';
+  }
+  var fixEl=document.getElementById('proc-fixture-fee');
+  var fixWrap=document.getElementById('proc-fixture-wrap');
+  if(fixEl&&def.fixture_price>0){
+    fixEl.value=def.fixture_price;
+    if(fixWrap)fixWrap.style.display='block';
+    updateProcNet();
+  } else if(fixEl){
+    fixEl.value='';
+    if(fixWrap)fixWrap.style.display='none';
+  }
+  if(def.lab_involved==='yes'){
+    var labSec=document.getElementById('proc-lab-section');
+    if(labSec)labSec.style.display='block';
+    autoMatchLabSvc(name);
+  }
+  var hint=document.getElementById('proc-def-hint');
+  if(hint){
+    if(def.notes){hint.textContent='📋 '+def.notes;hint.style.display='block';}
+    else hint.style.display='none';
+  }
+}
+
 </script>
 
 <!-- LAB MODAL -->
