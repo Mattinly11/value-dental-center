@@ -1055,7 +1055,7 @@ async function openEditProc(id){
 }
 async function saveProc(){
   var rawVal=document.getElementById('proc-name').value;if(!rawVal){showToast('Select a procedure','error');return;}
-  var name=getProcDisplayName()||rawVal;
+  var name=rawVal;
   var fee=parseFloat(document.getElementById('proc-fee').value)||0;
   var labFeeBase=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
   var fixtureFeeAmt=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
@@ -1083,7 +1083,7 @@ async function saveProc(){
   if(!id){
     var newP=r.data;
     var apptId2=document.getElementById('proc-appt-id').value||null;
-    await db.from('invoices').insert([{
+    var invRes=await db.from('invoices').insert([{
       patient_id:pid,patient_name:pname,
       procedure_id:newP?newP.id:null,
       procedure_name:name,treating_dentist:payload.treating_dentist,
@@ -1092,12 +1092,16 @@ async function saveProc(){
       date:payload.date,status:'unpaid',referrer:payload.referrer,
       appointment_id:apptId2
     }]);
+    if(invRes.error){showToast('Procedure saved but invoice failed: '+invRes.error.message,'error');console.error(invRes.error);}
     // reload appointment invoices so $ icon appears immediately
-    await loadApptInvoices();
-    buildSched();
+    if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
   }
   showToast(id?'Procedure updated':'Procedure saved & invoice created');
-  closeMdl('proc-modal');loadClinical(pid);
+  closeMdl('proc-modal');
+  // only reload clinical tab if we're on a patient profile
+  if(profState.pid && profState.tab==='clinical'){
+    loadClinical(pid);
+  }
 }
 async function deleteProc(){
   var id=document.getElementById('proc-id').value;if(!id||!confirm('Delete this procedure?'))return;
