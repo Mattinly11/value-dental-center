@@ -1054,12 +1054,12 @@ async function openEditProc(id){
   renderProcChart();openMdl('proc-modal');
 }
 async function saveProc(){
-  var rawVal=document.getElementById('proc-name').value;if(!rawVal){showToast('Select a procedure','error');return;}
+  var rawVal=document.getElementById('proc-name').value;
+  if(!rawVal){showToast('Select a procedure','error');return;}
   var name=rawVal;
   var pid=document.getElementById('proc-pid').value;
   var pname=document.getElementById('proc-pname').value;
-  // Debug: show what we have
-  if(!pid){showToast('Error: No patient ID found. Please try again.','error');alert('DEBUG: pid='+pid+' pname='+pname+' name='+name);return;}
+  if(!pid){showToast('No patient ID — please reopen from patient profile','error');return;}
   var fee=parseFloat(document.getElementById('proc-fee').value)||0;
   var labFeeBase=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
   var fixtureFeeAmt=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
@@ -1070,7 +1070,8 @@ async function saveProc(){
   var labName=labId?(procLabCache.find(function(l){return l.id===labId;})||{}).name||null:null;
   var id=document.getElementById('proc-id').value;
   var teeth=Object.keys(procSelTeeth).map(function(n){return parseInt(n);}).sort(function(a,b){return a-b;});
-  var payload={patient_id:pid,patient_name:pname,procedure_name:name,
+  var payload={
+    patient_id:pid,patient_name:pname,procedure_name:name,
     date:document.getElementById('proc-date').value||null,
     treating_dentist:document.getElementById('proc-dr').value||null,
     referrer:document.getElementById('proc-ref').value||null,
@@ -1078,32 +1079,42 @@ async function saveProc(){
     lab_id:labId||null,lab_service_id:labSvcId||null,lab_name:labName||null,
     status:document.getElementById('proc-status').value||'completed',
     notes:document.getElementById('proc-notes').value.trim()||null,
-    teeth:teeth.length>0?teeth:null,category:'general'};
-  var r=id?await db.from('procedures').update(payload).eq('id',id):await db.from('procedures').insert([payload]).select().single();
-  if(r.error){showToast('Error: '+r.error.message,'error');console.error(r.error);alert('SAVE ERROR: '+r.error.message);return;}
-  // Create invoice immediately if new
+    teeth:teeth.length>0?teeth:null,
+    category:'general'
+  };
+  var r=id
+    ?await db.from('procedures').update(payload).eq('id',id)
+    :await db.from('procedures').insert([payload]).select().single();
+  if(r.error){
+    showToast('Failed: '+r.error.message,'error');
+    console.error('saveProc error:',r.error);
+    return;
+  }
   if(!id){
     var newP=r.data;
     var apptId2=document.getElementById('proc-appt-id').value||null;
     var invRes=await db.from('invoices').insert([{
       patient_id:pid,patient_name:pname,
       procedure_id:newP?newP.id:null,
-      procedure_name:name,treating_dentist:payload.treating_dentist,
-      fee:fee,lab_fee:labFee,net_fee:netFee,lab_name:labName||null,
+      procedure_name:name,
+      treating_dentist:payload.treating_dentist,
+      fee:fee,lab_fee:labFee,net_fee:netFee,
+      lab_name:labName||null,
       teeth:teeth.length>0?teeth:null,
-      date:payload.date,status:'unpaid',referrer:payload.referrer,
+      date:payload.date,
+      status:'unpaid',
+      referrer:payload.referrer,
       appointment_id:apptId2
     }]);
-    if(invRes.error){showToast('Procedure saved but invoice failed: '+invRes.error.message,'error');console.error(invRes.error);}
-    // reload appointment invoices so $ icon appears immediately
+    if(invRes.error){
+      showToast('Procedure saved but invoice failed: '+invRes.error.message,'error');
+      console.error('invoice error:',invRes.error);
+    }
     if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
   }
   showToast(id?'Procedure updated':'Procedure saved & invoice created');
   closeMdl('proc-modal');
-  // only reload clinical tab if we're on a patient profile
-  if(profState.pid && profState.tab==='clinical'){
-    loadClinical(pid);
-  }
+  if(profState.pid&&profState.tab==='clinical'){loadClinical(pid);}
 }
 async function deleteProc(){
   var id=document.getElementById('proc-id').value;if(!id||!confirm('Delete this procedure?'))return;
