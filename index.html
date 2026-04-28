@@ -1078,7 +1078,11 @@ async function saveProc(){
     notes:document.getElementById('proc-notes').value.trim()||null,
     teeth:teeth.length>0?teeth:null,category:'general'};
   var r=id?await db.from('procedures').update(payload).eq('id',id):await db.from('procedures').insert([payload]).select().single();
-  if(r.error){showToast('Failed to save','error');console.error(r.error);return;}
+  if(r.error){showToast('Error: '+r.error.message,'error');console.error('PROC SAVE ERROR:',JSON.stringify(r.error));alert('Save failed: '+r.error.message+'
+
+Code: '+r.error.code+'
+
+Details: '+r.error.details);return;}
   // Create invoice immediately if new
   if(!id){
     var newP=r.data;
