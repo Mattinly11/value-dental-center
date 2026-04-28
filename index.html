@@ -69,8 +69,8 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 /* MODALS */
 .mbg{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:300;align-items:center;justify-content:center;padding:20px;}
 .mbg.open{display:flex;}
-.modal{background:white;border-radius:16px;padding:24px;width:500px;max-width:100%;box-shadow:0 16px 48px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;}
-.mw{width:620px;} .mxl{width:800px;}
+.modal{background:white;border-radius:16px;padding:24px;width:560px;max-width:100%;box-shadow:0 16px 48px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;}
+.mw{width:700px;} .mxl{width:900px;}
 .mtit{font-size:15px;font-weight:700;color:var(--s800);margin-bottom:3px;}
 .msub{font-size:11px;color:var(--s400);margin-bottom:18px;}
 .mac{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;}
@@ -257,7 +257,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <div class="fgrp"><label class="flbl">Medical notes</label><textarea class="finp" id="pt-notes" rows="2" placeholder="Allergies, conditions..."></textarea></div>
     <div class="mac">
       <button class="btn btnr" id="pt-del-btn" style="display:none;margin-right:auto;" onclick="deletePatient()">Delete</button>
-      <button class="btn" onclick="closeMdl('pt-modal')">Cancel</button>
+      <button class="btn" onclick="closePtModal()">Cancel</button>
       <button class="btn btnp" onclick="savePatient()">Save patient</button>
     </div>
   </div>
@@ -271,7 +271,10 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <input type="hidden" id="am-id">
     <div class="fg">
       <div class="fgrp"><label class="flbl">Patient <span class="req">*</span></label>
-        <input class="finp" id="am-patient" list="pt-dl" placeholder="Type patient name..." autocomplete="off">
+        <div style="display:flex;gap:8px;">
+          <input class="finp" id="am-patient" list="pt-dl" placeholder="Type patient name..." autocomplete="off" style="flex:1;">
+          <button type="button" class="btn btnsm btnp" onclick="openAddPtFromAppt()" title="Register new patient" style="flex-shrink:0;white-space:nowrap;">+ New patient</button>
+        </div>
         <datalist id="pt-dl"></datalist></div>
       <div class="fgrp"><label class="flbl">Dentist <span class="req">*</span></label>
         <select class="finp" id="am-dr"><option value="">Select...</option><option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option><option>Dr. Mateen</option><option>Dr. Ibrahim</option><option>Dr. Mahmoud</option><option>Dr. Niwar</option><option>Dr. Dilveen</option></select></div>
@@ -289,7 +292,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       <label class="flbl">Duration — <span id="am-dur-label" style="color:var(--b600);font-weight:700;">30 min</span></label>
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="font-size:10px;color:var(--s400);">15m</span>
-        <input type="range" id="am-dur" min="1" max="12" value="2" step="1" style="flex:1;accent-color:var(--b600);" oninput="onDurSlider(this.value)">
+        <input type="range" id="am-dur" min="1" max="17" value="2" step="1" style="flex:1;accent-color:var(--b600);" oninput="onDurSlider(this.value)">
         <span style="font-size:10px;color:var(--s400);">3h</span>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:4px;">
@@ -1161,6 +1164,8 @@ async function saveProc(){
   showToast(id?'Procedure updated':'Procedure saved & invoice created');
   closeMdl('proc-modal');
   if(profState.pid&&profState.tab==='clinical'){loadClinical(pid);}
+  // show patient status update modal
+  if(pid && pname){openPtStatusModal(pid,pname);}
 }
 async function deleteProc(){
   var id=document.getElementById('proc-id').value;if(!id||!confirm('Delete this procedure?'))return;
@@ -1227,9 +1232,13 @@ async function savePayment(){
   var totalPaid=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
   var ns=totalPaid>=totalFee?'paid':totalPaid>0?'partial':'unpaid';
   await db.from('invoices').update({status:ns}).eq('id',invId);
-  showToast('Payment recorded!');closeMdl('pay-modal');
-  // reload $ icons on schedule if visible
-  if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
+  showToast('Payment recorded! 💰');
+  closeMdl('pay-modal');
+  closeMdl('ad-modal');
+  // always return to calendar and refresh
+  await loadApptInvoices();
+  if(currentSection==='appointments'){buildSched();}
+  else{goTo('appointments');}
   if(profState.tab==='billing')loadBillingTab(pid,pname);
 }
 // ══════════════════════ APPOINTMENTS ═════════════════════════════
@@ -2700,7 +2709,7 @@ async function openPayModalFromAppt(invId, invSummary){
 
 // ══════════ APPOINTMENT BOOKING — DURATION + TEETH ═══════════════
 var amSelTeeth={}, amIsPrim=false;
-var DUR_STEPS=[15,30,45,60,75,90,105,120,150,180,210,240];
+var DUR_STEPS=[15,30,45,60,75,90,105,120,150,180,210,240,270,300,360,420,480];
 
 function onDurSlider(val){
   var mins=DUR_STEPS[parseInt(val)-1]||30;
@@ -2752,24 +2761,59 @@ var procForms=[]; // tracks extra procedure forms added
 function addAnotherProc(){
   var container=document.getElementById('extra-procs-container');
   if(!container)return;
-  var idx=procForms.length+1;
+  var idx=Date.now(); // unique id
   procForms.push(idx);
+  var epTeeth={};
   var div=document.createElement('div');
   div.id='extra-proc-'+idx;
-  div.style.cssText='margin-top:16px;padding-top:16px;border-top:2px dashed var(--b200);position:relative;';
-  div.innerHTML=
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
-    '<div style="font-size:12px;font-weight:700;color:var(--b600);">Procedure #'+(idx+1)+'</div>'+
+  div.style.cssText='margin-top:16px;padding-top:16px;border-top:2px dashed var(--b200);';
+
+  // build HTML
+  var html=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--b600);">&#10010; Additional procedure</div>'+
     '<button type="button" class="btn btnr btnxs" onclick="removeExtraProc('+idx+')">Remove</button></div>'+
-    '<div class="fg"><div class="fgrp"><label class="flbl">Procedure</label>'+
+    // Dental chart
+    '<div style="margin-bottom:10px;">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:4px;">'+
+    '<div style="font-size:11px;font-weight:600;color:var(--s600);">Teeth (optional)</div>'+
+    '<div style="display:flex;gap:4px;flex-wrap:wrap;">'+
+    '<button type="button" class="btn btnxs" onclick="epQS('+idx+',\"upper\")">Upper</button>'+
+    '<button type="button" class="btn btnxs" onclick="epQS('+idx+',\"lower\")">Lower</button>'+
+    '<button type="button" class="btn btnxs" onclick="epQS('+idx+',\"clear\")">Clear</button>'+
+    '</div></div>'+
+    '<div id="ep-chart-'+idx+'" style="background:var(--s50);border-radius:var(--radsm);padding:8px;border:1px solid var(--s200);overflow-x:auto;text-align:center;"></div>'+
+    '<div style="font-size:10px;color:var(--b700);font-weight:600;margin-top:3px;" id="ep-sel-lbl-'+idx+'">0 teeth selected</div></div>'+
+    // Procedure + date
+    '<div class="fg">'+
+    '<div class="fgrp"><label class="flbl">Procedure <span class="req">*</span></label>'+
     '<select class="finp" id="ep-name-'+idx+'"><option value="">Select...</option></select></div>'+
-    '<div class="fgrp"><label class="flbl">Fee (USD)</label>'+
-    '<input class="finp" type="number" id="ep-fee-'+idx+'" placeholder="0" min="0"></div></div>'+
+    '<div class="fgrp"><label class="flbl">Date</label>'+
+    '<input class="finp" type="date" id="ep-date-'+idx+'" value="'+fd(new Date())+'"></div></div>'+
+    // Dentist + referrer
+    '<div class="fg">'+
+    '<div class="fgrp"><label class="flbl">Treating dentist</label>'+
+    '<select class="finp" id="ep-dr-'+idx+'"><option value="">Select...</option>'+
+    ['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen','Dr. Mateen','Dr. Ibrahim','Dr. Mahmoud','Dr. Niwar','Dr. Dilveen'].map(function(d){return'<option>'+d+'</option>';}).join('')+
+    '</select></div>'+
+    '<div class="fgrp"><label class="flbl">Referred by (partner)</label>'+
+    '<select class="finp" id="ep-ref-'+idx+'"><option value="">No referral</option>'+
+    ['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen'].map(function(d){return'<option>'+d+'</option>';}).join('')+
+    '</select></div></div>'+
+    // Fee + status
+    '<div class="fg">'+
+    '<div class="fgrp"><label class="flbl">Fee (USD) <span class="req">*</span></label>'+
+    '<input class="finp" type="number" id="ep-fee-'+idx+'" placeholder="0" min="0"></div>'+
+    '<div class="fgrp"><label class="flbl">Status</label>'+
+    '<select class="finp" id="ep-status-'+idx+'"><option value="completed" selected>Completed</option><option value="inprogress">In progress</option><option value="planned">Planned</option></select></div></div>'+
     '<div class="fgrp"><label class="flbl">Notes</label>'+
-    '<textarea class="finp" id="ep-notes-'+idx+'" rows="1" placeholder="Additional notes..."></textarea></div>';
+    '<textarea class="finp" id="ep-notes-'+idx+'" rows="2" placeholder="Clinical notes..."></textarea></div>';
+
+  div.innerHTML=html;
   container.appendChild(div);
-  // populate proc select for this extra form
-  var sel=div.querySelector('select');
+
+  // populate proc select
+  var sel=document.getElementById('ep-name-'+idx);
   if(sel){
     var cats={};allProcDefs.forEach(function(p){if(!cats[p.category||'Other'])cats[p.category||'Other']=[];cats[p.category||'Other'].push(p);});
     Object.keys(cats).sort().forEach(function(cat){
@@ -2779,9 +2823,39 @@ function addAnotherProc(){
     });
     sel.addEventListener('change',function(){
       var def=allProcDefs.find(function(d){return d.name===sel.value;});
-      if(def){var feeEl=div.querySelector('#ep-fee-'+idx);if(feeEl)feeEl.value=def.currency==='IQD'?(def.price/1310).toFixed(0):def.price;}
+      if(def){var feeEl=document.getElementById('ep-fee-'+idx);if(feeEl)feeEl.value=def.currency==='IQD'?(def.price/1310).toFixed(0):def.price;}
     });
   }
+
+  // render mini chart
+  epTeethMap[idx]={};
+  renderEpChart(idx);
+
+  // tooth click delegation for this chart
+  document.getElementById('ep-chart-'+idx).addEventListener('click',function(e){
+    var tb=e.target.closest('.tooth-btn');
+    if(!tb)return;
+    var n=parseInt(tb.title.replace('Tooth ','').split(' ')[0]);
+    if(!n)return;
+    if(epTeethMap[idx][n])delete epTeethMap[idx][n];else epTeethMap[idx][n]=true;
+    renderEpChart(idx);
+  });
+}
+
+var epTeethMap={};
+function renderEpChart(idx){
+  var el=document.getElementById('ep-chart-'+idx);if(!el)return;
+  el.innerHTML=buildChart({},epTeethMap[idx]||{},false);
+  var lbl=document.getElementById('ep-sel-lbl-'+idx);
+  var c=Object.keys(epTeethMap[idx]||{}).length;
+  if(lbl)lbl.textContent=c+' '+(c===1?'tooth':'teeth')+' selected';
+}
+function epQS(idx,type){
+  var up=FDI_PERM.upper[0].concat(FDI_PERM.upper[1]),lo=FDI_PERM.lower[0].concat(FDI_PERM.lower[1]);
+  epTeethMap[idx]={};
+  if(type==='upper')up.forEach(function(n){epTeethMap[idx][n]=true;});
+  else if(type==='lower')lo.forEach(function(n){epTeethMap[idx][n]=true;});
+  renderEpChart(idx);
 }
 
 function removeExtraProc(idx){
@@ -2792,7 +2866,7 @@ function removeExtraProc(idx){
 function resetExtraProcs(){
   var container=document.getElementById('extra-procs-container');
   if(container)container.innerHTML='';
-  procForms=[];
+  procForms=[];epTeethMap={};
 }
 
 // Save all extra procedures after main proc saved
@@ -2803,21 +2877,110 @@ async function saveExtraProcs(pid,pname,apptId,date,dentist){
     if(!name)continue;
     var fee=parseFloat((document.getElementById('ep-fee-'+idx)||{}).value)||0;
     var notes=(document.getElementById('ep-notes-'+idx)||{}).value||null;
+    var epDr=(document.getElementById('ep-dr-'+idx)||{}).value||dentist;
+    var epRef=(document.getElementById('ep-ref-'+idx)||{}).value||null;
+    var epDate=(document.getElementById('ep-date-'+idx)||{}).value||date;
+    var epStatus=(document.getElementById('ep-status-'+idx)||{}).value||'completed';
+    var epTeeth=Object.keys(epTeethMap[idx]||{}).map(function(n){return parseInt(n);}).sort(function(a,b){return a-b;});
     var r=await db.from('procedures').insert([{
       patient_id:pid,patient_name:pname,procedure_name:name,
-      date:date,treating_dentist:dentist,fee:fee,net_fee:fee,
-      status:'completed',notes:notes,category:'general'
+      date:epDate,treating_dentist:epDr,referrer:epRef,
+      fee:fee,net_fee:fee,status:epStatus,notes:notes,
+      teeth:epTeeth.length>0?epTeeth:null,category:'general'
     }]).select().single();
     if(!r.error&&r.data){
       await db.from('invoices').insert([{
         patient_id:pid,patient_name:pname,procedure_id:r.data.id,
-        procedure_name:name,treating_dentist:dentist,
-        fee:fee,net_fee:fee,date:date,status:'unpaid',
+        procedure_name:name,treating_dentist:epDr,referrer:epRef,
+        fee:fee,net_fee:fee,date:epDate,status:'unpaid',
+        teeth:epTeeth.length>0?epTeeth:null,
         appointment_id:apptId
       }]);
     }
+    // cleanup epTeethMap
+    delete epTeethMap[idx];
   }
 }
+
+
+// ══════ NEW PATIENT FROM APPOINTMENT FLOW ════════════════════════
+var _returnToAppt = false; // flag: after saving patient, return to appt modal
+
+function openAddPtFromAppt(){
+  _returnToAppt = true;
+  closeMdl('am-modal');
+  // pre-fill name if typed
+  var typed = document.getElementById('am-patient').value.trim();
+  document.getElementById('pt-mtit').textContent = 'Register new patient';
+  document.getElementById('pt-id').value = '';
+  document.getElementById('pt-name').value = typed;
+  document.getElementById('pt-dob').value = '';
+  document.getElementById('pt-gender').value = '';
+  document.getElementById('pt-phone').value = '';
+  document.getElementById('pt-status').value = 'new';
+  document.getElementById('pt-dr').value = '';
+  document.getElementById('pt-notes').value = '';
+  document.getElementById('pt-del-btn').style.display = 'none';
+  openMdl('pt-modal');
+}
+
+function closePtModal(){
+  closeMdl('pt-modal');
+  if(_returnToAppt){ _returnToAppt=false; openNewAppt(); }
+}
+
+// Override savePatient to handle return-to-appt flow
+var _origSavePatient = window.savePatient;
+async function savePatient(){
+  var name=document.getElementById('pt-name').value.trim();
+  if(!name){showToast('Enter patient name','error');return;}
+  var id=document.getElementById('pt-id').value;
+  var payload={name:name,dob:document.getElementById('pt-dob').value||null,
+    gender:document.getElementById('pt-gender').value||null,
+    phone:document.getElementById('pt-phone').value.trim()||null,
+    status:document.getElementById('pt-status').value,
+    primary_dentist:document.getElementById('pt-dr').value||null,
+    medical_notes:document.getElementById('pt-notes').value.trim()||null};
+  var r=id?await db.from('patients').update(payload).eq('id',id):await db.from('patients').insert([payload]);
+  if(r.error){showToast('Failed to save','error');return;}
+  // refresh patient list
+  var allPtsRes=await db.from('patients').select('*').order('name');
+  if(!allPtsRes.error)allPts=allPtsRes.data||[];
+  showToast(id?'Patient updated':'Patient added');
+  closeMdl('pt-modal');
+  if(_returnToAppt){
+    _returnToAppt=false;
+    // return to appointment booking with name pre-filled
+    await openNewAppt();
+    document.getElementById('am-patient').value=name;
+    // refresh datalist
+    var dl=document.getElementById('pt-dl');
+    if(dl)dl.innerHTML=allPts.map(function(p){return '<option value="'+p.name+'">';}).join('');
+  } else {
+    if(profState.pid===id)renderProf(profState.pid,profState.pname);
+    else renderPatients();
+  }
+}
+
+// ══════ PATIENT STATUS AFTER PROCEDURE ═══════════════════════════
+async function openPtStatusModal(pid, pname){
+  document.getElementById('psm-pid').value = pid;
+  document.getElementById('psm-pname').value = pname;
+  openMdl('pt-status-modal');
+}
+
+async function setPtStatusFromProc(status){
+  var pid = document.getElementById('psm-pid').value;
+  if(!pid){closeMdl('pt-status-modal');return;}
+  await db.from('patients').update({status:status}).eq('id',pid);
+  showToast('Patient status updated to: '+status);
+  closeMdl('pt-status-modal');
+  // refresh patient list in background
+  var r=await db.from('patients').select('*').order('name');
+  if(!r.error)allPts=r.data||[];
+}
+
+// ══════ UPDATED savePayment — close all & return to calendar ══════
 
 </script>
 
@@ -3076,6 +3239,38 @@ async function saveExtraProcs(pid,pname,apptId,date,dentist){
       <button class="btn" onclick="closeMdl('padm-modal')">Cancel</button>
       <button class="btn btnp" onclick="saveProcAdmin()">Save procedure</button>
     </div>
+  </div>
+</div>
+
+<!-- PATIENT STATUS UPDATE MODAL (appears after saving procedure) -->
+<div class="mbg" id="pt-status-modal">
+  <div class="modal" style="width:420px;text-align:center;">
+    <div style="font-size:28px;margin-bottom:10px;">✅</div>
+    <div class="mtit">Procedure recorded!</div>
+    <div class="msub">Update patient status before leaving</div>
+    <input type="hidden" id="psm-pid">
+    <input type="hidden" id="psm-pname">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+      <button class="btn" data-pstatus="active" onclick="setPtStatusFromProc('active')" style="background:var(--g50);color:var(--g700);border-color:var(--g100);">
+        <div style="font-size:16px;">🟢</div><div style="font-size:11px;font-weight:600;margin-top:3px;">Active</div>
+      </button>
+      <button class="btn" data-pstatus="inprogress" onclick="setPtStatusFromProc('inprogress')" style="background:var(--p50);color:var(--p700);border-color:var(--p100);">
+        <div style="font-size:16px;">🟣</div><div style="font-size:11px;font-weight:600;margin-top:3px;">In progress</div>
+      </button>
+      <button class="btn" data-pstatus="followup" onclick="setPtStatusFromProc('followup')" style="background:var(--a50);color:var(--a700);border-color:var(--a100);">
+        <div style="font-size:16px;">🟡</div><div style="font-size:11px;font-weight:600;margin-top:3px;">Follow-up needed</div>
+      </button>
+      <button class="btn" data-pstatus="completed" onclick="setPtStatusFromProc('completed')" style="background:var(--s100);color:var(--s600);border-color:var(--s200);">
+        <div style="font-size:16px;">⚪</div><div style="font-size:11px;font-weight:600;margin-top:3px;">Completed</div>
+      </button>
+      <button class="btn" data-pstatus="new" onclick="setPtStatusFromProc('new')" style="background:var(--b50);color:var(--b600);border-color:var(--b100);">
+        <div style="font-size:16px;">🔵</div><div style="font-size:11px;font-weight:600;margin-top:3px;">New</div>
+      </button>
+      <button class="btn" data-pstatus="inactive" onclick="setPtStatusFromProc('inactive')" style="background:var(--r50);color:var(--r600);border-color:var(--r100);">
+        <div style="font-size:16px;">🔴</div><div style="font-size:11px;font-weight:600;margin-top:3px;">Inactive</div>
+      </button>
+    </div>
+    <button class="btn btnsm" onclick="closeMdl('pt-status-modal')" style="width:100%;margin-top:4px;color:var(--s400);">Skip — keep current status</button>
   </div>
 </div>
 </body>
