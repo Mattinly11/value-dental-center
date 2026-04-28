@@ -1056,6 +1056,10 @@ async function openEditProc(id){
 async function saveProc(){
   var rawVal=document.getElementById('proc-name').value;if(!rawVal){showToast('Select a procedure','error');return;}
   var name=rawVal;
+  var pid=document.getElementById('proc-pid').value;
+  var pname=document.getElementById('proc-pname').value;
+  // Debug: show what we have
+  if(!pid){showToast('Error: No patient ID found. Please try again.','error');alert('DEBUG: pid='+pid+' pname='+pname+' name='+name);return;}
   var fee=parseFloat(document.getElementById('proc-fee').value)||0;
   var labFeeBase=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
   var fixtureFeeAmt=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
@@ -1064,8 +1068,6 @@ async function saveProc(){
   var labId=(document.getElementById('proc-lab')||{}).value||null;
   var labSvcId=(document.getElementById('proc-lab-svc')||{}).value||null;
   var labName=labId?(procLabCache.find(function(l){return l.id===labId;})||{}).name||null:null;
-  var pid=document.getElementById('proc-pid').value;
-  var pname=document.getElementById('proc-pname').value;
   var id=document.getElementById('proc-id').value;
   var teeth=Object.keys(procSelTeeth).map(function(n){return parseInt(n);}).sort(function(a,b){return a-b;});
   var payload={patient_id:pid,patient_name:pname,procedure_name:name,
@@ -1078,11 +1080,7 @@ async function saveProc(){
     notes:document.getElementById('proc-notes').value.trim()||null,
     teeth:teeth.length>0?teeth:null,category:'general'};
   var r=id?await db.from('procedures').update(payload).eq('id',id):await db.from('procedures').insert([payload]).select().single();
-  if(r.error){showToast('Error: '+r.error.message,'error');console.error('PROC SAVE ERROR:',JSON.stringify(r.error));alert('Save failed: '+r.error.message+'
-
-Code: '+r.error.code+'
-
-Details: '+r.error.details);return;}
+  if(r.error){showToast('Error: '+r.error.message,'error');console.error(r.error);alert('SAVE ERROR: '+r.error.message);return;}
   // Create invoice immediately if new
   if(!id){
     var newP=r.data;
