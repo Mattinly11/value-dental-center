@@ -2527,8 +2527,14 @@ async function openAddProcFromAppt(appt){
   document.getElementById('proc-mtit').textContent = 'Record procedure';
   document.getElementById('proc-msub').textContent = 'Patient: ' + (appt.patient_name||'');
   document.getElementById('proc-id').value = '';
-  document.getElementById('proc-pid').value = appt.patient_id || '';
   document.getElementById('proc-pname').value = appt.patient_name || '';
+  // look up patient_id from name since appointments only store patient_name
+  var pid = appt.patient_id || '';
+  if(!pid && appt.patient_name){
+    var ptLookup = await db.from('patients').select('id').ilike('name', appt.patient_name).single();
+    if(ptLookup.data) pid = ptLookup.data.id;
+  }
+  document.getElementById('proc-pid').value = pid;
   // store appt id so invoice links to it
   document.getElementById('proc-appt-id').value = appt.id;
   ['proc-dr','proc-notes','proc-fee'].forEach(function(i){
