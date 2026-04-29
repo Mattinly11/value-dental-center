@@ -591,8 +591,8 @@ function dd(d){return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric'
 function t2m(t){if(!t)return 0;var p=t.split(':');return +p[0]*60+ +p[1];}
 function m2t(m){var h=Math.floor(m/60),mn=m%60;return(h<10?'0':'')+h+':'+(mn<10?'0':'')+mn;}
 function mY(m){return(m/SLOT_MIN)*SLOT_H;}
-function fu(n){return '$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});}
-function fiQD(n){return((+n||0)*IQD).toLocaleString()+' IQD';}
+function fu(n){return ((+n||0)*IQD).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})+' IQD';}
+function fiQD(n){return fu(n);} // alias - both show IQD now
 function getDR(dr){if(!drRates[dr])drRates[dr]={ownPct:35,refPct:20};return drRates[dr];}
 function saveRates(){localStorage.setItem('vdc-dr-rates',JSON.stringify(drRates));}
 function statC(bg,ic,lbl,val,sub){return '<div class="stat-card"><div class="stat-icon" style="background:'+bg+';">'+ic+'</div><div class="stat-lbl">'+lbl+'</div><div class="stat-val">'+val+'</div>'+(sub?'<div style="font-size:10px;color:var(--s400);margin-top:2px;">'+sub+'</div>':'')+'</div>';}
@@ -1718,33 +1718,74 @@ async function openPtBilling(pid,pname){
 }
 
 // ══════════════════════ STAFF & FINANCE ══════════════════════════
+var finPays=[],finInvs=[];
 async function renderFinance(){
+  document.getElementById('pg-actions').innerHTML='';
   document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading finance...</div>';
-  var r1=await db.from('procedures').select('*');
-  var r2=await db.from('expenses').select('*');
-  var r3=await db.from('substaff').select('*');
-  finProcs=r1.data||[];finExps=r2.data||[];finSubs=r3.data||[];
+  var results=await Promise.all([
+    db.from('procedures').select('*'),
+    db.from('expenses').select('*'),
+    db.from('substaff').select('*'),
+    db.from('payments').select('*'),
+    db.from('invoices').select('*')
+  ]);
+  finProcs=results[0].data||[];finExps=results[1].data||[];finSubs=results[2].data||[];
+  finPays=results[3].data||[];finInvs=results[4].data||[];
   buildFinUI();
 }
 function buildFinUI(){
-  var months=[];
-  for(var i=0;i<6;i++){var d=new Date(finY,finM-i,1);months.push({m:d.getMonth(),y:d.getFullYear(),label:d.toLocaleDateString('en-GB',{month:'short',year:'numeric'})});}
+  var curDate=new Date(finY,finM,1);
+  var monthLabel=curDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  var isCurrentMonth=finM===new Date().getMonth()&&finY===new Date().getFullYear();
   var html=
-    '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">'+
-    '<span style="font-size:11px;font-weight:600;color:var(--s500);">Month:</span>'+
-    months.map(function(mn){var on=mn.m===finM&&mn.y===finY;return '<button class="mo-pill'+(on?' on':'')+'" onclick="setFinM('+mn.m+','+mn.y+')">'+mn.label+'</button>';}).join('')+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">'+
+    '<div style="font-size:16px;font-weight:700;color:var(--s800);">'+monthLabel+'</div>'+
+    (isCurrentMonth?'<span style="background:var(--b600);color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">Current</span>':'')+
+    '<button class="btn btnsm" onclick="openFinMonthPicker()" style="margin-left:4px;">&#128197; Change month</button>'+
+    '<button class="btn btnsm" onclick="setFinM(new Date().getMonth(),new Date().getFullYear())">This month</button>'+
+    '<input type="month" id="fin-month-input" style="position:absolute;opacity:0;pointer-events:none;width:1px;" onchange="onFinMonthPick(this.value)">'+
     '</div>'+
     '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:14px;flex-wrap:wrap;">'+
-    ['overview','procedures','dentists','substaff','expenses'].map(function(t){
-      var L={overview:'Finance overview',procedures:'Procedure log',dentists:'Dentist payroll',substaff:'Substaff',expenses:'Expenses'};
+    ['overview','payments','dentists','substaff','expenses'].map(function(t){
+      var L={overview:'Finance overview',payments:'Payment log',dentists:'Dentist payroll',substaff:'Substaff',expenses:'Expenses'};
       return '<button class="fin-tab'+(finTab===t?' act':'')+'" onclick="setFinT(\''+t+'\')">'+L[t]+'</button>';
     }).join('')+'</div>'+
     '<div id="fin-content"></div>';
   document.getElementById('pg-content').innerHTML=html;buildFinTab();
 }
+function openFinMonthPicker(){
+  var inp=document.getElementById('fin-month-input');
+  if(!inp)return;
+  inp.value=finY+'-'+(finM+1<10?'0':'')+(finM+1);
+  try{inp.showPicker();}catch(e){inp.click();}
+}
+function onFinMonthPick(v){
+  if(!v)return;
+  var parts=v.split('-');
+  finY=parseInt(parts[0]);finM=parseInt(parts[1])-1;
+  buildFinUI();
+}
 function setFinM(m,y){finM=m;finY=y;buildFinUI();}
 function setFinT(t){finTab=t;buildFinUI();}
 function getMP(){return finProcs.filter(function(p){if(!p.date)return false;var d=new Date(p.date);return d.getMonth()===finM&&d.getFullYear()===finY;});}
+// get payments recorded this month
+function getMPays(){return finPays.filter(function(p){if(!p.date)return false;var d=new Date(p.date);return d.getMonth()===finM&&d.getFullYear()===finY;});}
+// get invoice by id
+function getInv(id){return finInvs.find(function(i){return i.id===id;})||null;}
+// calculate split for a payment amount based on its invoice's rules
+function calcPayDist(payAmt,inv){
+  if(!inv)return{treaterGets:0,refGets:0,vGets:payAmt,type:'unknown'};
+  var t=inv.treating_dentist||'',r=inv.referrer||'';
+  var labFee=Number(inv.lab_fee||0);
+  // net fee ratio: lab is deducted from total, split applies to net portion proportionally
+  var totalFee=Number(inv.fee||0);
+  var netRatio=totalFee>0?(totalFee-labFee)/totalFee:1;
+  var netPay=payAmt*netRatio; // portion of this payment that is splittable
+  var isP=PARTNERS.indexOf(t)>=0,refIsP=r&&PARTNERS.indexOf(r)>=0;
+  if(isP)return{treaterGets:payAmt,refGets:0,vGets:0,type:'partner',dentist:t};
+  if(refIsP){var rates=getDR(t),pct=rates.refPct/100,tg=netPay*pct;return{treaterGets:tg,refGets:netPay-tg,vGets:0,type:'referred',pct:rates.refPct,dentist:t,referrer:r};}
+  var r2=getDR(t),pct2=r2.ownPct/100,tg2=netPay*pct2;return{treaterGets:tg2,refGets:0,vGets:netPay-tg2,type:'own',pct:r2.ownPct,dentist:t};
+}
 function getME(){return finExps.filter(function(e){if(!e.date)return false;var d=new Date(e.date);return d.getMonth()===finM&&d.getFullYear()===finY;});}
 function calcDist(proc){
   var t=proc.treating_dentist||'',r=proc.referrer||'';
@@ -1757,87 +1798,148 @@ function calcDist(proc){
 function buildFinTab(){
   var el=document.getElementById('fin-content');if(!el)return;
   if(finTab==='overview')el.innerHTML=buildFO();
-  else if(finTab==='procedures')el.innerHTML=buildFP();
+  else if(finTab==='payments')el.innerHTML=buildFP();
   else if(finTab==='dentists')el.innerHTML=buildFD();
   else if(finTab==='substaff')el.innerHTML=buildFS();
   else if(finTab==='expenses')el.innerHTML=buildFE();
 }
 function buildFO(){
-  var procs=getMP(),exps=getME();
-  var totalExp=exps.reduce(function(s,e){return s+Number(e.amount||0);},0),expPP=totalExp/3;
+  var pays=getMPays(),exps=getME();
+  // total collected this month
+  var totalCollected=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
+  // outstanding across ALL invoices (not just this month)
+  var totalOutstanding=finInvs.reduce(function(s,inv){
+    var pd=finPays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
+    return s+Math.max(0,Number(inv.fee||0)-pd);
+  },0);
+  // split payments by rules
   var wallets={};PARTNERS.forEach(function(p){wallets[p]=0;});var vW=0;
-  procs.forEach(function(p){
-    var d=calcDist(p),t=p.treating_dentist||'',r=p.referrer||'';
-    if(PARTNERS.indexOf(t)>=0)wallets[t]=(wallets[t]||0)+d.treaterGets;
-    if(r&&PARTNERS.indexOf(r)>=0)wallets[r]=(wallets[r]||0)+d.refGets;
-    vW+=d.vGets;
+  var drEarnings={};REG.forEach(function(dr){drEarnings[dr]=0;});
+  pays.forEach(function(pay){
+    var inv=getInv(pay.invoice_id);
+    var d=calcPayDist(Number(pay.amount||0),inv);
+    if(d.type==='partner'){wallets[d.dentist]=(wallets[d.dentist]||0)+d.treaterGets;}
+    else if(d.type==='referred'||d.type==='own'){
+      drEarnings[d.dentist]=(drEarnings[d.dentist]||0)+d.treaterGets;
+      if(d.referrer&&PARTNERS.indexOf(d.referrer)>=0)wallets[d.referrer]=(wallets[d.referrer]||0)+d.refGets;
+      else vW+=d.vGets;
+    } else {vW+=d.vGets;}
   });
+  // value wallet splits equally to partners
+  var totalExp=exps.reduce(function(s,e){return s+Number(e.amount||0);},0),expPP=totalExp/3;
   var vPP=vW/3;
+  // stats row
+  var html=
+    '<div class="stats-row">'+
+    statC('var(--g50)','&#128176;','Collected this month',fu(totalCollected))+
+    statC('var(--r50)','&#9888;','Total outstanding',fu(totalOutstanding))+
+    statC('var(--b50)','&#128200;','Payments recorded',pays.length)+
+    statC('var(--a50)','&#128176;','Expenses this month',fu(totalExp))+
+    '</div>';
+  // partner wallet cards
   var pC=[{bg:'#DBEAFE',border:'#2563EB',c:'#1D4ED8'},{bg:'#CCFBF1',border:'#0D9488',c:'#0F766E'},{bg:'#EDE9FE',border:'#7C3AED',c:'#6D28D9'}];
-  var wH='<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px;">';
+  html+='<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px;">';
   PARTNERS.forEach(function(p,i){
-    var c=pC[i],g=wallets[p],net=g+vPP-expPP;
-    wH+='<div class="wallet-card" style="background:'+c.bg+';border-color:'+c.border+';">'+
+    var c=pC[i],g=wallets[p]||0,net=g+vPP-expPP;
+    html+='<div class="wallet-card" style="background:'+c.bg+';border-color:'+c.border+';">'+
       '<div style="font-size:10px;font-weight:700;color:'+c.c+';text-transform:uppercase;margin-bottom:4px;">'+p+'</div>'+
-      '<div style="font-size:20px;font-weight:700;color:'+c.c+';">'+fu(g)+'</div>'+
-      '<div style="font-size:9px;color:'+c.c+';opacity:0.8;margin-bottom:6px;">Own procedures</div>'+
-      '<div style="font-size:11px;color:'+c.c+';">Net: '+fu(net)+'</div>'+
-      '<div style="font-size:10px;color:'+c.c+';opacity:0.7;">'+fiQD(net)+'</div></div>';
+      '<div style="font-size:18px;font-weight:700;color:'+c.c+';">'+fu(g)+'</div>'+
+      '<div style="font-size:9px;color:'+c.c+';opacity:0.8;margin-bottom:6px;">From payments this month</div>'+
+      '<div style="font-size:12px;color:'+c.c+';">+ '+fu(vPP)+' (wallet share)</div>'+
+      '<div style="font-size:12px;color:'+c.c+';">- '+fu(expPP)+' (expenses)</div>'+
+      '<div style="font-size:13px;font-weight:700;color:'+c.c+';margin-top:4px;border-top:1px solid '+c.border+';padding-top:4px;">Net: '+fu(net)+'</div>'+
+      '</div>';
   });
-  wH+='<div class="wallet-card" style="background:#F5F3FF;border-color:#7C3AED;">'+
+  html+='<div class="wallet-card" style="background:#F5F3FF;border-color:#7C3AED;">'+
     '<div style="font-size:10px;font-weight:700;color:#6D28D9;text-transform:uppercase;margin-bottom:4px;">Value Wallet</div>'+
-    '<div style="font-size:20px;font-weight:700;color:#6D28D9;">'+fu(vW)+'</div>'+
-    '<div style="font-size:9px;color:#6D28D9;opacity:0.8;margin-bottom:6px;">Shared equally</div>'+
-    '<div style="font-size:11px;color:#6D28D9;">'+fu(vPP)+'/partner</div></div></div>';
-  var drH='<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">Regular dentist payouts</div></div><div class="vdc-card-body">'+
-    '<table class="tbl"><thead><tr><th>Dentist</th><th>Own%</th><th>Ref%</th><th>Procedures</th><th>Payout (USD)</th><th>Payout (IQD)</th><th>To Value wallet</th></tr></thead><tbody>'+
+    '<div style="font-size:18px;font-weight:700;color:#6D28D9;">'+fu(vW)+'</div>'+
+    '<div style="font-size:9px;color:#6D28D9;opacity:0.8;margin-bottom:6px;">From payments this month</div>'+
+    '<div style="font-size:12px;color:#6D28D9;">'+fu(vPP)+' per partner</div>'+
+    '</div></div>';
+  // regular dentist earnings from this month's payments
+  html+='<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">Regular dentist earnings — from payments this month</div></div><div class="vdc-card-body">'+
+    '<table class="tbl"><thead><tr><th>Dentist</th><th>Own%</th><th>Ref%</th><th>Payments received</th><th>Earnings (IQD)</th><th>To Value wallet</th></tr></thead><tbody>'+
     REG.map(function(dr){
-      var rates=getDR(dr),myP=procs.filter(function(p){return p.treating_dentist===dr;});
-      var po=myP.reduce(function(s,p){return s+calcDist(p).treaterGets;},0);
-      var toV=myP.filter(function(p){return!p.referrer||PARTNERS.indexOf(p.referrer)<0;}).reduce(function(s,p){return s+calcDist(p).vGets;},0);
-      return '<tr><td style="font-weight:600;">'+dr+'</td><td style="color:var(--b700);font-weight:700;">'+rates.ownPct+'%</td><td style="color:var(--a700);font-weight:700;">'+rates.refPct+'%</td>'+
-        '<td>'+myP.length+'</td><td style="font-weight:700;color:var(--g700);">'+fu(po)+'</td><td style="font-size:10px;color:var(--s400);">'+fiQD(po)+'</td><td style="color:#6D28D9;">'+fu(toV)+'</td></tr>';
+      var rates=getDR(dr);
+      var myPays=pays.filter(function(p){var inv=getInv(p.invoice_id);return inv&&inv.treating_dentist===dr;});
+      var earning=drEarnings[dr]||0;
+      var toV=myPays.reduce(function(s,p){
+        var inv=getInv(p.invoice_id);
+        var d=calcPayDist(Number(p.amount||0),inv);
+        return s+(d.vGets||0);
+      },0);
+      return '<tr><td style="font-weight:600;">'+dr+'</td>'+
+        '<td style="color:var(--b700);font-weight:700;">'+rates.ownPct+'%</td>'+
+        '<td style="color:var(--a700);font-weight:700;">'+rates.refPct+'%</td>'+
+        '<td>'+myPays.length+' payment'+(myPays.length!==1?'s':'')+'</td>'+
+        '<td style="font-weight:700;color:var(--g700);">'+fu(earning)+'</td>'+
+        '<td style="color:#6D28D9;">'+(toV>0?fu(toV):'—')+'</td></tr>';
     }).join('')+'</tbody></table></div></div>';
-  return wH+drH;
+  return html;
 }
 function buildFP(){
-  var procs=getMP();if(!procs.length)return '<div style="text-align:center;padding:30px;font-size:13px;color:var(--s400);">No procedures this month</div>';
-  return '<div class="vdc-card"><div class="vdc-card-body" style="overflow-x:auto;"><table class="tbl"><thead><tr><th>Date</th><th>Patient</th><th>Procedure</th><th>Treating</th><th>Referrer</th><th>Fee</th><th>Net</th><th>Rate</th><th>Treater gets</th><th>Value gets</th></tr></thead><tbody>'+
-    procs.map(function(p){
-      var d=calcDist(p);
-      return '<tr><td style="font-size:10px;color:var(--s400);">'+(p.date||'—')+'</td><td>'+(p.patient_name||'—')+'</td>'+
-        '<td style="font-weight:600;">'+(p.procedure_name||'—')+'</td><td>'+(p.treating_dentist||'—')+'</td>'+
-        '<td style="color:var(--s400);">'+(p.referrer||'—')+'</td><td>'+fu(p.fee)+'</td>'+
-        '<td style="font-weight:700;">'+fu(p.net_fee||p.fee)+'</td>'+
-        '<td style="font-size:10px;font-weight:700;color:var(--b600);">'+(d.type==='partner'?'100%':d.pct+'%')+'</td>'+
-        '<td style="color:var(--g700);font-weight:700;">'+fu(d.treaterGets)+'</td>'+
-        '<td style="color:#6D28D9;">'+(d.vGets>0?fu(d.vGets):'—')+'</td></tr>';
+  var pays=getMPays();
+  if(!pays.length)return '<div style="text-align:center;padding:30px;font-size:13px;color:var(--s400);">No payments recorded this month</div>';
+  return '<div class="vdc-card"><div class="vdc-card-body" style="overflow-x:auto;">'+
+    '<table class="tbl"><thead><tr><th>Date</th><th>Patient</th><th>Procedure</th><th>Treating dentist</th><th>Referrer</th><th>Payment</th><th>Method</th><th>Dr gets</th><th>Ref gets</th><th>Value gets</th></tr></thead><tbody>'+
+    pays.map(function(pay){
+      var inv=getInv(pay.invoice_id);
+      var d=calcPayDist(Number(pay.amount||0),inv);
+      return '<tr>'+
+        '<td style="font-size:10px;color:var(--s400);">'+(pay.date||'—')+'</td>'+
+        '<td style="font-weight:600;">'+(inv?inv.patient_name||'—':'—')+'</td>'+
+        '<td>'+(inv?inv.procedure_name||'—':'—')+'</td>'+
+        '<td>'+(inv?inv.treating_dentist||'—':'—')+'</td>'+
+        '<td style="color:var(--s400);">'+(inv&&inv.referrer?inv.referrer:'—')+'</td>'+
+        '<td style="font-weight:700;color:var(--b700);">'+fu(pay.amount)+'</td>'+
+        '<td style="font-size:10px;">'+(pay.method||'—')+'</td>'+
+        '<td style="color:var(--g700);font-weight:700;">'+(d.treaterGets>0?fu(d.treaterGets):'—')+'</td>'+
+        '<td style="color:var(--a700);">'+(d.refGets>0?fu(d.refGets):'—')+'</td>'+
+        '<td style="color:#6D28D9;">'+(d.vGets>0?fu(d.vGets):'—')+'</td>'+
+        '</tr>';
     }).join('')+'</tbody></table></div></div>';
 }
+
 function buildFD(){
-  var procs=getMP(),paidMap=JSON.parse(localStorage.getItem('vdc-dr-paid-'+finY+'-'+finM)||'{}');
+  var pays=getMPays();
+  var paidMap=JSON.parse(localStorage.getItem('vdc-dr-paid-'+finY+'-'+finM)||'{}');
   var html='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">';
   REG.forEach(function(dr){
-    var rates=getDR(dr),myP=procs.filter(function(p){return p.treating_dentist===dr;});
-    var po=myP.reduce(function(s,p){return s+calcDist(p).treaterGets;},0);
+    var rates=getDR(dr);
+    var myPays=pays.filter(function(p){var inv=getInv(p.invoice_id);return inv&&inv.treating_dentist===dr;});
+    var earning=myPays.reduce(function(s,p){return s+calcPayDist(Number(p.amount||0),getInv(p.invoice_id)).treaterGets;},0);
+    var drInvs=finInvs.filter(function(inv){return inv.treating_dentist===dr;});
+    var outstanding=drInvs.reduce(function(s,inv){
+      var pd=finPays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
+      return s+Math.max(0,Number(inv.fee||0)-pd);
+    },0);
     var isPaid=paidMap[dr]||false;
     html+='<div class="vdc-card"><div class="vdc-card-body">'+
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'+
       '<div style="width:38px;height:38px;border-radius:50%;background:var(--b50);color:var(--b700);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">'+dr.replace('Dr. ','').slice(0,2).toUpperCase()+'</div>'+
-      '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--s800);">'+dr+'</div><div style="font-size:10px;color:var(--s400);">'+myP.length+' procedures</div></div>'+
-      '<button class="btn btnsm btnxs" onclick="openDRR(\''+dr+'\')">Edit rates</button></div>'+
+      '<div style="flex:1;"><div style="font-size:13px;font-weight:700;">'+dr+'</div>'+
+      '<div style="font-size:10px;color:var(--s400);">'+myPays.length+' payment'+(myPays.length!==1?'s':'')+ ' this month</div></div>'+
+      '<button class="btn btnsm btnxs" data-drr="'+dr+'" onclick="openDRRbtn(this)">Edit rates</button></div>'+
       '<div style="background:var(--s50);border-radius:var(--radsm);padding:8px 10px;margin-bottom:10px;">'+
       '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:11px;color:var(--s500);">Own rate:</span><span style="font-weight:700;color:var(--b700);">'+rates.ownPct+'%</span></div>'+
       '<div style="display:flex;justify-content:space-between;"><span style="font-size:11px;color:var(--s500);">Referred rate:</span><span style="font-weight:700;color:var(--a700);">'+rates.refPct+'%</span></div></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'+
+      '<div style="background:var(--g50);border-radius:var(--radsm);padding:8px;border:1px solid var(--g100);">'+
+      '<div style="font-size:9px;color:var(--g700);font-weight:600;margin-bottom:2px;">EARNED THIS MONTH</div>'+
+      '<div style="font-size:15px;font-weight:700;color:var(--g700);">'+fu(earning)+'</div></div>'+
+      '<div style="background:var(--r50);border-radius:var(--radsm);padding:8px;border:1px solid var(--r100);">'+
+      '<div style="font-size:9px;color:var(--r600);font-weight:600;margin-bottom:2px;">OUTSTANDING</div>'+
+      '<div style="font-size:15px;font-weight:700;color:var(--r600);">'+fu(outstanding)+'</div></div></div>'+
       '<div style="display:flex;align-items:center;justify-content:space-between;">'+
-      '<div><div style="font-size:10px;color:var(--s400);">Monthly payout</div><div style="font-size:18px;font-weight:700;">'+fu(po)+'</div><div style="font-size:10px;color:var(--s400);">'+fiQD(po)+'</div></div>'+
-      '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">'+
-      (isPaid?'<span class="badge bg">&#10003; Paid</span>':'<span class="badge br">Unpaid</span>')+
-      '<button class="btn btnsm btnxs" onclick="togDrPaid(\''+dr+'\')">'+( isPaid?'Undo':'Mark paid')+'</button></div></div></div></div>';
+      (isPaid?'<span class="badge bg">&#10003; Paid</span>':'<span class="badge br">Not paid yet</span>')+
+      '<button class="btn btnxs" data-dr="'+dr+'" onclick="togDrPaidBtn(this)">'+( isPaid?'Undo':'Mark paid')+'</button></div>'+
+      '</div></div>';
   });
   return html+'</div>';
 }
+function togDrPaidBtn(btn){togDrPaid(btn.dataset.dr);}
 function togDrPaid(dr){var k='vdc-dr-paid-'+finY+'-'+finM,m=JSON.parse(localStorage.getItem(k)||'{}');m[dr]=!m[dr];localStorage.setItem(k,JSON.stringify(m));buildFinTab();}
+function openDRRbtn(btn){openDRR(btn.dataset.drr);}
 function openDRR(dr){var r=getDR(dr);document.getElementById('drr-name').textContent=dr;document.getElementById('drr-dr').value=dr;document.getElementById('drr-own').value=r.ownPct;document.getElementById('drr-ref').value=r.refPct;document.getElementById('drr-own-bar').style.width=r.ownPct+'%';document.getElementById('drr-ref-bar').style.width=r.refPct+'%';openMdl('drr-modal');}
 function saveDrRate(){var dr=document.getElementById('drr-dr').value,o=parseInt(document.getElementById('drr-own').value)||35,r=parseInt(document.getElementById('drr-ref').value)||20;if(o<1||o>100||r<1||r>100){showToast('Rates must be 1–100','error');return;}drRates[dr]={ownPct:o,refPct:r};saveRates();closeMdl('drr-modal');showToast('Rates updated for '+dr);buildFinTab();}
 
