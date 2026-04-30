@@ -227,7 +227,10 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     </div>
     <div class="main">
       <div class="topbar">
-        <div><div class="ttitle" id="pg-title">Patients</div><div class="tsub" id="pg-sub"></div></div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div id="pg-back" style="display:none;"></div>
+          <div><div class="ttitle" id="pg-title">Patients</div><div class="tsub" id="pg-sub"></div></div>
+        </div>
         <div id="pg-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"></div>
       </div>
       <div class="content" id="pg-content"><div class="loader"><div class="spinner"></div>Loading...</div></div>
@@ -291,23 +294,9 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <div class="fgrp">
       <label class="flbl">Duration — <span id="am-dur-label" style="color:var(--b600);font-weight:700;">30 min</span></label>
       <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:10px;color:var(--s400);">15m</span>
         <input type="range" id="am-dur" min="1" max="17" value="2" step="1" style="flex:1;accent-color:var(--b600);" oninput="onDurSlider(this.value)">
-        <span style="font-size:10px;color:var(--s400);">3h</span>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-top:4px;">
-        <span style="font-size:9px;color:var(--s300);">|</span>
-        <span style="font-size:9px;color:var(--s400);">30m</span>
-        <span style="font-size:9px;color:var(--s400);">45m</span>
-        <span style="font-size:9px;color:var(--s400);">1h</span>
-        <span style="font-size:9px;color:var(--s400);">1h15</span>
-        <span style="font-size:9px;color:var(--s400);">1h30</span>
-        <span style="font-size:9px;color:var(--s400);">1h45</span>
-        <span style="font-size:9px;color:var(--s400);">2h</span>
-        <span style="font-size:9px;color:var(--s400);">2h30</span>
-        <span style="font-size:9px;color:var(--s400);">3h</span>
-        <span style="font-size:9px;color:var(--s300);">|</span>
-      </div>
+
     </div>
     <div class="fgrp"><label class="flbl">Procedure type</label>
       <select class="finp" id="am-proc"><option value="">Select procedure...</option></select></div>
@@ -420,7 +409,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       </div>
       <!-- Implant fixture price -->
       <div id="proc-fixture-wrap" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--p200);">
-        <label class="flbl">Implant fixture price (USD)</label>
+        <label class="flbl">Implant fixture cost</label>
         <input class="finp" type="number" id="proc-fixture-fee" placeholder="0" min="0" oninput="updateProcNet()">
         <div style="font-size:10px;color:var(--s400);margin-top:3px;">Deducted from procedure fee before any split</div>
       </div>
@@ -624,6 +613,17 @@ function doLogin(){
   }else{var e=document.getElementById('li-err');e.style.display='block';setTimeout(function(){e.style.display='none';},3000);}
 }
 function doLogout(){sessionStorage.removeItem('vdc-user');location.reload();}
+
+function setBackBtn(label, fn){
+  var el=document.getElementById('pg-back');
+  if(!el)return;
+  el.style.display='block';
+  el.innerHTML='<button class="btn" style="white-space:nowrap;" onclick="('+fn+')()">&#8592; '+label+'</button>';
+}
+function clearBackBtn(){
+  var el=document.getElementById('pg-back');
+  if(el){el.style.display='none';el.innerHTML='';}
+}
 window.onload=function(){_attachChipDelegation();
   var u=sessionStorage.getItem('vdc-user');
   if(u){document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';
@@ -642,6 +642,7 @@ function goTo(s){
   document.getElementById('pg-title').textContent=T[s]||s;
   document.getElementById('pg-sub').textContent=S[s]||'';
   document.getElementById('pg-actions').innerHTML='';
+  clearBackBtn();
   // add refresh button to topbar sub-area
   var rfEl=document.getElementById('topbar-refresh');
   if(!rfEl){
@@ -1307,7 +1308,7 @@ function buildSched(){
       if(a.status==='checkedin'&&a.checkin_time){
         var mins=Math.floor((Date.now()-new Date(a.checkin_time))/60000);
         var hh=Math.floor(mins/60),mm=mins%60;
-        wt='<span id="wt-'+a.id+'" style="font-size:9px;font-weight:700;">&#9203; '+(hh>0?hh+'h ':'')+mm+'m</span>';
+        wt='<span id="wt-'+a.id+'" style="font-size:9px;font-weight:700;">&#9203; '+mm+'m</span>';
       }
       var noteH=a.notes?'<button class="note-btn" onclick="event.stopPropagation();" tabindex="0">!<span class="note-pop">'+a.notes+'</span></button>':'';
       var sb='<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:4px;background:'+sc.border+'30;color:'+sc.color+';border:1px solid '+sc.border+';white-space:nowrap;flex-shrink:0;">'+sc.emoji+' '+sc.label+'</span>';
@@ -1372,7 +1373,7 @@ function tickWait(){
       var mins=Math.floor((Date.now()-new Date(a.checkin_time))/60000);
       var hh=Math.floor(mins/60),mm=mins%60;
       var el=document.getElementById('wt-'+a.id);
-      if(el)el.textContent='⏱ '+(hh>0?hh+'h ':'')+mm+'m';
+      if(el)el.textContent='⏱ '+mm+'m';
     }
   });
 }
@@ -1532,7 +1533,7 @@ function openApptDetail(id){
   var wt='';
   if(a.status==='checkedin'&&a.checkin_time){
     var mins=Math.floor((Date.now()-new Date(a.checkin_time))/60000),hh=Math.floor(mins/60),mm=mins%60;
-    wt='<div style="background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;"><div style="font-size:11px;color:var(--a700);font-weight:600;">&#9203; Waiting time</div><div style="font-size:20px;font-weight:700;color:var(--a700);">'+(hh>0?hh+'h ':'')+mm+'m</div></div>';
+    wt='<div style="background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;"><div style="font-size:11px;color:var(--a700);font-weight:600;">&#9203; Waiting time</div><div style="font-size:20px;font-weight:700;color:var(--a700);">'+mm+'m</div></div>';
   }
   var ptBtn='';
   if(a.status==='completed'){
@@ -1832,7 +1833,7 @@ function buildFO(){
   var html=
     '<div class="stats-row">'+
     statC('var(--g50)','&#128176;','Collected this month',fu(totalCollected))+
-    statC('var(--r50)','&#9888;','Total outstanding',fu(totalOutstanding))+
+    
     statC('var(--b50)','&#128200;','Payments recorded',pays.length)+
     statC('var(--a50)','&#128176;','Expenses this month',fu(totalExp))+
     '</div>';
@@ -1927,9 +1928,7 @@ function buildFD(){
       '<div style="background:var(--g50);border-radius:var(--radsm);padding:8px;border:1px solid var(--g100);">'+
       '<div style="font-size:9px;color:var(--g700);font-weight:600;margin-bottom:2px;">EARNED THIS MONTH</div>'+
       '<div style="font-size:15px;font-weight:700;color:var(--g700);">'+fu(earning)+'</div></div>'+
-      '<div style="background:var(--r50);border-radius:var(--radsm);padding:8px;border:1px solid var(--r100);">'+
-      '<div style="font-size:9px;color:var(--r600);font-weight:600;margin-bottom:2px;">OUTSTANDING</div>'+
-      '<div style="font-size:15px;font-weight:700;color:var(--r600);">'+fu(outstanding)+'</div></div></div>'+
+'</div>'+
       '<div style="display:flex;align-items:center;justify-content:space-between;">'+
       (isPaid?'<span class="badge bg">&#10003; Paid</span>':'<span class="badge br">Not paid yet</span>')+
       '<button class="btn btnxs" data-dr="'+dr+'" onclick="togDrPaidBtn(this)">'+( isPaid?'Undo':'Mark paid')+'</button></div>'+
@@ -2079,7 +2078,8 @@ function openLabDetail(labId){
   var svcs=allSvcs.filter(function(s){return s.lab_id===labId;});
   var actionsEl=document.getElementById('pg-actions');
   actionsEl.innerHTML='';
-  var backBtn=document.createElement('button');backBtn.className='btn';backBtn.textContent='\u2190 All labs';backBtn.onclick=renderLabs;
+  setBackBtn('All labs','renderLabs');
+  var backBtn=document.createElement('button');backBtn.className='btn';backBtn.style.display='none';backBtn.onclick=renderLabs;
   var addBtn=document.createElement('button');addBtn.className='btn btnsm';addBtn.textContent='+ Add service';addBtn.onclick=function(){openAddSvc(lab.id,lab.name);};
   var editBtn=document.createElement('button');editBtn.className='btn btnsm';editBtn.textContent='Edit lab';editBtn.onclick=function(){openEditLab(lab.id);};
   actionsEl.appendChild(backBtn);actionsEl.appendChild(addBtn);actionsEl.appendChild(editBtn);
@@ -2093,7 +2093,7 @@ function openLabDetail(labId){
       svcs.map(function(s){
         return '<tr><td style="font-weight:600;">'+s.name+'</td>'+
           '<td style="font-weight:700;color:var(--b700);">'+fu(s.price)+'</td>'+
-          '<td style="font-size:11px;color:var(--s400);">'+fiQD(s.price)+'</td>'+
+          '<td style="font-size:10px;color:var(--s400);">'+(s.currency||'USD')+'</td>'+
           '<td>'+(s.related_procedure?'<span class="badge bs">'+s.related_procedure+'</span>':'<span style="color:var(--s400);">General</span>')+'</td>'+
           '<td><button class="btn btnxs" data-svcid="'+s.id+'">Edit</button></td></tr>';
       }).join('')+'</tbody></table>':
@@ -2155,7 +2155,9 @@ function openEditSvc(id){
   document.getElementById('svc-id').value=s.id;
   document.getElementById('svc-lab-id').value=s.lab_id;
   document.getElementById('svc-name').value=s.name||'';
-  document.getElementById('svc-price').value=s.price||'';
+  var svcCurr=s.currency||'IQD';
+  document.getElementById('svc-currency')&&(document.getElementById('svc-currency').value=svcCurr);
+  document.getElementById('svc-price').value=svcCurr==='IQD'?Math.round((s.price||0)*IQD):s.price||'';
   document.getElementById('svc-proc').value=s.related_procedure||'';
   document.getElementById('svc-del-btn').style.display='inline-flex';
   openMdl('svc-modal');
@@ -2166,7 +2168,9 @@ async function saveSvc(){
   if(!name){showToast('Enter service name','error');return;}
   var id=document.getElementById('svc-id').value;
   var labId=document.getElementById('svc-lab-id').value;
-  var payload={lab_id:labId,name:name,price:price,related_procedure:document.getElementById('svc-proc').value||null};
+  var currency=(document.getElementById('svc-currency')||{}).value||'IQD';
+  var priceUSD=currency==='IQD'?price/IQD:price;
+  var payload={lab_id:labId,name:name,price:priceUSD,currency:currency,related_procedure:document.getElementById('svc-proc').value||null};
   var r=id?await db.from('lab_services').update(payload).eq('id',id):await db.from('lab_services').insert([payload]);
   if(r.error){showToast('Failed to save','error');return;}
   showToast(id?'Service updated':'Service added');closeMdl('svc-modal');
@@ -2534,6 +2538,11 @@ function buildProcAdminUI(){
   });
 }
 
+function toggleFixturePrice(){
+  var yn=document.getElementById('padm-implant-yn');
+  var fw=document.getElementById('padm-fixture-wrap');
+  if(yn&&fw)fw.style.display=yn.value==='yes'?'block':'none';
+}
 function toggleImplantField(){
   var v=document.getElementById('padm-lab').value;
   var w=document.getElementById('padm-implant-wrap');
@@ -2550,6 +2559,8 @@ function openAddProcAdmin(){
   document.getElementById('padm-override').value='yes';
   document.getElementById('padm-lab').value='no';
   document.getElementById('padm-fixture').value='';
+  document.getElementById('padm-implant-yn')&&(document.getElementById('padm-implant-yn').value='no');
+  document.getElementById('padm-fixture-wrap')&&(document.getElementById('padm-fixture-wrap').style.display='none');
   document.getElementById('padm-notes').value='';
   document.getElementById('padm-del-btn').style.display='none';
   toggleImplantField();
@@ -2566,6 +2577,9 @@ function openEditProcAdmin(id){
   document.getElementById('padm-currency').value=p.currency||'USD';
   document.getElementById('padm-override').value=p.price_override||'yes';
   document.getElementById('padm-lab').value=p.lab_involved||'no';
+  var hasFixture=(p.fixture_price||0)>0;
+  document.getElementById('padm-implant-yn')&&(document.getElementById('padm-implant-yn').value=hasFixture?'yes':'no');
+  document.getElementById('padm-fixture-wrap')&&(document.getElementById('padm-fixture-wrap').style.display=hasFixture?'block':'none');
   document.getElementById('padm-fixture').value=p.fixture_price||'';
   document.getElementById('padm-notes').value=p.notes||'';
   document.getElementById('padm-del-btn').style.display='inline-flex';
@@ -2584,7 +2598,7 @@ async function saveProcAdmin(){
     currency:document.getElementById('padm-currency').value,
     price_override:document.getElementById('padm-override').value,
     lab_involved:document.getElementById('padm-lab').value,
-    fixture_price:parseFloat(document.getElementById('padm-fixture').value)||0,
+    fixture_price:(document.getElementById('padm-implant-yn')&&document.getElementById('padm-implant-yn').value==='yes')?parseFloat(document.getElementById('padm-fixture').value)||0:0,
     notes:document.getElementById('padm-notes').value.trim()||null
   };
   var r=id
@@ -3110,7 +3124,11 @@ async function setPtStatusFromProc(status){
     <input type="hidden" id="svc-lab-id">
     <div class="fgrp"><label class="flbl">Service name <span class="req">*</span></label><input class="finp" id="svc-name" placeholder="e.g. Zirconia crown"></div>
     <div class="fg">
-      <div class="fgrp"><label class="flbl">Price (USD) <span class="req">*</span></label><input class="finp" type="number" id="svc-price" placeholder="0" min="0"></div>
+      <div class="fgrp"><label class="flbl">Price <span class="req">*</span></label>
+        <div style="display:flex;gap:8px;">
+          <input class="finp" type="number" id="svc-price" placeholder="0" min="0" style="flex:1;">
+          <select class="finp" id="svc-currency" style="width:90px;"><option value="IQD" selected>IQD</option><option value="USD">USD</option></select>
+        </div></div>
       <div class="fgrp"><label class="flbl">Related procedure</label>
         <select class="finp" id="svc-proc">
           <option value="">General (any procedure)</option>
@@ -3329,9 +3347,19 @@ async function setPtStatusFromProc(status){
           <option value="yes">Yes — requires lab work</option>
         </select></div>
       <div class="fgrp" id="padm-implant-wrap" style="display:none;">
-        <label class="flbl">Implant fixture price (USD)</label>
-        <input class="finp" type="number" id="padm-fixture" placeholder="0" min="0">
-        <div style="font-size:10px;color:var(--s400);margin-top:3px;">Deducted from procedure fee before any split, same as lab fee</div>
+        <label class="flbl">Implant involved?</label>
+        <select class="finp" id="padm-implant-yn" onchange="toggleFixturePrice()">
+          <option value="no">No</option>
+          <option value="yes">Yes — has implant fixture cost</option>
+        </select>
+        <div id="padm-fixture-wrap" style="display:none;margin-top:8px;">
+          <label class="flbl">Implant fixture price</label>
+          <div style="display:flex;gap:8px;">
+            <input class="finp" type="number" id="padm-fixture" placeholder="0" min="0" style="flex:1;">
+            <select class="finp" id="padm-fixture-currency" style="width:90px;"><option value="IQD" selected>IQD</option><option value="USD">USD</option></select>
+          </div>
+          <div style="font-size:10px;color:var(--s400);margin-top:3px;">Deducted from fee before any split</div>
+        </div>
       </div>
     </div>
     <div class="fgrp"><label class="flbl">Clinical notes / instructions</label>
