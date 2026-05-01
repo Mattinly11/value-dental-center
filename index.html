@@ -1098,7 +1098,7 @@ async function openAddProc(pid){
     sel.innerHTML='<option value=>Select procedure...</option>';
     Object.keys(cats).sort().forEach(function(cat){
       var og=document.createElement('optgroup');og.label=cat;
-      cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+(p.currency==='IQD'?p.price.toLocaleString()+' IQD':fu(p.price))+')';og.appendChild(o);});
+      cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+fmtAmt(p.price,p.currency||'IQD')+')';og.appendChild(o);});
       sel.appendChild(og);
     });
     if(!allProcDefs.length){var o=document.createElement('option');o.value='Other';o.textContent='Other (no procedures defined yet)';sel.appendChild(o);}
@@ -1119,7 +1119,8 @@ async function openEditProc(id){
   document.getElementById('proc-date').value=pr.date||'';
   document.getElementById('proc-dr').value=pr.treating_dentist||'';
   document.getElementById('proc-ref').value=pr.referrer||'';
-  document.getElementById('proc-fee').value=pr.fee||'';
+  var feeEl2=document.getElementById('proc-fee');if(feeEl2){feeEl2.value=pr.fee||'';feeEl2.dataset.currency=pr.fee_currency||'IQD';}
+  var feeLbl=document.getElementById('proc-fee-currency-lbl');if(feeLbl)feeLbl.textContent='('+(pr.fee_currency||'IQD')+')'; 
   document.getElementById('proc-status').value=pr.status||'completed';
   document.getElementById('proc-notes').value=pr.notes||'';
   document.getElementById('proc-del-btn').style.display='inline-flex';
@@ -1131,7 +1132,7 @@ async function openEditProc(id){
     var pl=document.getElementById('proc-lab');if(pl)pl.value=pr.lab_id;
     await onProcLabChange(pr.lab_id);
     var ps=document.getElementById('proc-lab-svc');if(ps&&pr.lab_service_id)ps.value=pr.lab_service_id;
-    var pf=document.getElementById('proc-lab-fee');if(pf)pf.value=pr.lab_fee||'';
+    var pf=document.getElementById('proc-lab-fee');if(pf){pf.value=pr.lab_fee||'';pf.dataset.currency=pr.fee_currency||'IQD';}
     updateProcNet();
   } else {
     if(labSec)labSec.style.display='none';
@@ -2355,10 +2356,10 @@ async function onProcLabChange(labId){
     var pf=document.getElementById('proc-lab-fee');if(pf)pf.value='';updateProcNet();return;}
   var svcs=procSvcCache.filter(function(s){return s.lab_id===labId;});
   svcSel.innerHTML='<option value="">Select service...</option>'+
-    svcs.map(function(s){return '<option value="'+s.id+'" data-price="'+s.price+'" data-proc="'+(s.related_procedure||'')+'">'+s.name+' ('+fu(s.price)+')</option>';}).join('');
+    svcs.map(function(s){return '<option value="'+s.id+'" data-price="'+s.price+'" data-currency="'+(s.currency||'IQD')+'" data-proc="'+(s.related_procedure||'')+'">'+s.name+' ('+fmtAmt(s.price,s.currency||'IQD')+')</option>';}).join('');
   var procName=document.getElementById('proc-name').value;
   if(procName){var match=svcs.find(function(s){return s.related_procedure===procName;});
-    if(match){svcSel.value=match.id;var pf=document.getElementById('proc-lab-fee');if(pf)pf.value=match.price||'';updateProcNet();}}
+    if(match){svcSel.value=match.id;var pf=document.getElementById('proc-lab-fee');if(pf){pf.value=match.price||'';pf.dataset.currency=match.currency||'IQD';}var lbl=document.getElementById('proc-lab-fee-lbl');if(lbl)lbl.textContent='Lab fee ('+(match.currency||'IQD')+')';updateProcNet();}}
 }
 function onProcSvcChange(svcId){
   var svcSel=document.getElementById('proc-lab-svc');
@@ -2598,12 +2599,12 @@ function buildProcAdminUI(){
       '<th>Name</th><th>Default price</th><th>Lab</th><th>Fixture fee</th><th>Override</th><th>Notes</th><th></th>'+
       '</tr></thead><tbody>'+
       procs.map(function(p){
-        var price=p.currency==='IQD'?p.price.toLocaleString()+' IQD':fu(p.price);
-        var priceUSD=p.currency==='IQD'?'≈'+fu(p.price/1310):'';
+        var price=fmtAmt(p.price,p.currency||'IQD');
+        var priceUSD='';
         return '<tr>'+
           '<td style="font-weight:700;color:var(--s800);">'+p.name+'</td>'+
           '<td><div style="font-weight:700;color:var(--b700);">'+price+'</div>'+
-          (priceUSD?'<div style="font-size:10px;color:var(--s400);">'+priceUSD+'</div>':'')+
+
           '</td>'+
           '<td>'+(p.lab_involved==='yes'?'<span class="badge bp">&#128300; Yes</span>':'<span style="color:var(--s400);font-size:11px;">No</span>')+'</td>'+
           '<td>'+(p.fixture_price>0?'<span style="font-weight:600;color:var(--a700);">'+fu(p.fixture_price)+'</span>':'<span style="color:var(--s400);">—</span>')+'</td>'+
@@ -2854,7 +2855,7 @@ async function openAddProcFromAppt(appt){
     sel.innerHTML='<option value="">Select procedure...</option>';
     Object.keys(cats).sort().forEach(function(cat){
       var og=document.createElement('optgroup');og.label=cat;
-      cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+(p.currency==='IQD'?p.price.toLocaleString()+' IQD':fu(p.price))+')';og.appendChild(o);});
+      cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+fmtAmt(p.price,p.currency||'IQD')+')';og.appendChild(o);});
       sel.appendChild(og);
     });
     // pre-select procedure type from appointment
