@@ -610,7 +610,7 @@ function dd(d){return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric'
 function t2m(t){if(!t)return 0;var p=t.split(':');return +p[0]*60+ +p[1];}
 function m2t(m){var h=Math.floor(m/60),mn=m%60;return(h<10?'0':'')+h+':'+(mn<10?'0':'')+mn;}
 function mY(m){return(m/SLOT_MIN)*SLOT_H;}
-function fu(n){return ((+n||0)*IQD).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})+' IQD';}
+function fu(n){return Math.round(+n||0).toLocaleString('en-US')+' IQD';}
 function fiqd(n){return Math.round(+n||0).toLocaleString('en-US')+' IQD';}
 function fusd(n){return '$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
 // Smart format: checks currency field on invoice/procedure
@@ -935,7 +935,7 @@ async function loadClinical(pid){
         '<td style="font-weight:600;">'+(pr.procedure_name||'—')+'</td>'+
         '<td style="font-size:10px;color:var(--s500);">'+(pr.teeth&&pr.teeth.length?pr.teeth.join(', '):'—')+'</td>'+
         '<td>'+(pr.treating_dentist||'—')+'</td>'+
-        '<td style="font-weight:700;color:var(--b700);">'+fu(pr.fee)+'</td>'+
+        '<td style="font-weight:700;color:var(--b700);">'+fmtAmt(pr.fee,pr.fee_currency||'IQD')+'</td>'+
         '<td><span class="badge '+(sc[pr.status]||'bs')+'">'+( pr.status||'—')+'</span></td>'+
         '<td><button class="btn btnxs" onclick="openEditProc(\''+pr.id+'\')">Edit</button></td></tr>';
     }).join('')+'</tbody></table>':'<div style="padding:24px 0;text-align:center;font-size:13px;color:var(--s400);">No procedures yet</div>';
@@ -999,9 +999,9 @@ async function loadBillingTab(pid,pname){
   var invs=invR.data||[];
   var payR=await db.from('payments').select('*');
   var pays=payR.data||[];
-  var billed=invs.reduce(function(s,i){return s+Number(i.fee||0);},0);
+  var billed=invs.reduce(function(s,i){return s+toIQD(Number(i.fee||0),i.fee_currency);},0);
   var paid=invs.reduce(function(s,inv){
-    return s+pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
+    return s+pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount_iqd||p.amount||0);},0);
   },0);
   var due=billed-paid;
   var html=
@@ -1025,7 +1025,7 @@ async function loadBillingTab(pid,pname){
         (inv.teeth&&inv.teeth.length?'<div style="font-size:10px;color:var(--s500);margin-top:2px;">Teeth: '+inv.teeth.join(', ')+'</div>':'')+
         '</div>'+
         '<div style="text-align:right;flex-shrink:0;">'+
-        '<div style="font-size:14px;font-weight:700;">'+fmtAmt(inv.fee,inv.fee_currency)+'</div>'+
+        '<div style="font-size:14px;font-weight:700;">'+fmtAmt(inv.fee,inv.fee_currency||'IQD')+'</div>'+
         '<span class="badge '+sc+'" style="margin-top:4px;">'+sl+(b>0?' · '+fu(b)+' due':'')+'</span>'+
         '</div></div>';
     }).join('');
@@ -1233,7 +1233,8 @@ async function openInvDetail(invId,pid,pname){
   var pr=await db.from('payments').select('*').eq('invoice_id',invId);
   var pays=pr.data||[];
   var paid=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
-  var bal=Number(inv.fee||0)-paid;
+  var invFeeIQD2=toIQD(Number(inv.fee||0),inv.fee_currency);
+  var bal=invFeeIQD2-paid;
   if(bal<=0){showToast('This invoice is already fully paid ✓');return;}
   document.getElementById('pay-inv-id').value=invId;
   document.getElementById('pay-pid').value=pid;
@@ -1674,8 +1675,8 @@ function buildBillingUI(){
   var todayPaid=pays.filter(function(p){return(p.date||'').slice(0,10)===today;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
   var monthPaid=pays.filter(function(p){return(p.date||'').slice(0,7)===thisM;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
   var totalDue=invs.reduce(function(s,inv){
-    var pd=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
-    return s+Math.max(0,Number(inv.fee||0)-pd);
+    var pd=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount_iqd||p.amount||0);},0);
+    return s+Math.max(0,toIQD(Number(inv.fee||0),inv.fee_currency)-pd);
   },0);
   // group by patient with dentist info
   var byPt={};
@@ -1683,7 +1684,7 @@ function buildBillingUI(){
     var k=inv.patient_name||'Unknown';
     if(!byPt[k])byPt[k]={name:k,pid:inv.patient_id,dentist:inv.treating_dentist||'',invs:[],billed:0,paid:0};
     var pd=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
-    byPt[k].invs.push(inv);byPt[k].billed+=Number(inv.fee||0);byPt[k].paid+=pd;
+    byPt[k].invs.push(inv);byPt[k].billed+=toIQD(Number(inv.fee||0),inv.fee_currency);byPt[k].paid+=pd;
     // update dentist from most recent invoice if not set
     if(!byPt[k].dentist&&inv.treating_dentist)byPt[k].dentist=inv.treating_dentist;
   });
@@ -1883,7 +1884,7 @@ function buildFO(){
   });
   var totalExp=exps.reduce(function(s,e){return s+Number(e.amount||0);},0),expPP=totalExp/3;
   var vPPiqd=vWiqd/3,vPPusd=vWusd/3;
-  var totalCollectedIQD=pays.reduce(function(s,p){return s+Number(p.amount_iqd||p.amount||0);},0);
+  var totalCollectedIQD=pays.reduce(function(s,p){return s+Number(p.amount_iqd||0);},0);
   var totalCollectedUSD=pays.reduce(function(s,p){return s+Number(p.amount_usd||0);},0);
   var html=
     '<div class="stats-row">'+
@@ -1953,7 +1954,7 @@ function buildFP(){
         '<td>'+(inv?inv.procedure_name||'—':'—')+'</td>'+
         '<td>'+(inv?inv.treating_dentist||'—':'—')+'</td>'+
         '<td style="color:var(--s400);">'+(inv&&inv.referrer?inv.referrer:'—')+'</td>'+
-        '<td style="font-weight:700;color:var(--b700);">'+fu(pay.amount)+'</td>'+
+        '<td style="font-weight:700;color:var(--b700);">'+(Number(pay.amount_iqd||0)>0?fu(Number(pay.amount_iqd)):'')+(Number(pay.amount_usd||0)>0?(Number(pay.amount_iqd||0)>0?' + ':'')+fusd(Number(pay.amount_usd)):'')+'</td>'+
         '<td style="font-size:10px;">'+(pay.method||'—')+'</td>'+
         '<td style="color:var(--g700);font-weight:700;">'+(d.treaterGets>0?fu(d.treaterGets):'—')+'</td>'+
         '<td style="color:var(--a700);">'+(d.refGets>0?fu(d.refGets):'—')+'</td>'+
@@ -2016,7 +2017,7 @@ function buildFS(){
     html+='<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:13px;display:flex;align-items:center;gap:12px;">'+
       '<div style="width:38px;height:38px;border-radius:50%;background:var(--s100);color:var(--s600);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">'+(ic[s.role]||'&#128100;')+'</div>'+
       '<div style="flex:1;"><div style="font-size:12px;font-weight:700;">'+(s.name||'')+'</div><div style="font-size:10px;color:var(--s400);">'+(s.role||'')+'</div>'+
-      '<div style="font-size:13px;font-weight:700;color:var(--g700);margin-top:3px;">'+fu(s.salary_usd||0)+'/mo</div><div style="font-size:10px;color:var(--s400);">'+fiQD(s.salary_usd||0)+'</div></div>'+
+      '<div style="font-size:13px;font-weight:700;color:var(--g700);margin-top:3px;">'+fu(s.salary_usd||0)+'/mo</div></div>'+
       '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">'+
       (isPaid?'<span class="badge bg">&#10003; Paid</span>':'<span class="badge br">Unpaid</span>')+
       '<button class="btn btnxs" onclick="togSubPaid(\''+s.id+'\')">'+( isPaid?'Undo':'Mark paid')+'</button></div></div>';
@@ -2154,11 +2155,11 @@ function openLabDetail(labId){
     '<div class="vdc-card-hdr"><div class="vdc-card-title">Services &amp; prices</div></div>'+
     '<div class="vdc-card-body">'+
     (svcs.length?
-      '<table class="tbl"><thead><tr><th>Service</th><th>Price (USD)</th><th>Price (IQD)</th><th>Related procedure</th><th></th></tr></thead><tbody>'+
+      '<table class="tbl"><thead><tr><th>Service</th><th>Price</th><th>Currency</th><th>Related procedure</th><th></th></tr></thead><tbody>'+
       svcs.map(function(s){
         return '<tr><td style="font-weight:600;">'+s.name+'</td>'+
-          '<td style="font-weight:700;color:var(--b700);">'+fu(s.price)+'</td>'+
-          '<td style="font-size:10px;color:var(--s400);">'+(s.currency||'USD')+'</td>'+
+          '<td style="font-weight:700;color:var(--b700);">'+fmtAmt(s.price,s.currency||'IQD')+'</td>'+
+          '<td style="font-size:11px;color:var(--s500);">'+(s.currency||'IQD')+'</td>'+
           '<td>'+(s.related_procedure?'<span class="badge bs">'+s.related_procedure+'</span>':'<span style="color:var(--s400);">General</span>')+'</td>'+
           '<td><button class="btn btnxs" data-svcid="'+s.id+'">Edit</button></td></tr>';
       }).join('')+'</tbody></table>':
@@ -2427,8 +2428,8 @@ async function renderDashboard(){
   ]);
   var todayAppts=results[0].data||[],invs=results[1].data||[],pays=results[2].data||[];
   var pts=results[3].data||[],procs=results[4].data||[];
-  var todayPaid=pays.filter(function(p){return(p.date||'').slice(0,10)===today;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
-  var monthPaid=pays.filter(function(p){return(p.date||'').slice(0,7)===thisMonth;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
+  var todayPaid=pays.filter(function(p){return(p.date||'').slice(0,10)===today;}).reduce(function(s,p){return s+Number(p.amount_iqd||p.amount||0);},0);
+  var monthPaid=pays.filter(function(p){return(p.date||'').slice(0,7)===thisMonth;}).reduce(function(s,p){return s+Number(p.amount_iqd||p.amount||0);},0);
   var totalDue=invs.reduce(function(s,inv){
     var pd=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
     return s+Math.max(0,Number(inv.fee||0)-pd);
@@ -2500,7 +2501,7 @@ async function renderDashboard(){
         return '<tr style="cursor:pointer;" onclick="openPtByName(\''+( pr.patient_name||'').replace(/'/g,'&#39;')+'\')">'+'<td style="font-size:10px;color:var(--s400);">'+(pr.date||'—')+'</td>'+
           '<td style="font-weight:600;">'+(pr.patient_name||'—')+'</td>'+
           '<td>'+(pr.procedure_name||'—')+'</td><td>'+(pr.treating_dentist||'—')+'</td>'+
-          '<td style="font-weight:700;color:var(--b700);">'+fu(pr.fee)+'</td>'+
+          '<td style="font-weight:700;color:var(--b700);">'+fmtAmt(pr.fee,pr.fee_currency||'IQD')+'</td>'+
           '<td><span class="badge '+(sc[pr.status]||'bs')+'">'+(pr.status||'—')+'</span></td></tr>';
       }).join('')+'</tbody></table>':
       '<div style="text-align:center;padding:16px 0;font-size:13px;color:var(--s400);">No procedures yet</div>')+
