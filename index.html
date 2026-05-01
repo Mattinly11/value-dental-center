@@ -404,7 +404,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
           <select class="finp" id="proc-lab" onchange="onProcLabChange(this.value)"><option value="">Select lab...</option></select></div>
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab service</label>
           <select class="finp" id="proc-lab-svc" onchange="onProcSvcChange(this.value)"><option value="">Select service...</option></select></div>
-        <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab fee (IQD)</label>
+        <div class="fgrp" style="margin-bottom:0;"><label class="flbl" id="proc-lab-fee-lbl">Lab fee (IQD)</label>
           <input class="finp" type="number" id="proc-lab-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
       </div>
       <!-- Implant fixture price -->
@@ -423,7 +423,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       </div>
     </div>
     <div class="fg">
-      <div class="fgrp"><label class="flbl">Procedure fee (IQD) <span class="req">*</span></label><input class="finp" type="number" id="proc-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
+      <div class="fgrp"><label class="flbl">Procedure fee <span id="proc-fee-currency-lbl" style="color:var(--b600);">(IQD)</span> <span class="req">*</span></label><input class="finp" type="number" id="proc-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
       <div class="fgrp"><label class="flbl">Status</label>
         <select class="finp" id="proc-status"><option value="planned">Planned</option><option value="inprogress">In progress</option><option value="completed" selected>Completed</option></select></div>
     </div>
@@ -611,8 +611,18 @@ function t2m(t){if(!t)return 0;var p=t.split(':');return +p[0]*60+ +p[1];}
 function m2t(m){var h=Math.floor(m/60),mn=m%60;return(h<10?'0':'')+h+':'+(mn<10?'0':'')+mn;}
 function mY(m){return(m/SLOT_MIN)*SLOT_H;}
 function fu(n){return ((+n||0)*IQD).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})+' IQD';}
-function fiqd(n){return Math.round(+n||0).toLocaleString('en-US')+' IQD';} // format direct IQD value
-function fusd(n){return '$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});} // format USD
+function fiqd(n){return Math.round(+n||0).toLocaleString('en-US')+' IQD';}
+function fusd(n){return '$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+// Smart format: checks currency field on invoice/procedure
+function fmtAmt(amount,currency){
+  if(!currency||currency==='IQD')return fiqd(amount);
+  return fusd(amount);
+}
+// Convert any amount to IQD equivalent for comparison
+function toIQD(amount,currency){
+  if(!currency||currency==='IQD')return +amount||0;
+  return (+amount||0)*IQD;
+}
 function fiQD(n){return fu(n);} // alias - both show IQD now
 function getDR(dr){if(!drRates[dr])drRates[dr]={ownPct:35,refPct:20};return drRates[dr];}
 function saveRates(){localStorage.setItem('vdc-dr-rates',JSON.stringify(drRates));}
@@ -1015,7 +1025,7 @@ async function loadBillingTab(pid,pname){
         (inv.teeth&&inv.teeth.length?'<div style="font-size:10px;color:var(--s500);margin-top:2px;">Teeth: '+inv.teeth.join(', ')+'</div>':'')+
         '</div>'+
         '<div style="text-align:right;flex-shrink:0;">'+
-        '<div style="font-size:14px;font-weight:700;">'+fu(inv.fee)+'</div>'+
+        '<div style="font-size:14px;font-weight:700;">'+fmtAmt(inv.fee,inv.fee_currency)+'</div>'+
         '<span class="badge '+sc+'" style="margin-top:4px;">'+sl+(b>0?' · '+fu(b)+' due':'')+'</span>'+
         '</div></div>';
     }).join('');
@@ -1137,9 +1147,18 @@ async function saveProc(){
   var pname=document.getElementById('proc-pname').value;
   if(!pid){showToast('No patient ID — please reopen from patient profile','error');return;}
   var fee=parseFloat(document.getElementById('proc-fee').value)||0;
+  var feeCurrency=(document.getElementById('proc-fee').dataset.currency)||'IQD';
   var labFeeBase=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
+  var labFeeCurrency=(document.getElementById('proc-lab-fee')||{dataset:{}}).dataset.currency||'IQD';
   var fixtureFeeAmt=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
-  var labFee=labFeeBase+fixtureFeeAmt;
+  // convert lab fee to same currency as procedure fee if different
+  var labFeeConverted=labFeeBase;
+  if(labFeeCurrency!==feeCurrency){
+    if(labFeeCurrency==='USD'&&feeCurrency==='IQD')labFeeConverted=labFeeBase*IQD;
+    else if(labFeeCurrency==='IQD'&&feeCurrency==='USD')labFeeConverted=labFeeBase/IQD;
+  }
+  var fixtureFeeConverted=fixtureFeeAmt; // fixture always same currency as proc
+  var labFee=labFeeConverted+fixtureFeeConverted;
   var netFee=fee-labFee;
   var labId=(document.getElementById('proc-lab')||{}).value||null;
   var labSvcId=(document.getElementById('proc-lab-svc')||{}).value||null;
@@ -1151,7 +1170,7 @@ async function saveProc(){
     date:document.getElementById('proc-date').value||null,
     treating_dentist:document.getElementById('proc-dr').value||null,
     referrer:document.getElementById('proc-ref').value||null,
-    fee:fee,lab_fee:labFee,net_fee:netFee,
+    fee:fee,fee_currency:feeCurrency,lab_fee:labFee,net_fee:netFee,
     lab_id:labId||null,lab_service_id:labSvcId||null,lab_name:labName||null,
     status:document.getElementById('proc-status').value||'completed',
     notes:document.getElementById('proc-notes').value.trim()||null,
@@ -1174,7 +1193,7 @@ async function saveProc(){
       procedure_id:newP?newP.id:null,
       procedure_name:name,
       treating_dentist:payload.treating_dentist,
-      fee:fee,lab_fee:labFee,net_fee:netFee,
+      fee:fee,fee_currency:feeCurrency,lab_fee:labFee,net_fee:netFee,
       lab_name:labName||null,
       teeth:teeth.length>0?teeth:null,
       date:payload.date,
@@ -1261,7 +1280,9 @@ async function savePayment(){
   var pr=await db.from('payments').select('*').eq('invoice_id',invId);
   var pays=pr.data||[];
   var ir=await db.from('invoices').select('fee').eq('id',invId).single();
-  var totalFee=Number((ir.data||{}).fee||0);
+  var rawFee=Number((ir.data||{}).fee||0);
+  var rawCurr=(ir.data||{}).fee_currency||'IQD';
+  var totalFee=toIQD(rawFee,rawCurr);
   var totalPaid=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
   var ns=totalPaid>=totalFee?'paid':totalPaid>0?'partial':'unpaid';
   await db.from('invoices').update({status:ns}).eq('id',invId);
@@ -2201,7 +2222,7 @@ function openEditSvc(id){
   document.getElementById('svc-name').value=s.name||'';
   var svcCurr=s.currency||'IQD';
   document.getElementById('svc-currency')&&(document.getElementById('svc-currency').value=svcCurr);
-  document.getElementById('svc-price').value=svcCurr==='IQD'?Math.round((s.price||0)*IQD):s.price||'';
+  document.getElementById('svc-price').value=s.price||'';
   document.getElementById('svc-proc').value=s.related_procedure||'';
   document.getElementById('svc-del-btn').style.display='inline-flex';
   openMdl('svc-modal');
@@ -2213,8 +2234,7 @@ async function saveSvc(){
   var id=document.getElementById('svc-id').value;
   var labId=document.getElementById('svc-lab-id').value;
   var currency=(document.getElementById('svc-currency')||{}).value||'IQD';
-  var priceUSD=currency==='IQD'?price/IQD:price;
-  var payload={lab_id:labId,name:name,price:priceUSD,currency:currency,related_procedure:document.getElementById('svc-proc').value||null};
+  var payload={lab_id:labId,name:name,price:price,currency:currency,related_procedure:document.getElementById('svc-proc').value||null};
   var r=id?await db.from('lab_services').update(payload).eq('id',id):await db.from('lab_services').insert([payload]);
   if(r.error){showToast('Failed to save','error');return;}
   showToast(id?'Service updated':'Service added');closeMdl('svc-modal');
@@ -2342,7 +2362,14 @@ async function onProcLabChange(labId){
 function onProcSvcChange(svcId){
   var svcSel=document.getElementById('proc-lab-svc');
   var opt=svcSel?Array.from(svcSel.options).find(function(o){return o.value===svcId;}):null;
-  if(opt&&opt.dataset.price){var pf=document.getElementById('proc-lab-fee');if(pf)pf.value=opt.dataset.price;updateProcNet();}
+  if(opt&&opt.dataset.price){
+    var pf=document.getElementById('proc-lab-fee');
+    if(pf){pf.value=opt.dataset.price;pf.dataset.currency=opt.dataset.currency||'IQD';}
+    // update lab fee label
+    var lbl=document.getElementById('proc-lab-fee-lbl');
+    if(lbl)lbl.textContent='Lab fee ('+(opt.dataset.currency||'IQD')+')';
+    updateProcNet();
+  }
 }
 function autoMatchLabSvc(procName){
   // find a service that matches this procedure across all labs
@@ -2361,8 +2388,18 @@ function autoMatchLabSvc(procName){
   }
 }
 function updateProcNet(){
-  var fee=parseFloat((document.getElementById('proc-fee')||{}).value)||0;
-  var labFee=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
+  var feeEl=document.getElementById('proc-fee');
+  var fee=parseFloat((feeEl||{}).value)||0;
+  var feeCurr=(feeEl||{dataset:{}}).dataset.currency||'IQD';
+  var labEl=document.getElementById('proc-lab-fee');
+  var labFeeRaw=parseFloat((labEl||{}).value)||0;
+  var labCurr=(labEl||{dataset:{}}).dataset.currency||'IQD';
+  // convert lab fee to proc fee currency for display
+  var labFee=labFeeRaw;
+  if(labCurr!==feeCurr){
+    if(labCurr==='USD'&&feeCurr==='IQD')labFee=labFeeRaw*IQD;
+    else if(labCurr==='IQD'&&feeCurr==='USD')labFee=labFeeRaw/IQD;
+  }
   var fixtureFee=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
   var totalDeductions=labFee+fixtureFee;
   var net=fee-totalDeductions;
@@ -2370,9 +2407,9 @@ function updateProcNet(){
   if(totalDeductions>0&&fee>0){
     if(disp)disp.style.display='flex';
     var pf=document.getElementById('pnd-fee'),pl=document.getElementById('pnd-lab'),pn=document.getElementById('pnd-net');
-    if(pf)pf.textContent=fu(fee);
-    if(pl)pl.textContent='-'+fu(totalDeductions)+(fixtureFee>0?' (lab+fixture)':'');
-    if(pn){pn.textContent=fu(net);pn.style.color=net>=0?'var(--g700)':'var(--r600)';}
+    if(pf)pf.textContent=fmtAmt(fee,feeCurr);
+    if(pl)pl.textContent='-'+fmtAmt(totalDeductions,feeCurr)+(fixtureFee>0?' (lab+fixture)':'');
+    if(pn){pn.textContent=fmtAmt(net,feeCurr);pn.style.color=net>=0?'var(--g700)':'var(--r600)';}
   }else{if(disp)disp.style.display='none';}
 }
 
@@ -2639,7 +2676,7 @@ async function saveProcAdmin(){
     name:name,
     category:document.getElementById('padm-cat').value,
     price:parseFloat(document.getElementById('padm-price').value)||0,
-    currency:document.getElementById('padm-currency').value,
+    currency:document.getElementById('padm-currency').value||'IQD',
     price_override:document.getElementById('padm-override').value,
     lab_involved:document.getElementById('padm-lab').value,
     fixture_price:(document.getElementById('padm-implant-yn')&&document.getElementById('padm-implant-yn').value==='yes')?parseFloat(document.getElementById('padm-fixture').value)||0:0,
@@ -2678,12 +2715,18 @@ function onProcDefSelect(name){
   var def=allProcDefs.find(function(p){return p.name===name;});
   if(!def)return;
   var feeEl=document.getElementById('proc-fee');
+  var feeLbl=document.querySelector('label[for="proc-fee"]');
   if(feeEl){
-    var priceUSD=def.currency==='IQD'?(def.price/1310).toFixed(2):def.price;
-    feeEl.value=priceUSD;
+    // store price as-is in its original currency — NO conversion
+    feeEl.value=def.price;
     feeEl.readOnly=def.price_override==='no';
     feeEl.style.background=def.price_override==='no'?'var(--s100)':'';
     feeEl.title=def.price_override==='no'?'Price locked by admin':'';
+    // update label to show correct currency
+    var currLbl=document.getElementById('proc-fee-currency-lbl');
+    if(currLbl)currLbl.textContent='('+( def.currency||'IQD')+')';
+    // store currency on the field for saveProc to use
+    feeEl.dataset.currency=def.currency||'IQD';
   }
   var fixEl=document.getElementById('proc-fixture-fee');
   var fixWrap=document.getElementById('proc-fixture-wrap');
@@ -2857,10 +2900,10 @@ async function openPayModalFromAppt(invId, invSummary){
     (inv.teeth&&inv.teeth.length?'<div style="font-size:11px;color:var(--s500);margin-bottom:6px;">Teeth: '+inv.teeth.join(', ')+'</div>':'')+
     (inv.treating_dentist?'<div style="font-size:11px;color:var(--s500);margin-bottom:6px;">Dentist: '+inv.treating_dentist+'</div>':'')+
     '<div style="display:flex;gap:16px;font-size:11px;color:var(--s500);">'+
-    '<div>Total: <strong style="color:var(--s800);">'+fu(inv.fee)+'</strong></div>'+
-    (inv.lab_fee>0?'<div>Lab: <strong style="color:var(--r600);">-'+fu(inv.lab_fee)+'</strong></div>':'')+
-    '<div>Paid: <strong style="color:var(--g700);">'+fu(paid)+'</strong></div>'+
-    '<div>Balance: <strong style="color:'+(bal>0?'var(--r600)':'var(--g700)')+';">'+fu(bal)+'</strong></div>'+
+    '<div>Total: <strong style="color:var(--s800);">'+fmtAmt(inv.fee,inv.fee_currency)+'</strong></div>'+
+    (inv.lab_fee>0?'<div>Lab: <strong style="color:var(--r600);">-'+fmtAmt(inv.lab_fee,inv.fee_currency)+'</strong></div>':'')+
+    '<div>Paid: <strong style="color:var(--g700);">'+fiqd(Math.round(paidEquiv))+'</strong></div>'+
+    '<div>Balance: <strong style="color:'+(bal>0?'var(--r600)':'var(--g700)')+';">'+fmtAmt(Math.round(bal),inv.fee_currency)+'</strong></div>'+
     '</div>'+payRows;
   updatePayBal();
   openMdl('pay-modal');
@@ -2983,7 +3026,7 @@ function addAnotherProc(){
     });
     sel.addEventListener('change',function(){
       var def=allProcDefs.find(function(d){return d.name===sel.value;});
-      if(def){var feeEl=document.getElementById('ep-fee-'+idx);if(feeEl)feeEl.value=def.currency==='IQD'?(def.price/1310).toFixed(0):def.price;}
+      if(def){var feeEl=document.getElementById('ep-fee-'+idx);if(feeEl){feeEl.value=def.price;feeEl.dataset.currency=def.currency||'IQD';}}
     });
   }
 
@@ -3196,18 +3239,21 @@ async function openPayModalFromAppt(invId, invSummary){
   var paidIQD=pays.reduce(function(s,p){return s+Number(p.amount_iqd||0);},0);
   var paidUSD=pays.reduce(function(s,p){return s+Number(p.amount_usd||0);},0);
   var paidEquiv=paidIQD+(paidUSD*IQD);
-  var fee=Number(inv.fee||0); // stored in IQD
-  var bal=Math.max(0,fee-paidEquiv);
+  var fee=Number(inv.fee||0);
+  var feeCurr=inv.fee_currency||'IQD';
+  var feeIQD=toIQD(fee,feeCurr); // convert to IQD for balance calc
+  var bal=Math.max(0,feeIQD-paidEquiv);
   document.getElementById('pay-inv-id').value=invId;
   document.getElementById('pay-pid').value=inv.patient_id||'';
   document.getElementById('pay-pname').value=inv.patient_name||'';
   document.getElementById('pay-msub').textContent=(inv.procedure_name||'Procedure')+' · '+(inv.date||'');
   document.getElementById('pay-amt-iqd').value=bal>0?Math.round(bal):'';
   document.getElementById('pay-amt-usd').value='';
+  document.getElementById('pay-amt-usd').value='';
   document.getElementById('pay-date').value=fd(new Date());
   document.getElementById('pay-rate').value=IQD;
   var payModal=document.getElementById('pay-modal');
-  payModal.dataset.invFee=fee;
+  payModal.dataset.invFee=feeIQD;
   payModal.dataset.alreadyPaid=paidEquiv;
   document.querySelectorAll('.pay-btn').forEach(function(b){b.classList.remove('sel');});
   document.querySelector('.pay-btn').classList.add('sel');
@@ -3283,9 +3329,10 @@ function getPayDistDual(pay, inv){
   var t=inv.treating_dentist||'',r=inv.referrer||'';
   var iqd=Number(pay.amount_iqd||0);
   var usd=Number(pay.amount_usd||0);
-  var labFeeIQD=Number(inv.lab_fee||0);
-  var totalFee=Number(inv.fee||1);
-  var netRatio=totalFee>0?Math.max(0,(totalFee-labFeeIQD)/totalFee):1;
+  var labFeeRaw=Number(inv.lab_fee||0);
+  var labFeeIQD=toIQD(labFeeRaw,inv.fee_currency);
+  var feeIQD2=toIQD(Number(inv.fee||1),inv.fee_currency);
+  var netRatio=feeIQD2>0?Math.max(0,(feeIQD2-labFeeIQD)/feeIQD2):1;
   var netIQD=iqd*netRatio,netUSD=usd*netRatio;
   var isP=PARTNERS.indexOf(t)>=0,refIsP=r&&PARTNERS.indexOf(r)>=0;
   if(isP)return{treaterIQD:iqd,treaterUSD:usd,refIQD:0,refUSD:0,vIQD:0,vUSD:0,type:'partner',dentist:t};
