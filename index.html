@@ -888,7 +888,17 @@ async function renderProf(id,name,tab){
   document.getElementById('pg-content').innerHTML=html;
   loadTab(p);
 }
-function switchTab(t,id,name){profState.tab=t;profState.pid=id;profState.pname=name;loadTab(null);}
+function switchTab(t,id,name){
+  profState.tab=t;profState.pid=id;profState.pname=name;
+  // update active tab button without full re-render
+  document.querySelectorAll('.prof-tab').forEach(function(btn){
+    btn.classList.remove('act');
+    if(btn.textContent.toLowerCase().includes(t)||btn.getAttribute('onclick').includes("'"+t+"'")){
+      btn.classList.add('act');
+    }
+  });
+  loadTab(null);
+}
 async function loadTab(p){
   if(!p){var r=await db.from('patients').select('*').eq('id',profState.pid).single();p=r.data;}
   var el=document.getElementById('prof-content');if(!el)return;
@@ -1236,27 +1246,11 @@ async function openInvDetail(invId,pid,pname){
   var paid=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
   var invFeeIQD2=toIQD(Number(inv.fee||0),inv.fee_currency);
   var bal=invFeeIQD2-paid;
-  if(bal<=0){showToast('This invoice is already fully paid ✓');return;}
-  document.getElementById('pay-inv-id').value=invId;
-  document.getElementById('pay-pid').value=pid;
-  document.getElementById('pay-pname').value=pname;
-  document.getElementById('pay-msub').textContent=(inv.procedure_name||'Procedure')+' · '+(inv.date||'');
-  document.getElementById('pay-amt').value=bal.toFixed(2);
-  document.getElementById('pay-date').value=fd(new Date());
-  document.getElementById('pay-method').value='Cash';
-  document.querySelectorAll('.pay-btn').forEach(function(b){b.classList.remove('sel');});
-  document.querySelector('.pay-btn').classList.add('sel');
-  var stCls=paid>0?'ba':'br';var stLbl=paid>0?'Partially paid':'Unpaid';
-  document.getElementById('pay-detail').innerHTML=
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'+
-    '<div style="font-weight:700;color:var(--s800);">'+(inv.procedure_name||'—')+'</div>'+
-    '<span class="badge '+stCls+'">'+stLbl+'</span></div>'+
-    '<div style="display:flex;gap:16px;font-size:11px;color:var(--s500);">'+
-    '<div>Total: <strong style="color:var(--s800);">'+fu(inv.fee)+'</strong></div>'+
-    '<div>Paid: <strong style="color:var(--g700);">'+fu(paid)+'</strong></div>'+
-    '<div>Balance: <strong style="color:var(--r600);">'+fu(bal)+'</strong></div></div>'+
-    (pays.length?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--s100);">'+pays.map(function(py){return '<div style="font-size:11px;color:var(--s500);">'+(py.date||'')+' · '+(py.method||'')+' — <strong style="color:var(--g700);">'+fu(py.amount)+'</strong></div>';}).join('')+'</div>':'');
-  updatePayBal();openMdl('pay-modal');
+  // always open — even fully paid invoices can be viewed
+  // delegate to the full dual-currency payment modal
+  document.getElementById('pay-pid').value=pid||'';
+  document.getElementById('pay-pname').value=pname||'';
+  await openPayModalFromAppt(invId, {});
 }
 function updatePayBal(){
   var invFee=parseFloat(document.getElementById('pay-modal').dataset.invFee)||0;
