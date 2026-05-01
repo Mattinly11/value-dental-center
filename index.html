@@ -404,12 +404,12 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
           <select class="finp" id="proc-lab" onchange="onProcLabChange(this.value)"><option value="">Select lab...</option></select></div>
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab service</label>
           <select class="finp" id="proc-lab-svc" onchange="onProcSvcChange(this.value)"><option value="">Select service...</option></select></div>
-        <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab fee (USD)</label>
+        <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab fee (IQD)</label>
           <input class="finp" type="number" id="proc-lab-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
       </div>
       <!-- Implant fixture price -->
       <div id="proc-fixture-wrap" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--p200);">
-        <label class="flbl">Implant fixture cost</label>
+        <label class="flbl">Implant fixture cost (IQD)</label>
         <input class="finp" type="number" id="proc-fixture-fee" placeholder="0" min="0" oninput="updateProcNet()">
         <div style="font-size:10px;color:var(--s400);margin-top:3px;">Deducted from procedure fee before any split</div>
       </div>
@@ -423,7 +423,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       </div>
     </div>
     <div class="fg">
-      <div class="fgrp"><label class="flbl">Fee (USD) <span class="req">*</span></label><input class="finp" type="number" id="proc-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
+      <div class="fgrp"><label class="flbl">Procedure fee (IQD) <span class="req">*</span></label><input class="finp" type="number" id="proc-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
       <div class="fgrp"><label class="flbl">Status</label>
         <select class="finp" id="proc-status"><option value="planned">Planned</option><option value="inprogress">In progress</option><option value="completed" selected>Completed</option></select></div>
     </div>
@@ -443,16 +443,50 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 
 <!-- PAYMENT MODAL -->
 <div class="mbg" id="pay-modal">
-  <div class="modal">
+  <div class="modal mw">
     <div class="mtit">Record payment</div>
     <div class="msub" id="pay-msub">Invoice details</div>
     <input type="hidden" id="pay-inv-id">
     <input type="hidden" id="pay-pid">
     <input type="hidden" id="pay-pname">
     <div id="pay-detail" style="background:var(--s50);border-radius:var(--radsm);padding:12px;margin-bottom:14px;font-size:12px;"></div>
+    <!-- Exchange rate bar -->
+    <div style="background:var(--b50);border:1px solid var(--b100);border-radius:var(--radsm);padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <span style="font-size:11px;font-weight:600;color:var(--b700);">Today's exchange rate</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:11px;color:var(--s500);">1 USD =</span>
+        <input type="number" id="pay-rate" style="width:80px;padding:4px 8px;border-radius:6px;border:1.5px solid var(--b200);font-size:12px;font-weight:700;text-align:center;font-family:inherit;" oninput="onPayRateChange()" value="1310">
+        <span style="font-size:11px;color:var(--s500);">IQD</span>
+      </div>
+    </div>
     <div class="fg">
-      <div class="fgrp"><label class="flbl">Amount (USD) <span class="req">*</span></label><input class="finp" type="number" id="pay-amt" placeholder="0" min="0" oninput="updatePayBal()"></div>
       <div class="fgrp"><label class="flbl">Date</label><input class="finp" type="date" id="pay-date"></div>
+    </div>
+    <!-- Dual currency payment fields -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div style="background:var(--g50);border:1.5px solid var(--g100);border-radius:var(--radsm);padding:12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--g700);margin-bottom:8px;">🇮🇶 Iraqi Dinar (IQD)</div>
+        <div class="fgrp" style="margin-bottom:8px;"><label class="flbl">Amount paid (IQD)</label>
+          <input class="finp" type="number" id="pay-amt-iqd" placeholder="0" oninput="onPayIQD()"></div>
+        <div style="font-size:10px;color:var(--s400);">Positive = received · Negative = change given back</div>
+      </div>
+      <div style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:var(--radsm);padding:12px;">
+        <div style="font-size:11px;font-weight:700;color:#C2410C;margin-bottom:8px;">🇺🇸 US Dollar (USD)</div>
+        <div class="fgrp" style="margin-bottom:8px;"><label class="flbl">Amount paid (USD)</label>
+          <input class="finp" type="number" id="pay-amt-usd" placeholder="0" oninput="onPayUSD()"></div>
+        <div style="font-size:10px;color:var(--s400);" id="pay-usd-equiv">= 0 IQD at today's rate</div>
+      </div>
+    </div>
+    <!-- Summary -->
+    <div id="pay-summary" style="background:var(--s50);border-radius:var(--radsm);padding:10px 12px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:12px;font-weight:600;">Total received (IQD equivalent)</span>
+        <span style="font-size:14px;font-weight:700;color:var(--g700);" id="pay-total-equiv">0 IQD</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="font-size:12px;font-weight:600;">Remaining after payment</span>
+        <span style="font-size:14px;font-weight:700;" id="pay-bal-disp">0 IQD</span>
+      </div>
     </div>
     <div class="fgrp"><label class="flbl">Payment method</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;" id="pay-method-row">
@@ -462,10 +496,6 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         <button class="pay-btn" onclick="selPM(this,'Insurance')">Insurance</button>
       </div>
       <input type="hidden" id="pay-method" value="Cash"></div>
-    <div style="background:var(--s50);border-radius:var(--radsm);padding:10px 12px;display:flex;justify-content:space-between;margin-bottom:4px;">
-      <span style="font-size:12px;font-weight:600;">Remaining after payment</span>
-      <span style="font-size:14px;font-weight:700;" id="pay-bal-disp">$0</span>
-    </div>
     <div class="mac">
       <button class="btn" onclick="closeMdl('pay-modal')">Cancel</button>
       <button class="btn btnp" onclick="savePayment()">Record payment</button>
@@ -542,7 +572,7 @@ var SUPA='https://jqtvgjroaagfewuetali.supabase.co';
 var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxdHZnanJvYWFnZmV3dWV0YWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzQyNTIsImV4cCI6MjA5MDU1MDI1Mn0.vdekXCu_j4v3FQIqoPNRrQqf1oLxMsyKnVhHYkWTS2c';
 var db=supabase.createClient(SUPA,SKEY);
 var USERS={admin:'vdc2026admin',reception:'vdc2026desk'};
-var IQD=1310;
+var IQD=parseInt(localStorage.getItem("vdc-iqd-rate")||"1310");
 var PARTNERS=['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen'];
 var REG=['Dr. Mateen','Dr. Ibrahim','Dr. Mahmoud','Dr. Niwar','Dr. Dilveen'];
 var ROOMS=['Room 1','Room 2','Room 3','Room 4','Room 5'];
@@ -581,6 +611,8 @@ function t2m(t){if(!t)return 0;var p=t.split(':');return +p[0]*60+ +p[1];}
 function m2t(m){var h=Math.floor(m/60),mn=m%60;return(h<10?'0':'')+h+':'+(mn<10?'0':'')+mn;}
 function mY(m){return(m/SLOT_MIN)*SLOT_H;}
 function fu(n){return ((+n||0)*IQD).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})+' IQD';}
+function fiqd(n){return Math.round(+n||0).toLocaleString('en-US')+' IQD';} // format direct IQD value
+function fusd(n){return '$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});} // format USD
 function fiQD(n){return fu(n);} // alias - both show IQD now
 function getDR(dr){if(!drRates[dr])drRates[dr]={ownPct:35,refPct:20};return drRates[dr];}
 function saveRates(){localStorage.setItem('vdc-dr-rates',JSON.stringify(drRates));}
@@ -1813,49 +1845,57 @@ function buildFO(){
     var pd=finPays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
     return s+Math.max(0,Number(inv.fee||0)-pd);
   },0);
-  // split payments by rules
-  var wallets={};PARTNERS.forEach(function(p){wallets[p]=0;});var vW=0;
-  var drEarnings={};REG.forEach(function(dr){drEarnings[dr]=0;});
+  // split payments using dual currency
+  var walletsIQD={},walletsUSD={};PARTNERS.forEach(function(p){walletsIQD[p]=0;walletsUSD[p]=0;});
+  var vWiqd=0,vWusd=0;
+  var drEarningsIQD={},drEarningsUSD={};REG.forEach(function(dr){drEarningsIQD[dr]=0;drEarningsUSD[dr]=0;});
   pays.forEach(function(pay){
     var inv=getInv(pay.invoice_id);
-    var d=calcPayDist(Number(pay.amount||0),inv);
-    if(d.type==='partner'){wallets[d.dentist]=(wallets[d.dentist]||0)+d.treaterGets;}
+    var d=getPayDistDual(pay,inv);
+    if(d.type==='partner'){walletsIQD[d.dentist]=(walletsIQD[d.dentist]||0)+d.treaterIQD;walletsUSD[d.dentist]=(walletsUSD[d.dentist]||0)+d.treaterUSD;}
     else if(d.type==='referred'||d.type==='own'){
-      drEarnings[d.dentist]=(drEarnings[d.dentist]||0)+d.treaterGets;
-      if(d.referrer&&PARTNERS.indexOf(d.referrer)>=0)wallets[d.referrer]=(wallets[d.referrer]||0)+d.refGets;
-      else vW+=d.vGets;
-    } else {vW+=d.vGets;}
+      drEarningsIQD[d.dentist]=(drEarningsIQD[d.dentist]||0)+d.treaterIQD;
+      drEarningsUSD[d.dentist]=(drEarningsUSD[d.dentist]||0)+d.treaterUSD;
+      if(d.referrer&&PARTNERS.indexOf(d.referrer)>=0){walletsIQD[d.referrer]=(walletsIQD[d.referrer]||0)+d.refIQD;walletsUSD[d.referrer]=(walletsUSD[d.referrer]||0)+d.refUSD;}
+      else{vWiqd+=d.vIQD;vWusd+=d.vUSD;}
+    } else {vWiqd+=d.vIQD;vWusd+=d.vUSD;}
   });
-  // value wallet splits equally to partners
   var totalExp=exps.reduce(function(s,e){return s+Number(e.amount||0);},0),expPP=totalExp/3;
-  var vPP=vW/3;
-  // stats row
+  var vPPiqd=vWiqd/3,vPPusd=vWusd/3;
+  var totalCollectedIQD=pays.reduce(function(s,p){return s+Number(p.amount_iqd||p.amount||0);},0);
+  var totalCollectedUSD=pays.reduce(function(s,p){return s+Number(p.amount_usd||0);},0);
   var html=
     '<div class="stats-row">'+
-    statC('var(--g50)','&#128176;','Collected this month',fu(totalCollected))+
-    
+    statC('var(--g50)','🇮🇶','Collected IQD',fiqd(Math.round(totalCollectedIQD)))+
+    statC('#FFF7ED','🇺🇸','Collected USD',fusd(totalCollectedUSD))+
     statC('var(--b50)','&#128200;','Payments recorded',pays.length)+
-    statC('var(--a50)','&#128176;','Expenses this month',fu(totalExp))+
+    statC('var(--a50)','&#128176;','Expenses this month',fiqd(Math.round(totalExp)))+
     '</div>';
-  // partner wallet cards
   var pC=[{bg:'#DBEAFE',border:'#2563EB',c:'#1D4ED8'},{bg:'#CCFBF1',border:'#0D9488',c:'#0F766E'},{bg:'#EDE9FE',border:'#7C3AED',c:'#6D28D9'}];
   html+='<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px;">';
   PARTNERS.forEach(function(p,i){
-    var c=pC[i],g=wallets[p]||0,net=g+vPP-expPP;
+    var c=pC[i],gIQD=walletsIQD[p]||0,gUSD=walletsUSD[p]||0;
     html+='<div class="wallet-card" style="background:'+c.bg+';border-color:'+c.border+';">'+
-      '<div style="font-size:10px;font-weight:700;color:'+c.c+';text-transform:uppercase;margin-bottom:4px;">'+p+'</div>'+
-      '<div style="font-size:18px;font-weight:700;color:'+c.c+';">'+fu(g)+'</div>'+
-      '<div style="font-size:9px;color:'+c.c+';opacity:0.8;margin-bottom:6px;">From payments this month</div>'+
-      '<div style="font-size:12px;color:'+c.c+';">+ '+fu(vPP)+' (wallet share)</div>'+
-      '<div style="font-size:12px;color:'+c.c+';">- '+fu(expPP)+' (expenses)</div>'+
-      '<div style="font-size:13px;font-weight:700;color:'+c.c+';margin-top:4px;border-top:1px solid '+c.border+';padding-top:4px;">Net: '+fu(net)+'</div>'+
+      '<div style="font-size:10px;font-weight:700;color:'+c.c+';text-transform:uppercase;margin-bottom:6px;">'+p+'</div>'+
+      '<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
+      '<div style="font-size:9px;color:'+c.c+';font-weight:600;">🇮🇶 IQD</div>'+
+      '<div style="font-size:15px;font-weight:700;color:'+c.c+';">'+fiqd(Math.round(gIQD+vPPiqd))+'</div></div>'+
+      (gUSD>0||vPPusd>0?'<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
+      '<div style="font-size:9px;color:'+c.c+';font-weight:600;">🇺🇸 USD</div>'+
+      '<div style="font-size:15px;font-weight:700;color:'+c.c+';">'+fusd(gUSD+vPPusd)+'</div></div>':'')+
+      '<div style="font-size:10px;color:'+c.c+';margin-top:4px;border-top:1px solid '+c.border+';padding-top:4px;">- expenses: '+fiqd(Math.round(expPP))+'</div>'+
       '</div>';
   });
   html+='<div class="wallet-card" style="background:#F5F3FF;border-color:#7C3AED;">'+
-    '<div style="font-size:10px;font-weight:700;color:#6D28D9;text-transform:uppercase;margin-bottom:4px;">Value Wallet</div>'+
-    '<div style="font-size:18px;font-weight:700;color:#6D28D9;">'+fu(vW)+'</div>'+
-    '<div style="font-size:9px;color:#6D28D9;opacity:0.8;margin-bottom:6px;">From payments this month</div>'+
-    '<div style="font-size:12px;color:#6D28D9;">'+fu(vPP)+' per partner</div>'+
+    '<div style="font-size:10px;font-weight:700;color:#6D28D9;text-transform:uppercase;margin-bottom:6px;">Value Wallet</div>'+
+    '<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
+    '<div style="font-size:9px;color:#6D28D9;font-weight:600;">🇮🇶 IQD</div>'+
+    '<div style="font-size:15px;font-weight:700;color:#6D28D9;">'+fiqd(Math.round(vWiqd))+'</div>'+
+    '<div style="font-size:10px;color:#6D28D9;">'+fiqd(Math.round(vPPiqd))+'/partner</div></div>'+
+    (vWusd>0?'<div style="background:white;border-radius:6px;padding:6px 8px;">'+
+    '<div style="font-size:9px;color:#6D28D9;font-weight:600;">🇺🇸 USD</div>'+
+    '<div style="font-size:15px;font-weight:700;color:#6D28D9;">'+fusd(vWusd)+'</div>'+
+    '<div style="font-size:10px;color:#6D28D9;">'+fusd(vPPusd)+'/partner</div></div>':'')+
     '</div></div>';
   // regular dentist earnings from this month's payments
   html+='<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">Regular dentist earnings — from payments this month</div></div><div class="vdc-card-body">'+
@@ -2017,7 +2057,11 @@ function renderSettings(){
     '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:14px;">&#127973; Clinic info</div>'+
     '<div class="set-row"><div style="font-size:12px;font-weight:600;">Clinic name</div><div style="font-size:13px;color:var(--s600);">Value Dental Center</div></div>'+
     '<div class="set-row"><div style="font-size:12px;font-weight:600;">Location</div><div style="font-size:13px;color:var(--s600);">Duhok, Iraq</div></div>'+
-    '<div class="set-row"><div style="font-size:12px;font-weight:600;">IQD exchange rate</div><div style="font-size:13px;color:var(--s600);">1 USD = '+IQD+' IQD</div></div>'+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">IQD exchange rate</div><div style="font-size:10px;color:var(--s400);margin-top:2px;">Updated daily — for USD conversion</div></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:13px;">1 USD =</span>'+
+    '<input type="number" id="settings-iqd-rate" value="'+IQD+'" style="width:90px;padding:5px 8px;border-radius:var(--radsm);border:1.5px solid var(--s200);font-size:13px;font-weight:700;font-family:inherit;text-align:center;">'+
+    '<span style="font-size:13px;">IQD</span>'+
+    '<button class="btn btnsm btnp" onclick="saveIQDRate()">Save</button></div></div>'+
     '</div>'+
     '<div class="set-sec">'+
     '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:14px;">&#128100; Login accounts</div>'+
@@ -3097,6 +3141,161 @@ async function setPtStatusFromProc(status){
 }
 
 // ══════ UPDATED savePayment — close all & return to calendar ══════
+
+
+// ══════════ DUAL CURRENCY PAYMENT SYSTEM ════════════════════════
+function saveIQDRate(){
+  var el=document.getElementById('settings-iqd-rate');
+  if(!el)return;
+  var rate=parseInt(el.value)||1310;
+  localStorage.setItem('vdc-iqd-rate',rate);
+  IQD=rate;
+  showToast('Exchange rate saved: 1 USD = '+rate+' IQD');
+}
+
+function onPayRateChange(){
+  // update USD equivalent display
+  onPayUSD();
+  updatePayBal();
+}
+function onPayIQD(){
+  // IQD entered — just update balance
+  updatePayBal();
+}
+function onPayUSD(){
+  var usd=parseFloat(document.getElementById('pay-amt-usd').value)||0;
+  var rate=parseFloat(document.getElementById('pay-rate').value)||IQD;
+  var equiv=Math.round(usd*rate);
+  var el=document.getElementById('pay-usd-equiv');
+  if(el)el.textContent='= '+fiqd(equiv)+' at current rate';
+  updatePayBal();
+}
+function updatePayBal(){
+  var rate=parseFloat((document.getElementById('pay-rate')||{}).value)||IQD;
+  var iqd=parseFloat((document.getElementById('pay-amt-iqd')||{}).value)||0;
+  var usd=parseFloat((document.getElementById('pay-amt-usd')||{}).value)||0;
+  var totalEquiv=iqd+(usd*rate); // total in IQD equivalent
+  var invFee=parseFloat((document.getElementById('pay-modal')||{dataset:{}}).dataset.invFee)||0;
+  var alreadyPaid=parseFloat((document.getElementById('pay-modal')||{dataset:{}}).dataset.alreadyPaid)||0;
+  var remaining=Math.max(0,invFee-(alreadyPaid+totalEquiv));
+  var totalEl=document.getElementById('pay-total-equiv');
+  var balEl=document.getElementById('pay-bal-disp');
+  if(totalEl)totalEl.textContent=fiqd(Math.round(totalEquiv));
+  if(balEl){
+    balEl.textContent=fiqd(Math.round(remaining));
+    balEl.style.color=remaining>0?'var(--r600)':'var(--g700)';
+  }
+}
+
+// ══════════ UPDATED openPayModalFromAppt ════════════════════════
+async function openPayModalFromAppt(invId, invSummary){
+  var r=await db.from('invoices').select('*').eq('id',invId).single();
+  var inv=r.data;if(!inv)return;
+  var pr=await db.from('payments').select('*').eq('invoice_id',invId);
+  var pays=pr.data||[];
+  var paidIQD=pays.reduce(function(s,p){return s+Number(p.amount_iqd||0);},0);
+  var paidUSD=pays.reduce(function(s,p){return s+Number(p.amount_usd||0);},0);
+  var paidEquiv=paidIQD+(paidUSD*IQD);
+  var fee=Number(inv.fee||0); // stored in IQD
+  var bal=Math.max(0,fee-paidEquiv);
+  document.getElementById('pay-inv-id').value=invId;
+  document.getElementById('pay-pid').value=inv.patient_id||'';
+  document.getElementById('pay-pname').value=inv.patient_name||'';
+  document.getElementById('pay-msub').textContent=(inv.procedure_name||'Procedure')+' · '+(inv.date||'');
+  document.getElementById('pay-amt-iqd').value=bal>0?Math.round(bal):'';
+  document.getElementById('pay-amt-usd').value='';
+  document.getElementById('pay-date').value=fd(new Date());
+  document.getElementById('pay-rate').value=IQD;
+  var payModal=document.getElementById('pay-modal');
+  payModal.dataset.invFee=fee;
+  payModal.dataset.alreadyPaid=paidEquiv;
+  document.querySelectorAll('.pay-btn').forEach(function(b){b.classList.remove('sel');});
+  document.querySelector('.pay-btn').classList.add('sel');
+  document.getElementById('pay-method').value='Cash';
+  // build detail
+  var payRows=pays.length?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--s100);">'+
+    '<div style="font-size:10px;font-weight:600;color:var(--s400);margin-bottom:4px;">PAYMENT HISTORY</div>'+
+    pays.map(function(py){
+      var iqd=Number(py.amount_iqd||0),usd=Number(py.amount_usd||0);
+      var parts=[];
+      if(iqd!==0)parts.push(fiqd(iqd));
+      if(usd!==0)parts.push(fusd(usd));
+      return '<div style="font-size:11px;color:var(--s600);display:flex;justify-content:space-between;padding:2px 0;">'+(py.date||'')+(py.method?' · '+py.method:'')+'<strong style="color:var(--g700);">'+parts.join(' + ')+'</strong></div>';
+    }).join('')+'</div>':'';
+  document.getElementById('pay-detail').innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'+
+    '<div style="font-weight:700;color:var(--s800);">'+(inv.procedure_name||'—')+'</div>'+
+    '<span class="badge '+(bal<=0?'bg':paidEquiv>0?'ba':'br')+'">'+(bal<=0?'Paid':paidEquiv>0?'Partial':'Unpaid')+'</span></div>'+
+    (inv.teeth&&inv.teeth.length?'<div style="font-size:11px;color:var(--s500);margin-bottom:4px;">Teeth: '+inv.teeth.join(', ')+'</div>':'')+
+    (inv.treating_dentist?'<div style="font-size:11px;color:var(--s500);margin-bottom:6px;">Dentist: '+inv.treating_dentist+'</div>':'')+
+    '<div style="display:flex;gap:16px;font-size:11px;color:var(--s500);">'+
+    '<div>Total: <strong style="color:var(--s800);">'+fiqd(fee)+'</strong></div>'+
+    '<div>Paid: <strong style="color:var(--g700);">'+fiqd(Math.round(paidEquiv))+(paidUSD>0?' + '+fusd(paidUSD):'')+'</strong></div>'+
+    '<div>Balance: <strong style="color:'+(bal>0?'var(--r600)':'var(--g700)')+';">'+fiqd(Math.round(bal))+'</strong></div>'+
+    '</div>'+payRows;
+  onPayUSD();
+  openMdl('pay-modal');
+}
+
+// ══════════ UPDATED savePayment ══════════════════════════════════
+async function savePayment(){
+  var invId=document.getElementById('pay-inv-id').value;
+  var iqd=parseFloat(document.getElementById('pay-amt-iqd').value)||0;
+  var usd=parseFloat(document.getElementById('pay-amt-usd').value)||0;
+  var rate=parseFloat(document.getElementById('pay-rate').value)||IQD;
+  if(iqd===0&&usd===0){showToast('Enter payment amount','error');return;}
+  var pid=document.getElementById('pay-pid').value;
+  var pname=document.getElementById('pay-pname').value;
+  var method=document.getElementById('pay-method').value;
+  var date=document.getElementById('pay-date').value;
+  var totalEquiv=iqd+(usd*rate);
+  // insert payment with dual currency
+  var r=await db.from('payments').insert([{
+    invoice_id:invId,
+    amount:totalEquiv, // total IQD equivalent (for legacy compatibility)
+    amount_iqd:iqd,
+    amount_usd:usd,
+    exchange_rate:rate,
+    method:method,
+    date:date
+  }]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');console.error(r.error);return;}
+  // update invoice status
+  var pr=await db.from('payments').select('*').eq('invoice_id',invId);
+  var pays=pr.data||[];
+  var ir=await db.from('invoices').select('fee').eq('id',invId).single();
+  var totalFee=Number((ir.data||{}).fee||0);
+  var totalPaid=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
+  var ns=totalPaid>=totalFee?'paid':totalPaid>0?'partial':'unpaid';
+  await db.from('invoices').update({status:ns}).eq('id',invId);
+  showToast('Payment recorded! 💰');
+  closeMdl('pay-modal');closeMdl('ad-modal');
+  await loadApptInvoices();
+  if(currentSection==='appointments'){buildSched();}
+  else{goTo('appointments');}
+  if(profState.tab==='billing')loadBillingTab(pid,pname);
+}
+
+// ══════════ UPDATED FINANCE — DUAL WALLETS ════════════════════════
+function getPayDistDual(pay, inv){
+  // returns {treaterIQD, treaterUSD, refIQD, refUSD, vIQD, vUSD, type, dentist, referrer}
+  if(!inv)return{treaterIQD:0,treaterUSD:0,refIQD:0,refUSD:0,vIQD:Number(pay.amount_iqd||0),vUSD:Number(pay.amount_usd||0),type:'unknown'};
+  var t=inv.treating_dentist||'',r=inv.referrer||'';
+  var iqd=Number(pay.amount_iqd||0);
+  var usd=Number(pay.amount_usd||0);
+  var labFeeIQD=Number(inv.lab_fee||0);
+  var totalFee=Number(inv.fee||1);
+  var netRatio=totalFee>0?Math.max(0,(totalFee-labFeeIQD)/totalFee):1;
+  var netIQD=iqd*netRatio,netUSD=usd*netRatio;
+  var isP=PARTNERS.indexOf(t)>=0,refIsP=r&&PARTNERS.indexOf(r)>=0;
+  if(isP)return{treaterIQD:iqd,treaterUSD:usd,refIQD:0,refUSD:0,vIQD:0,vUSD:0,type:'partner',dentist:t};
+  if(refIsP){
+    var rates=getDR(t),pct=rates.refPct/100;
+    return{treaterIQD:netIQD*pct,treaterUSD:netUSD*pct,refIQD:netIQD*(1-pct),refUSD:netUSD*(1-pct),vIQD:0,vUSD:0,type:'referred',pct:rates.refPct,dentist:t,referrer:r};
+  }
+  var r2=getDR(t),pct2=r2.ownPct/100;
+  return{treaterIQD:netIQD*pct2,treaterUSD:netUSD*pct2,refIQD:0,refUSD:0,vIQD:netIQD*(1-pct2),vUSD:netUSD*(1-pct2),type:'own',pct:r2.ownPct,dentist:t};
+}
 
 </script>
 
