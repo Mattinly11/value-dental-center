@@ -1028,7 +1028,7 @@ async function loadBillingTab(pid,pname){
   var pays=payR.data||[];
   var billed=invs.reduce(function(s,i){return s+toIQD(Number(i.fee||0),i.fee_currency);},0);
   var paid=invs.reduce(function(s,inv){
-    return s+pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount_iqd||p.amount||0);},0);
+    return s+pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
   },0);
   var due=billed-paid;
   var html=
@@ -1313,8 +1313,8 @@ async function savePayment(){
   var rawFee=Number((ir.data||{}).fee||0);
   var rawCurr=(ir.data||{}).fee_currency||'IQD';
   var totalFee=toIQD(rawFee,rawCurr);
-  var totalPaid=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
-  var ns=totalPaid>=totalFee?'paid':totalPaid>0?'partial':'unpaid';
+  var totalPaid2=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
+  var ns=totalPaid2>=totalFee?'paid':totalPaid2>0?'partial':'unpaid';
   await db.from('invoices').update({status:ns}).eq('id',invId);
   showToast('Payment recorded! 💰');
   closeMdl('pay-modal');
@@ -1704,7 +1704,7 @@ function buildBillingUI(){
   var todayPaid=pays.filter(function(p){return(p.date||'').slice(0,10)===today;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
   var monthPaid=pays.filter(function(p){return(p.date||'').slice(0,7)===thisM;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
   var totalDue=invs.reduce(function(s,inv){
-    var pd=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount_iqd||p.amount||0);},0);
+    var pd=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
     return s+Math.max(0,toIQD(Number(inv.fee||0),inv.fee_currency)-pd);
   },0);
   // group by patient with dentist info
@@ -2467,8 +2467,8 @@ async function renderDashboard(){
   ]);
   var todayAppts=results[0].data||[],invs=results[1].data||[],pays=results[2].data||[];
   var pts=results[3].data||[],procs=results[4].data||[];
-  var todayPaid=pays.filter(function(p){return(p.date||'').slice(0,10)===today;}).reduce(function(s,p){return s+Number(p.amount_iqd||p.amount||0);},0);
-  var monthPaid=pays.filter(function(p){return(p.date||'').slice(0,7)===thisMonth;}).reduce(function(s,p){return s+Number(p.amount_iqd||p.amount||0);},0);
+  var todayPaid=pays.filter(function(p){return(p.date||'').slice(0,10)===today;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
+  var monthPaid=pays.filter(function(p){return(p.date||'').slice(0,7)===thisMonth;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
   var totalDue=invs.reduce(function(s,inv){
     var pd=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
     return s+Math.max(0,Number(inv.fee||0)-pd);
@@ -3276,9 +3276,9 @@ async function openPayModalFromAppt(invId, invSummary){
   var inv=r.data;if(!inv)return;
   var pr=await db.from('payments').select('*').eq('invoice_id',invId);
   var pays=pr.data||[];
+  var paidEquiv=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
   var paidIQD=pays.reduce(function(s,p){return s+Number(p.amount_iqd||0);},0);
   var paidUSD=pays.reduce(function(s,p){return s+Number(p.amount_usd||0);},0);
-  var paidEquiv=paidIQD+(paidUSD*IQD);
   var fee=Number(inv.fee||0);
   var feeCurr=inv.fee_currency||'IQD';
   var feeIQD=toIQD(fee,feeCurr); // convert to IQD for balance calc
@@ -3359,8 +3359,8 @@ async function savePayment(){
   var pays=pr.data||[];
   var ir=await db.from('invoices').select('fee').eq('id',invId).single();
   var totalFee=Number((ir.data||{}).fee||0);
-  var totalPaid=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
-  var ns=totalPaid>=totalFee?'paid':totalPaid>0?'partial':'unpaid';
+  var totalPaid2=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
+  var ns=totalPaid2>=totalFee?'paid':totalPaid2>0?'partial':'unpaid';
   await db.from('invoices').update({status:ns}).eq('id',invId);
   showToast('Payment recorded! 💰');
   closeMdl('pay-modal');closeMdl('ad-modal');
@@ -3416,7 +3416,7 @@ async function deletePayment(payId, invId, pid){
     var invR=await db.from('invoices').select('fee,fee_currency').eq('id',invId).single();
     var payR=await db.from('payments').select('amount,amount_iqd,amount_usd').eq('invoice_id',invId);
     var pays=payR.data||[];
-    var totalPaid=pays.reduce(function(s,p){return s+Number(p.amount_iqd||p.amount||0);},0);
+    var totalPaid=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
     var fee=toIQD(Number((invR.data||{}).fee||0),(invR.data||{}).fee_currency);
     var ns=totalPaid>=fee?'paid':totalPaid>0?'partial':'unpaid';
     await db.from('invoices').update({status:ns}).eq('id',invId);
