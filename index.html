@@ -1964,30 +1964,35 @@ function buildFD(){
   REG.forEach(function(dr){
     var rates=getDR(dr);
     var myPays=pays.filter(function(p){var inv=getInv(p.invoice_id);return inv&&inv.treating_dentist===dr;});
-    var earning=myPays.reduce(function(s,p){return s+calcPayDist(Number(p.amount||0),getInv(p.invoice_id)).treaterGets;},0);
-    var drInvs=finInvs.filter(function(inv){return inv.treating_dentist===dr;});
-    var outstanding=drInvs.reduce(function(s,inv){
-      var pd=finPays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
-      return s+Math.max(0,Number(inv.fee||0)-pd);
-    },0);
+    // calculate IQD and USD earnings separately using dual currency split
+    var earnIQD=0,earnUSD=0;
+    myPays.forEach(function(p){
+      var d=getPayDistDual(p,getInv(p.invoice_id));
+      earnIQD+=d.treaterIQD||0;
+      earnUSD+=d.treaterUSD||0;
+    });
     var isPaid=paidMap[dr]||false;
+    var hasUSD=earnUSD>0;
     html+='<div class="vdc-card"><div class="vdc-card-body">'+
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'+
       '<div style="width:38px;height:38px;border-radius:50%;background:var(--b50);color:var(--b700);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">'+dr.replace('Dr. ','').slice(0,2).toUpperCase()+'</div>'+
       '<div style="flex:1;"><div style="font-size:13px;font-weight:700;">'+dr+'</div>'+
-      '<div style="font-size:10px;color:var(--s400);">'+myPays.length+' payment'+(myPays.length!==1?'s':'')+ ' this month</div></div>'+
+      '<div style="font-size:10px;color:var(--s400);">'+myPays.length+' payment'+(myPays.length!==1?'s':'')+' this month</div></div>'+
       '<button class="btn btnsm btnxs" data-drr="'+dr+'" onclick="openDRRbtn(this)">Edit rates</button></div>'+
       '<div style="background:var(--s50);border-radius:var(--radsm);padding:8px 10px;margin-bottom:10px;">'+
       '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:11px;color:var(--s500);">Own rate:</span><span style="font-weight:700;color:var(--b700);">'+rates.ownPct+'%</span></div>'+
       '<div style="display:flex;justify-content:space-between;"><span style="font-size:11px;color:var(--s500);">Referred rate:</span><span style="font-weight:700;color:var(--a700);">'+rates.refPct+'%</span></div></div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'+
+      '<div style="display:grid;grid-template-columns:'+(hasUSD?'1fr 1fr':'1fr')+';gap:8px;margin-bottom:10px;">'+
       '<div style="background:var(--g50);border-radius:var(--radsm);padding:8px;border:1px solid var(--g100);">'+
-      '<div style="font-size:9px;color:var(--g700);font-weight:600;margin-bottom:2px;">EARNED THIS MONTH</div>'+
-      '<div style="font-size:15px;font-weight:700;color:var(--g700);">'+fu(earning)+'</div></div>'+
-'</div>'+
+      '<div style="font-size:9px;color:var(--g700);font-weight:600;margin-bottom:2px;">&#127470;&#127478; IQD WALLET</div>'+
+      '<div style="font-size:15px;font-weight:700;color:var(--g700);">'+fu(Math.round(earnIQD))+'</div></div>'+
+      (hasUSD?'<div style="background:#FFF7ED;border-radius:var(--radsm);padding:8px;border:1px solid #FED7AA;">'+
+      '<div style="font-size:9px;color:#C2410C;font-weight:600;margin-bottom:2px;">&#127482;&#127480; USD WALLET</div>'+
+      '<div style="font-size:15px;font-weight:700;color:#C2410C;">'+fusd(earnUSD)+'</div></div>':'')+
+      '</div>'+
       '<div style="display:flex;align-items:center;justify-content:space-between;">'+
       (isPaid?'<span class="badge bg">&#10003; Paid</span>':'<span class="badge br">Not paid yet</span>')+
-      '<button class="btn btnxs" data-dr="'+dr+'" onclick="togDrPaidBtn(this)">'+( isPaid?'Undo':'Mark paid')+'</button></div>'+
+      '<button class="btn btnxs" data-dr="'+dr+'" onclick="togDrPaidBtn(this)">'+(isPaid?'Undo':'Mark paid')+'</button></div>'+
       '</div></div>';
   });
   return html+'</div>';
