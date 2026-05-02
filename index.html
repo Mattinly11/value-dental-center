@@ -964,7 +964,8 @@ async function loadClinical(pid){
         '<td>'+(pr.treating_dentist||'—')+'</td>'+
         '<td style="font-weight:700;color:var(--b700);">'+fmtAmt(pr.fee,pr.fee_currency||'IQD')+'</td>'+
         '<td><span class="badge '+(sc[pr.status]||'bs')+'">'+( pr.status||'—')+'</span></td>'+
-        '<td><button class="btn btnxs" onclick="openEditProc(\''+pr.id+'\')">Edit</button></td></tr>';
+        '<td style="display:flex;gap:4px;"><button class="btn btnxs" onclick="openEditProc(\''+pr.id+'\')">Edit</button>'+
+        '<button class="btn btnr btnxs" data-proc-id="'+pr.id+'" onclick="delProcRow(this)">&#128465;</button></td></tr>';
     }).join('')+'</tbody></table>':'<div style="padding:24px 0;text-align:center;font-size:13px;color:var(--s400);">No procedures yet</div>';
   el.innerHTML=
     '<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">Dental chart</div></div>'+
@@ -1085,7 +1086,8 @@ function apptRow(a,pname){
     '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:var(--s800);">'+(a.date||'—')+' · '+(a.start_time||'—')+'</div>'+
     '<div style="font-size:11px;color:var(--s400);margin-top:2px;">'+(a.dentist||'')+(a.room?' · '+a.room:'')+(a.procedure_type?' · '+a.procedure_type:'')+'</div></div>'+
     (a.status==='completed'?'<button class="btn btnsm btng btnxs" onclick="goToClinical(\''+a.id+'\',\''+pname.replace(/'/g,'&#39;')+'\')">&#10022; Record procedure</button>':'')+
-    '<span class="badge" style="background:'+sc.bg+';color:'+sc.color+';border:1px solid '+sc.border+';">'+sc.label+'</span></div>';
+    '<span class="badge" style="background:'+sc.bg+';color:'+sc.color+';border:1px solid '+sc.border+';">'+sc.label+'</span>'+
+    '<button class="btn btnr btnxs" data-appt-id="'+a.id+'" onclick="delApptRow(this)" title="Delete appointment">&#128465;</button></div>';
 }
 async function goToClinical(apptId,pname){
   profState.tab='clinical';
@@ -2178,10 +2180,13 @@ function openLabDetail(labId){
   var actionsEl=document.getElementById('pg-actions');
   actionsEl.innerHTML='';
   setBackBtn('All labs','renderLabs');
+  // add delete lab button to pg-actions
   var backBtn=document.createElement('button');backBtn.className='btn';backBtn.style.display='none';backBtn.onclick=renderLabs;
   var addBtn=document.createElement('button');addBtn.className='btn btnsm';addBtn.textContent='+ Add service';addBtn.onclick=function(){openAddSvc(lab.id,lab.name);};
   var editBtn=document.createElement('button');editBtn.className='btn btnsm';editBtn.textContent='Edit lab';editBtn.onclick=function(){openEditLab(lab.id);};
-  actionsEl.appendChild(backBtn);actionsEl.appendChild(addBtn);actionsEl.appendChild(editBtn);
+  var delLabBtn=document.createElement('button');delLabBtn.className='btn btnr btnsm';delLabBtn.innerHTML='&#128465; Delete lab';
+  delLabBtn.onclick=function(){delLabFromDetail(lab.id,lab.name);};
+  actionsEl.appendChild(backBtn);actionsEl.appendChild(addBtn);actionsEl.appendChild(editBtn);actionsEl.appendChild(delLabBtn);
   document.getElementById('pg-title').textContent=lab.name;
   document.getElementById('pg-sub').textContent=(lab.notes||'Lab services & pricing');
   var html='<div class="vdc-card">'+
@@ -3446,6 +3451,45 @@ async function deleteExpense(id){
 }
 
 function delPayBtn(btn){deletePayment(btn.dataset.payId,btn.dataset.invId,document.getElementById('pay-pid').value);}
+
+// ── Delete helpers for inline row buttons ────────────────────────
+function delProcRow(btn){
+  // set proc-id and proc-pid so deleteProc() works
+  var procId=btn.dataset.procId;
+  var pidEl=document.getElementById('proc-pid');
+  if(pidEl)pidEl.value=profState.pid||'';
+  document.getElementById('proc-id').value=procId;
+  deleteProc();
+}
+
+function delApptRow(btn){
+  var apptId=btn.dataset.apptId;
+  if(!apptId||!confirm('Delete this appointment?'))return;
+  db.from('appointments').delete().eq('id',apptId).then(function(r){
+    if(r.error){showToast('Failed to delete','error');return;}
+    showToast('Appointment deleted');
+    // reload appointments tab
+    if(profState.pid)loadTab('appointments');
+  });
+}
+
+async function delLabFromDetail(labId,labName){
+  // reuse deleteLab logic but with known id
+  if(!labId)return;
+  var procR=await db.from('procedures').select('id').eq('lab_id',labId).limit(1);
+  if((procR.data||[]).length>0){
+    showToast('Cannot delete: lab is used in recorded procedures.','error');return;
+  }
+  var svcR=await db.from('lab_services').select('id').eq('lab_id',labId);
+  var svcCount=(svcR.data||[]).length;
+  var msg='Delete lab "'+labName+'"?'+(svcCount>0?' This will also delete '+svcCount+' service'+(svcCount>1?'s':'')+'.':'');
+  if(!confirm(msg))return;
+  if(svcCount>0)await db.from('lab_services').delete().eq('lab_id',labId);
+  await db.from('labs').delete().eq('id',labId);
+  showToast('Lab deleted');
+  renderLabs();
+}
+
 </script>
 
 <!-- LAB MODAL -->
