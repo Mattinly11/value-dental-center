@@ -1916,22 +1916,21 @@ function buildFO(){
     '</div></div>';
   // regular dentist earnings from this month's payments
   html+='<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">Regular dentist earnings — from payments this month</div></div><div class="vdc-card-body">'+
-    '<table class="tbl"><thead><tr><th>Dentist</th><th>Own%</th><th>Ref%</th><th>Payments received</th><th>Earnings (IQD)</th><th>To Value wallet</th></tr></thead><tbody>'+
+    '<table class="tbl"><thead><tr><th>Dentist</th><th>Own%</th><th>Ref%</th><th>Payments</th><th>IQD earnings</th><th>USD earnings</th><th>To Value wallet</th></tr></thead><tbody>'+
     REG.map(function(dr){
       var rates=getDR(dr);
       var myPays=pays.filter(function(p){var inv=getInv(p.invoice_id);return inv&&inv.treating_dentist===dr;});
-      var earning=drEarnings[dr]||0;
-      var toV=myPays.reduce(function(s,p){
-        var inv=getInv(p.invoice_id);
-        var d=calcPayDist(Number(p.amount||0),inv);
-        return s+(d.vGets||0);
-      },0);
+      var earnIQD=drEarningsIQD[dr]||0;
+      var earnUSD=drEarningsUSD[dr]||0;
+      var toViqd=myPays.reduce(function(s,p){var d=getPayDistDual(p,getInv(p.invoice_id));return s+(d.vIQD||0);},0);
+      var toVusd=myPays.reduce(function(s,p){var d=getPayDistDual(p,getInv(p.invoice_id));return s+(d.vUSD||0);},0);
       return '<tr><td style="font-weight:600;">'+dr+'</td>'+
         '<td style="color:var(--b700);font-weight:700;">'+rates.ownPct+'%</td>'+
         '<td style="color:var(--a700);font-weight:700;">'+rates.refPct+'%</td>'+
         '<td>'+myPays.length+' payment'+(myPays.length!==1?'s':'')+'</td>'+
-        '<td style="font-weight:700;color:var(--g700);">'+fu(earning)+'</td>'+
-        '<td style="color:#6D28D9;">'+(toV>0?fu(toV):'—')+'</td></tr>';
+        '<td style="font-weight:700;color:var(--g700);">'+(earnIQD>0?fu(Math.round(earnIQD)):'—')+'</td>'+
+        '<td style="font-weight:700;color:var(--a700);">'+(earnUSD>0?fusd(earnUSD):'—')+'</td>'+
+        '<td style="color:#6D28D9;">'+(toViqd>0||toVusd>0?(toViqd>0?fu(Math.round(toViqd)):'')+( toVusd>0?(toViqd>0?' + ':'')+fusd(toVusd):''):'—')+'</td></tr>';
     }).join('')+'</tbody></table></div></div>';
   return html;
 }
@@ -1942,7 +1941,7 @@ function buildFP(){
     '<table class="tbl"><thead><tr><th>Date</th><th>Patient</th><th>Procedure</th><th>Treating dentist</th><th>Referrer</th><th>Payment</th><th>Method</th><th>Dr gets</th><th>Ref gets</th><th>Value gets</th></tr></thead><tbody>'+
     pays.map(function(pay){
       var inv=getInv(pay.invoice_id);
-      var d=calcPayDist(Number(pay.amount||0),inv);
+      var d=getPayDistDual(pay,inv);
       return '<tr>'+
         '<td style="font-size:10px;color:var(--s400);">'+(pay.date||'—')+'</td>'+
         '<td style="font-weight:600;">'+(inv?inv.patient_name||'—':'—')+'</td>'+
@@ -1951,9 +1950,9 @@ function buildFP(){
         '<td style="color:var(--s400);">'+(inv&&inv.referrer?inv.referrer:'—')+'</td>'+
         '<td style="font-weight:700;color:var(--b700);">'+(Number(pay.amount_iqd||0)>0?fu(Number(pay.amount_iqd)):'')+(Number(pay.amount_usd||0)>0?(Number(pay.amount_iqd||0)>0?' + ':'')+fusd(Number(pay.amount_usd)):'')+'</td>'+
         '<td style="font-size:10px;">'+(pay.method||'—')+'</td>'+
-        '<td style="color:var(--g700);font-weight:700;">'+(d.treaterGets>0?fu(d.treaterGets):'—')+'</td>'+
-        '<td style="color:var(--a700);">'+(d.refGets>0?fu(d.refGets):'—')+'</td>'+
-        '<td style="color:#6D28D9;">'+(d.vGets>0?fu(d.vGets):'—')+'</td>'+
+        '<td style="color:var(--g700);font-weight:700;">'+(d.treaterIQD>0?fu(Math.round(d.treaterIQD)):'')+( d.treaterUSD>0?(d.treaterIQD>0?' ':'')+fusd(d.treaterUSD):'')+(d.treaterIQD===0&&d.treaterUSD===0?'—':'')+'</td>'+
+        '<td style="color:var(--a700);">'+(d.refIQD>0?fu(Math.round(d.refIQD)):'')+( d.refUSD>0?(d.refIQD>0?' ':'')+fusd(d.refUSD):'')+(d.refIQD===0&&d.refUSD===0?'—':'')+'</td>'+
+        '<td style="color:#6D28D9;">'+(d.vIQD>0?fu(Math.round(d.vIQD)):'')+( d.vUSD>0?(d.vIQD>0?' ':'')+fusd(d.vUSD):'')+(d.vIQD===0&&d.vUSD===0?'—':'')+'</td>'+
         '</tr>';
     }).join('')+'</tbody></table></div></div>';
 }
