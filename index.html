@@ -497,6 +497,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       </div>
       <input type="hidden" id="pay-method" value="Cash"></div>
     <div class="mac">
+      <button class="btn btnr" id="pay-del-inv-btn" style="margin-right:auto;display:none;" onclick="deleteInvoice(document.getElementById('pay-inv-id').value, document.getElementById('pay-pid').value)">&#128465; Delete invoice</button>
       <button class="btn" onclick="closeMdl('pay-modal')">Cancel</button>
       <button class="btn btnp" onclick="savePayment()">Record payment</button>
     </div>
@@ -561,6 +562,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       <div class="fgrp"><label class="flbl">Salary (IQD)</label><input class="finp" type="number" id="sub-iqd" placeholder="0" oninput="subSyncIQD()"></div>
     </div>
     <div class="mac">
+      <button class="btn btnr" id="sub-del-btn" style="display:none;margin-right:auto;" onclick="deleteSubstaff(document.getElementById('sub-id').value)">Delete</button>
       <button class="btn" onclick="closeMdl('sub-modal')">Cancel</button>
       <button class="btn btnp" onclick="saveSub()">Save</button>
     </div>
@@ -851,9 +853,24 @@ async function savePatient(){
 }
 async function deletePatient(){
   var id=document.getElementById('pt-id').value,name=document.getElementById('pt-name').value;
-  if(!id||!confirm('Delete '+name+'?'))return;
+  if(!id)return;
+  // check for unpaid invoices — BLOCK if any exist
+  var invR=await db.from('invoices').select('id,fee,fee_currency,status').eq('patient_id',id);
+  var invs=invR.data||[];
+  var unpaid=invs.filter(function(i){return i.status!=='paid';});
+  if(unpaid.length>0){
+    showToast('Cannot delete: patient has '+unpaid.length+' unpaid invoice'+(unpaid.length>1?'s':'')+'. Settle all invoices first.','error');
+    return;
+  }
+  if(!confirm('Delete patient "'+name+'"? This will also delete all their procedures, invoices, payments and appointments. This cannot be undone.'))return;
+  // cascade delete
+  var invIds=invs.map(function(i){return i.id;});
+  if(invIds.length){await db.from('payments').delete().in('invoice_id',invIds);}
+  await db.from('invoices').delete().eq('patient_id',id);
+  await db.from('procedures').delete().eq('patient_id',id);
+  await db.from('appointments').delete().eq('patient_id',id);
   await db.from('patients').delete().eq('id',id);
-  showToast('Patient deleted');closeMdl('pt-modal');goTo('patients');
+  showToast('Patient deleted');closeMdl('pt-modal');renderPatients();
 }
 // ══════════════════════ PATIENT PROFILE ══════════════════════════
 async function openProf(id,name){profState.pid=id;profState.pname=name;profState.tab='info';renderProf(id,name);}
@@ -1028,7 +1045,7 @@ async function loadBillingTab(pid,pname){
       var b=Number(inv.fee||0)-p;
       var sc=b<=0?'bg':p>0?'ba':'br';
       var sl=b<=0?'Paid':p>0?'Partial':'Unpaid';
-      return '<div class="inv-row" onclick="openInvDetail(\''+inv.id+'\',\''+pid+'\',\''+pname.replace(/'/g,'&#39;')+'\')">'+
+      return '<div class="inv-row" style="position:relative;">'+'<div style="position:absolute;top:8px;right:8px;z-index:2;"><button class="btn btnr btnxs" onclick="event.stopPropagation();deleteInvoice(\''+inv.id+'\',\''+pid+'\')" title="Delete invoice">&#128465;</button></div>'+'<div onclick="openInvDetail(\''+inv.id+'\',\''+pid+'\',\''+pname.replace(/'/g,'&#39;')+'\')">'+
         '<div style="flex:1;min-width:0;">'+
         '<div style="font-size:12px;font-weight:700;color:var(--s800);">'+(inv.procedure_name||'—')+'</div>'+
         '<div style="font-size:10px;color:var(--s400);margin-top:2px;">'+(inv.date||'—')+(inv.treating_dentist?' · '+inv.treating_dentist:'')+'</div>'+
@@ -1231,10 +1248,27 @@ async function saveProc(){
   if(pid && pname){openPtStatusModal(pid,pname);}
 }
 async function deleteProc(){
-  var id=document.getElementById('proc-id').value;if(!id||!confirm('Delete this procedure?'))return;
+  var id=document.getElementById('proc-id').value;
+  if(!id)return;
+  // find linked invoice
+  var invR=await db.from('invoices').select('id').eq('procedure_id',id);
+  var invs=invR.data||[];
+  var invIds=invs.map(function(i){return i.id;});
+  var hasPayments=false;
+  if(invIds.length){
+    var payR=await db.from('payments').select('id').in('invoice_id',invIds);
+    hasPayments=(payR.data||[]).length>0;
+  }
+  var msg='Delete this procedure?';
+  if(invIds.length)msg+='\nThis will also delete the linked invoice'+(hasPayments?' and all its payments.':'.') ;
+  if(!confirm(msg))return;
+  if(invIds.length){
+    if(hasPayments)await db.from('payments').delete().in('invoice_id',invIds);
+    await db.from('invoices').delete().eq('procedure_id',id);
+  }
   await db.from('procedures').delete().eq('id',id);
-  showToast('Deleted');closeMdl('proc-modal');
-  loadClinical(document.getElementById('proc-pid').value);
+  showToast('Procedure deleted');closeMdl('proc-modal');
+  if(profState.pid)loadClinical(profState.pid);
 }
 
 // ══════════════════════ INVOICE DETAIL ═══════════════════════════
@@ -2201,8 +2235,14 @@ async function saveLab(){
 }
 async function deleteLab(){
   var id=document.getElementById('lab-id').value;
-  if(!id||!confirm('Delete this lab and all its services?'))return;
-  await db.from('lab_services').delete().eq('lab_id',id);
+  if(!id)return;
+  var procR=await db.from('procedures').select('id').eq('lab_id',id).limit(1);
+  if((procR.data||[]).length>0){showToast('Cannot delete: lab is used in recorded procedures.','error');return;}
+  var svcR=await db.from('lab_services').select('id').eq('lab_id',id);
+  var svcCount=(svcR.data||[]).length;
+  var msg='Delete this lab?'+(svcCount>0?' This will also delete '+svcCount+' service'+(svcCount>1?'s':'')+'.':'');
+  if(!confirm(msg))return;
+  if(svcCount>0)await db.from('lab_services').delete().eq('lab_id',id);
   await db.from('labs').delete().eq('id',id);
   showToast('Lab deleted');closeMdl('lab-modal');renderLabs();
 }
@@ -3258,6 +3298,9 @@ async function openPayModalFromAppt(invId, invSummary){
   document.querySelectorAll('.pay-btn').forEach(function(b){b.classList.remove('sel');});
   document.querySelector('.pay-btn').classList.add('sel');
   document.getElementById('pay-method').value='Cash';
+  // show delete invoice button for admin
+  var delBtn=document.getElementById('pay-del-inv-btn');
+  if(delBtn)delBtn.style.display='inline-flex';
   // build detail
   var payRows=pays.length?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--s100);">'+
     '<div style="font-size:10px;font-weight:600;color:var(--s400);margin-bottom:4px;">PAYMENT HISTORY</div>'+
@@ -3266,7 +3309,12 @@ async function openPayModalFromAppt(invId, invSummary){
       var parts=[];
       if(iqd!==0)parts.push(fiqd(iqd));
       if(usd!==0)parts.push(fusd(usd));
-      return '<div style="font-size:11px;color:var(--s600);display:flex;justify-content:space-between;padding:2px 0;">'+(py.date||'')+(py.method?' · '+py.method:'')+'<strong style="color:var(--g700);">'+parts.join(' + ')+'</strong></div>';
+      return '<div style="font-size:11px;color:var(--s600);display:flex;justify-content:space-between;align-items:center;padding:3px 0;">'+
+        '<span>'+(py.date||'')+(py.method?' · '+py.method:'')+'</span>'+
+        '<div style="display:flex;align-items:center;gap:8px;">'+
+        '<strong style="color:var(--g700);">'+parts.join(' + ')+'</strong>'+
+        '<button class="btn btnr" style="padding:2px 6px;font-size:9px;min-height:0;" data-pay-id="'+py.id+'" data-inv-id="'+py.invoice_id+'" onclick="delPayBtn(this)">&#128465;</button>'+
+        '</div></div>';
     }).join('')+'</div>':'';
   document.getElementById('pay-detail').innerHTML=
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'+
@@ -3344,6 +3392,60 @@ function getPayDistDual(pay, inv){
   return{treaterIQD:netIQD*pct2,treaterUSD:netUSD*pct2,refIQD:0,refUSD:0,vIQD:netIQD*(1-pct2),vUSD:netUSD*(1-pct2),type:'own',pct:r2.ownPct,dentist:t};
 }
 
+
+// ══════════ DELETE INVOICE ═══════════════════════════════════════
+async function deleteInvoice(invId, pid){
+  if(!invId)return;
+  var payR=await db.from('payments').select('id').eq('invoice_id',invId);
+  var payCount=(payR.data||[]).length;
+  var msg='Delete this invoice?'+(payCount>0?' This will also remove '+payCount+' payment'+(payCount>1?'s':'')+' recorded against it.':'');
+  if(!confirm(msg))return;
+  if(payCount>0)await db.from('payments').delete().eq('invoice_id',invId);
+  await db.from('invoices').delete().eq('id',invId);
+  showToast('Invoice deleted');
+  closeMdl('pay-modal');
+  if(pid&&profState.tab==='billing')loadBillingTab(pid,profState.pname);
+}
+
+// ══════════ DELETE PAYMENT (undo) ════════════════════════════════
+async function deletePayment(payId, invId, pid){
+  if(!payId||!confirm('Remove this payment? The invoice balance will be restored.'))return;
+  await db.from('payments').delete().eq('id',payId);
+  // recalculate invoice status
+  if(invId){
+    var invR=await db.from('invoices').select('fee,fee_currency').eq('id',invId).single();
+    var payR=await db.from('payments').select('amount,amount_iqd,amount_usd').eq('invoice_id',invId);
+    var pays=payR.data||[];
+    var totalPaid=pays.reduce(function(s,p){return s+Number(p.amount_iqd||p.amount||0);},0);
+    var fee=toIQD(Number((invR.data||{}).fee||0),(invR.data||{}).fee_currency);
+    var ns=totalPaid>=fee?'paid':totalPaid>0?'partial':'unpaid';
+    await db.from('invoices').update({status:ns}).eq('id',invId);
+  }
+  showToast('Payment removed');
+  if(pid&&profState.tab==='billing')loadBillingTab(pid,profState.pname);
+  if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
+}
+
+// ══════════ DELETE SUBSTAFF ════════════════════════════════════════
+async function deleteSubstaff(id){
+  if(!id||!confirm('Delete this staff member?'))return;
+  await db.from('substaff').delete().eq('id',id);
+  showToast('Staff member deleted');
+  closeMdl('sub-modal');
+  var r=await db.from('substaff').select('*');
+  finSubs=r.data||[];buildFinTab();
+}
+
+// ══════════ DELETE EXPENSE ════════════════════════════════════════
+async function deleteExpense(id){
+  if(!id||!confirm('Delete this expense?'))return;
+  await db.from('expenses').delete().eq('id',id);
+  showToast('Expense deleted');
+  var r=await db.from('expenses').select('*');
+  finExps=r.data||[];buildFinTab();
+}
+
+function delPayBtn(btn){deletePayment(btn.dataset.payId,btn.dataset.invId,document.getElementById('pay-pid').value);}
 </script>
 
 <!-- LAB MODAL -->
