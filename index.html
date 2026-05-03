@@ -423,7 +423,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       </div>
     </div>
     <div class="fg">
-      <div class="fgrp"><label class="flbl">Procedure fee <span id="proc-fee-currency-lbl" style="color:var(--b600);">(IQD)</span> <span class="req">*</span></label><input class="finp" type="number" id="proc-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
+      <div class="fgrp"><label class="flbl">Procedure fee <span id="proc-fee-currency-lbl" style="color:var(--b600);">(IQD)</span> <span class="req">*</span></label><input class="finp" type="number" id="proc-fee" placeholder="0" min="0" oninput="updateProcNet();syncTreatmentCost()"></div>
       <div class="fgrp"><label class="flbl">Status</label>
         <select class="finp" id="proc-status"><option value="planned">Planned</option><option value="inprogress">In progress</option><option value="completed" selected>Completed</option></select></div>
     </div>
@@ -1917,7 +1917,9 @@ function buildFinUI(){
   document.getElementById('pg-content').innerHTML=html;buildFinTab();
 }
 function openFinDateModal(){
-  var html='<div class="mbg" id="fin-date-modal" onclick="if(event.target===this)closeMdl(\'fin-date-modal\')" style="z-index:600;">'+
+  // remove any stale instance first
+  var old=document.getElementById('fin-date-modal');if(old)old.remove();
+  var html='<div class="mbg open" id="fin-date-modal" onclick="if(event.target===this)closeFinDateModal()" style="z-index:600;">'+
     '<div class="modal" style="max-width:440px;">'+
     '<div class="mtit">&#128197; Select period</div>'+
     '<div class="msub">Choose how to filter the finance data</div>'+
@@ -1927,12 +1929,13 @@ function openFinDateModal(){
     '<button class="btn btnsm'+(finMode==='range'?' btnp':'')+'" onclick="setFinPickMode(\'range\')">Date range</button>'+
     '</div>'+
     '<div id="fin-pick-body"></div>'+
-    '<div class="mac"><button class="btn" onclick="closeMdl(\'fin-date-modal\')">Cancel</button>'+
+    '<div class="mac"><button class="btn" onclick="closeFinDateModal()">Cancel</button>'+
     '<button class="btn btnp" onclick="applyFinPeriod()">Apply</button></div>'+
     '</div></div>';
   document.body.insertAdjacentHTML('beforeend',html);
   renderFinPickBody();
 }
+function closeFinDateModal(){var el=document.getElementById('fin-date-modal');if(el)el.remove();}
 function setFinPickMode(m){
   finMode=m;
   // update buttons
@@ -1983,13 +1986,7 @@ function applyFinPeriod(){
     finRangeStart=s;finRangeEnd=e;
   }
   closeMdl('fin-date-modal');
-  buildFinUI();
-}
-function openFinMonthPicker(){openFinDateModal();}
-function onFinMonthPick(v){
-  if(!v)return;
-  var parts=v.split('-');
-  finY=parseInt(parts[0]);finM=parseInt(parts[1])-1;
+  var el=document.getElementById('fin-date-modal');if(el)el.remove();
   buildFinUI();
 }
 function setFinM(m,y){finMode='month';finM=m;finY=y;buildFinUI();}
@@ -2001,33 +1998,10 @@ function _dateInPeriod(dateStr){
   if(finMode==='year'){return d.slice(0,4)===String(finRangeYear);}
   var dt=new Date(d);return dt.getMonth()===finM&&dt.getFullYear()===finY;
 }
-function getMP(){return finProcs.filter(function(p){return _dateInPeriod(p.date);});}
 function getMPays(){return finPays.filter(function(p){return _dateInPeriod(p.date);});}
 function getME(){return finExps.filter(function(e){return _dateInPeriod(e.date);});}
 // get invoice by id
 function getInv(id){return finInvs.find(function(i){return i.id===id;})||null;}
-// calculate split for a payment amount based on its invoice's rules
-function calcPayDist(payAmt,inv){
-  if(!inv)return{treaterGets:0,refGets:0,vGets:payAmt,type:'unknown'};
-  var t=inv.treating_dentist||'',r=inv.referrer||'';
-  var labFee=Number(inv.lab_fee||0);
-  // net fee ratio: lab is deducted from total, split applies to net portion proportionally
-  var totalFee=Number(inv.fee||0);
-  var netRatio=totalFee>0?(totalFee-labFee)/totalFee:1;
-  var netPay=payAmt*netRatio; // portion of this payment that is splittable
-  var isP=PARTNERS.indexOf(t)>=0,refIsP=r&&PARTNERS.indexOf(r)>=0;
-  if(isP)return{treaterGets:payAmt,refGets:0,vGets:0,type:'partner',dentist:t};
-  if(refIsP){var rates=getDR(t),pct=rates.refPct/100,tg=netPay*pct;return{treaterGets:tg,refGets:netPay-tg,vGets:0,type:'referred',pct:rates.refPct,dentist:t,referrer:r};}
-  var r2=getDR(t),pct2=r2.ownPct/100,tg2=netPay*pct2;return{treaterGets:tg2,refGets:0,vGets:netPay-tg2,type:'own',pct:r2.ownPct,dentist:t};
-}
-function calcDist(proc){
-  var t=proc.treating_dentist||'',r=proc.referrer||'';
-  var fee=Number(proc.net_fee||proc.fee||0);
-  var isP=PARTNERS.indexOf(t)>=0,refIsP=r&&PARTNERS.indexOf(r)>=0;
-  if(isP)return{treaterGets:fee,refGets:0,vGets:0,type:'partner'};
-  if(refIsP){var rates=getDR(t),pct=rates.refPct/100,tg=fee*pct;return{treaterGets:tg,refGets:fee-tg,vGets:0,type:'referred',pct:rates.refPct};}
-  var r2=getDR(t),pct2=r2.ownPct/100,tg2=fee*pct2;return{treaterGets:tg2,refGets:0,vGets:fee-tg2,type:'own',pct:r2.ownPct};
-}
 function buildFinTab(){
   var el=document.getElementById('fin-content');if(!el)return;
   if(finTab==='overview')el.innerHTML=buildFO();
@@ -2206,7 +2180,8 @@ function buildFD(){
 }
 function togDrPaidBtn(btn){togDrPaid(btn.dataset.dr);}
 function openVWWithdraw(partner,availIQD,availUSD){
-  var html='<div class="mbg" id="vw-modal" onclick="if(event.target===this)closeMdl(\'vw-modal\')" style="z-index:600;">'+
+  var old=document.getElementById('vw-modal');if(old)old.remove();
+  var html='<div class="mbg open" id="vw-modal" onclick="if(event.target===this)closeVWModal()" style="z-index:600;">'+
     '<div class="modal" style="max-width:380px;">'+
     '<div class="mtit">Withdraw from Value Wallet</div>'+
     '<div class="msub">'+partner+'\'s sub-wallet</div>'+
@@ -2217,11 +2192,12 @@ function openVWWithdraw(partner,availIQD,availUSD){
     '<input class="finp" type="number" id="vw-usd" min="0" max="'+availUSD.toFixed(2)+'" step="0.01" value="0" placeholder="0"></div>':'<input type="hidden" id="vw-usd" value="0">')+
     '</div>'+
     '<div class="mac">'+
-    '<button class="btn" onclick="closeMdl(\'vw-modal\')">Cancel</button>'+
+    '<button class="btn" onclick="closeVWModal()">Cancel</button>'+
     '<button class="btn btnp" onclick="confirmVWWithdraw(\''+partner+'\','+availIQD+','+availUSD.toFixed(2)+')">Confirm withdrawal</button>'+
     '</div></div></div>';
   document.body.insertAdjacentHTML('beforeend',html);
 }
+function closeVWModal(){var el=document.getElementById('vw-modal');if(el)el.remove();}
 function confirmVWWithdraw(partner,availIQD,availUSD){
   var wdIQD=Math.min(parseFloat(document.getElementById('vw-iqd').value)||0,availIQD);
   var wdUSD=Math.min(parseFloat(document.getElementById('vw-usd').value)||0,availUSD);
@@ -2233,7 +2209,7 @@ function confirmVWWithdraw(partner,availIQD,availUSD){
   data[partner].iqd=(data[partner].iqd||0)+wdIQD;
   data[partner].usd=(data[partner].usd||0)+wdUSD;
   localStorage.setItem(key,JSON.stringify(data));
-  closeMdl('vw-modal');
+  closeVWModal();
   showToast('Withdrawal recorded for '+partner);
   buildFinTab();
 }
@@ -2288,8 +2264,8 @@ function buildFE(){
           '<div style="flex:1;height:6px;background:var(--s100);border-radius:3px;overflow:hidden;"><div style="width:'+Math.round(e[1]/cMax*100)+'%;height:100%;background:var(--b600);border-radius:3px;"></div></div>'+
           '<div style="font-size:11px;font-weight:600;min-width:60px;text-align:right;">'+fu(e[1])+'</div></div>';
       }).join('')+'</div></div>':'');
-  html+=(exps.length?'<div class="vdc-card"><div class="vdc-card-body"><table class="tbl"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Total</th><th>Per partner</th></tr></thead><tbody>'+
-    exps.map(function(e){return '<tr><td style="font-size:10px;color:var(--s400);">'+(e.date||'—')+'</td><td><span class="badge bs">'+(e.category||'—')+'</span></td><td>'+(e.description||'—')+'</td><td style="font-weight:600;">'+fu(e.amount)+'</td><td style="color:var(--r600);">'+fu(Number(e.amount||0)/3)+'</td></tr>';}).join('')+
+  html+=(exps.length?'<div class="vdc-card"><div class="vdc-card-body"><table class="tbl"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Total</th><th>Per partner</th><th></th></tr></thead><tbody>'+
+    exps.map(function(e){return '<tr><td style="font-size:10px;color:var(--s400);">'+(e.date||'—')+'</td><td><span class="badge bs">'+(e.category||'—')+'</span></td><td>'+(e.description||'—')+'</td><td style="font-weight:600;">'+fu(e.amount)+'</td><td style="color:var(--r600);">'+fu(Number(e.amount||0)/3)+'</td><td><button class="btn btnr btnxs" onclick="deleteExpense(\''+e.id+'\')">&#128465;</button></td></tr>';}).join('')+
     '</tbody></table></div></div>':'');
   return html;
 }
@@ -2505,32 +2481,6 @@ async function deleteSvc(){
 
 // ── LAB INSIDE PROCEDURE MODAL ────────────────────────────────────
 var clinicProcCache=[];
-async function loadClinicProcedures(){
-  var r=await db.from('clinic_procedures').select('*').order('category').order('name');
-  clinicProcCache=r.data||[];
-  var sel=document.getElementById('proc-name');
-  if(!sel)return;
-  if(clinicProcCache.length){
-    // populate from database
-    var grouped={};
-    clinicProcCache.forEach(function(p){
-      var c=p.category||'other';if(!grouped[c])grouped[c]=[];grouped[c].push(p);
-    });
-    var catLabels={restorative:'Restorative',surgical:'Surgical',prosthetic:'Prosthetic',implant:'Implant',
-      orthodontic:'Orthodontic',preventive:'Preventive',cosmetic:'Cosmetic',endodontic:'Endodontic',
-      periodontic:'Periodontic',other:'Other'};
-    var opts='<option value="">Select procedure...</option>';
-    Object.keys(grouped).sort().forEach(function(cat){
-      opts+='<optgroup label="'+(catLabels[cat]||cat)+'">';
-      grouped[cat].forEach(function(p){
-        opts+='<option value="'+p.id+'" data-name="'+p.name.replace(/"/g,'&quot;')+'" data-price="'+p.price+'" data-currency="'+(p.currency||'USD')+'" data-lab="'+(p.lab_involved?'1':'0')+'" data-fixture="'+(p.fixture_price||0)+'" data-override="'+(p.price_override?'1':'0')+'" data-lagsvc="'+(p.suggested_lab_svc||'')+'">'+p.name+'</option>';
-      });
-      opts+='</optgroup>';
-    });
-    sel.innerHTML=opts;
-    sel.onchange=function(){onProcSelectChange(this);};
-  }
-}
 
 function onProcSelectChange(sel){
   var opt=sel.options[sel.selectedIndex];
