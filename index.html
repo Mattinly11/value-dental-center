@@ -246,7 +246,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <input type="hidden" id="pt-id">
     <div class="fg">
       <div class="fgrp"><label class="flbl">Full name <span class="req">*</span></label><input class="finp" id="pt-name" placeholder="e.g. Ali Rashid"></div>
-      <div class="fgrp"><label class="flbl">Date of birth</label><input class="finp" type="date" id="pt-dob"></div>
+      <div class="fgrp"><label class="flbl">Date of birth</label><input class="finp" type="date" id="pt-dob" max="2099-12-31" min="1900-01-01"></div>
     </div>
     <div class="fg">
       <div class="fgrp"><label class="flbl">Gender</label><select class="finp" id="pt-gender"><option value="">Select...</option><option>Male</option><option>Female</option></select></div>
@@ -611,6 +611,8 @@ var profState={pid:null,pname:null,tab:'info'};
 var currentSection='patients';
 var procSelTeeth={},procIsPrim=false;
 var finTab='overview',finM=new Date().getMonth(),finY=new Date().getFullYear();
+var finMode='month'; // 'month' | 'range' | 'year'
+var finRangeStart=null,finRangeEnd=null,finRangeYear=new Date().getFullYear();
 var finProcs=[],finExps=[],finSubs=[];
 var PT_COL=[{bg:'#DBEAFE',c:'#1D4ED8'},{bg:'#CCFBF1',c:'#0F766E'},{bg:'#FFE4E6',c:'#BE123C'},{bg:'#EDE9FE',c:'#6D28D9'},{bg:'#FEF3C7',c:'#B45309'},{bg:'#FCE7F3',c:'#9D174D'}];
 var FDI_PERM={upper:[[18,17,16,15,14,13,12,11],[21,22,23,24,25,26,27,28]],lower:[[48,47,46,45,44,43,42,41],[31,32,33,34,35,36,37,38]]};
@@ -637,6 +639,27 @@ function mY(m){return(m/SLOT_MIN)*SLOT_H;}
 function fu(n){return Math.round(+n||0).toLocaleString('en-US')+' IQD';}
 function fiqd(n){return Math.round(+n||0).toLocaleString('en-US')+' IQD';}
 function fusd(n){return '$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+// Smart teeth display: detect full arch patterns
+function fmtTeeth(teeth){
+  if(!teeth||!teeth.length)return null;
+  var upper=FDI_PERM.upper[0].concat(FDI_PERM.upper[1]);
+  var lower=FDI_PERM.lower[0].concat(FDI_PERM.lower[1]);
+  var all=upper.concat(lower);
+  var sorted=teeth.slice().sort(function(a,b){return a-b;});
+  var upSorted=upper.slice().sort(function(a,b){return a-b;});
+  var loSorted=lower.slice().sort(function(a,b){return a-b;});
+  var allSorted=all.slice().sort(function(a,b){return a-b;});
+  function arrEq(a,b){return a.length===b.length&&a.every(function(v,i){return v===b[i];});}
+  if(arrEq(sorted,allSorted))return 'Full Mouth';
+  if(arrEq(sorted,upSorted))return 'Full Upper Arch';
+  if(arrEq(sorted,loSorted))return 'Full Lower Arch';
+  // check if it's all upper teeth (subset matching upper arch exactly)
+  var hasUpper=sorted.every(function(t){return upper.indexOf(t)>=0;});
+  var hasLower=sorted.every(function(t){return lower.indexOf(t)>=0;});
+  if(sorted.length>=upper.length&&hasUpper)return 'Full Upper Arch';
+  if(sorted.length>=lower.length&&hasLower)return 'Full Lower Arch';
+  return teeth.join(', ');
+}
 // Smart format: checks currency field on invoice/procedure
 function fmtAmt(amount,currency){
   if(!currency||currency==='IQD')return fiqd(amount);
@@ -982,7 +1005,7 @@ async function loadClinical(pid){
       var sc={planned:'ba',inprogress:'bp',completed:'bg'};
       return '<tr><td style="font-size:10px;color:var(--s400);">'+(pr.date||'—')+'</td>'+
         '<td style="font-weight:600;">'+(pr.procedure_name||'—')+'</td>'+
-        '<td style="font-size:10px;color:var(--s500);">'+(pr.teeth&&pr.teeth.length?pr.teeth.join(', '):'—')+'</td>'+
+        '<td style="font-size:10px;color:var(--s500);">'+(pr.teeth&&pr.teeth.length?fmtTeeth(pr.teeth):'—')+'</td>'+
         '<td>'+(pr.treating_dentist||'—')+'</td>'+
         '<td style="font-weight:700;color:var(--b700);">'+fmtAmt(pr.fee,pr.fee_currency||'IQD')+'</td>'+
         '<td><span class="badge '+(sc[pr.status]||'bs')+'">'+( pr.status||'—')+'</span></td>'+
@@ -1068,15 +1091,18 @@ async function loadBillingTab(pid,pname){
       var b=Number(inv.fee||0)-p;
       var sc=b<=0?'bg':p>0?'ba':'br';
       var sl=b<=0?'Paid':p>0?'Partial':'Unpaid';
-      return '<div class="inv-row" style="position:relative;">'+'<div style="position:absolute;top:8px;right:8px;z-index:2;"><button class="btn btnr btnxs" onclick="event.stopPropagation();deleteInvoice(\''+inv.id+'\',\''+pid+'\')" title="Delete invoice">&#128465;</button></div>'+'<div onclick="openInvDetail(\''+inv.id+'\',\''+pid+'\',\''+pname.replace(/'/g,'&#39;')+'\')">'+
-        '<div style="flex:1;min-width:0;">'+
-        '<div style="font-size:12px;font-weight:700;color:var(--s800);">'+(inv.procedure_name||'—')+'</div>'+
-        '<div style="font-size:10px;color:var(--s400);margin-top:2px;">'+(inv.date||'—')+(inv.treating_dentist?' · '+inv.treating_dentist:'')+'</div>'+
-        (inv.teeth&&inv.teeth.length?'<div style="font-size:10px;color:var(--s500);margin-top:2px;">Teeth: '+inv.teeth.join(', ')+'</div>':'')+
-        '</div>'+
-        '<div style="text-align:right;flex-shrink:0;">'+
-        '<div style="font-size:14px;font-weight:700;">'+fmtAmt(inv.fee,inv.fee_currency||'IQD')+'</div>'+
-        '<span class="badge '+sc+'" style="margin-top:4px;">'+sl+(b>0?' · '+fu(b)+' due':'')+'</span>'+
+      var tStr=fmtTeeth(inv.teeth)||null;
+      return '<div style="display:flex;align-items:stretch;gap:0;margin-bottom:10px;border-radius:var(--radsm);border:1px solid var(--s200);overflow:hidden;background:white;box-shadow:0 1px 4px rgba(0,0,0,0.04);">'+
+        '<div onclick="openInvDetail(\''+inv.id+'\',\''+pid+'\',\''+pname.replace(/'/g,'&#39;')+'\')" style="flex:1;padding:12px 14px;cursor:pointer;min-width:0;" onmouseenter="this.style.background=\'var(--b50)\'" onmouseleave="this.style.background=\'white\'">'+
+        '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:3px;">'+(inv.procedure_name||'—')+'</div>'+
+        '<div style="font-size:11px;color:var(--s400);">'+(inv.date||'—')+(inv.treating_dentist?' · '+inv.treating_dentist:'')+'</div>'+
+        (tStr?'<div style="font-size:11px;color:var(--b600);margin-top:3px;">&#129748; '+tStr+'</div>':'')+
+        '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;">'+
+        '<div style="font-size:14px;font-weight:700;color:var(--s800);">'+fmtAmt(inv.fee,inv.fee_currency||'IQD')+'</div>'+
+        '<span class="badge '+sc+'">'+sl+(b>0?' · '+fu(Math.round(b))+' due':'')+'</span>'+
+        '</div></div>'+
+        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 10px;border-left:1px solid var(--s100);">'+
+        '<button class="btn btnr btnxs" onclick="event.stopPropagation();deleteInvoice(\''+inv.id+'\',\''+pid+'\')" title="Delete invoice" style="margin:0;">&#128465;</button>'+
         '</div></div>';
     }).join('');
   }
@@ -1864,16 +1890,23 @@ async function renderFinance(){
   buildFinUI();
 }
 function buildFinUI(){
-  var curDate=new Date(finY,finM,1);
-  var monthLabel=curDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-  var isCurrentMonth=finM===new Date().getMonth()&&finY===new Date().getFullYear();
+  var label,isCurrentMonth=false;
+  if(finMode==='range'&&finRangeStart&&finRangeEnd){
+    label=finRangeStart+' → '+finRangeEnd;
+  } else if(finMode==='year'){
+    label='Year '+finRangeYear;
+    isCurrentMonth=finRangeYear===new Date().getFullYear();
+  } else {
+    var curDate=new Date(finY,finM,1);
+    label=curDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    isCurrentMonth=finM===new Date().getMonth()&&finY===new Date().getFullYear();
+  }
   var html=
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">'+
-    '<div style="font-size:16px;font-weight:700;color:var(--s800);">'+monthLabel+'</div>'+
+    '<div style="font-size:16px;font-weight:700;color:var(--s800);">'+label+'</div>'+
     (isCurrentMonth?'<span style="background:var(--b600);color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">Current</span>':'')+
-    '<button class="btn btnsm" onclick="openFinMonthPicker()" style="margin-left:4px;">&#128197; Change month</button>'+
+    '<button class="btn btnsm" onclick="openFinDateModal()" style="margin-left:4px;">&#128197; Change period</button>'+
     '<button class="btn btnsm" onclick="setFinM(new Date().getMonth(),new Date().getFullYear())">This month</button>'+
-    '<input type="month" id="fin-month-input" style="position:absolute;opacity:0;pointer-events:none;width:1px;" onchange="onFinMonthPick(this.value)">'+
     '</div>'+
     '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:14px;flex-wrap:wrap;">'+
     ['overview','payments','dentists','substaff','expenses'].map(function(t){
@@ -1883,23 +1916,94 @@ function buildFinUI(){
     '<div id="fin-content"></div>';
   document.getElementById('pg-content').innerHTML=html;buildFinTab();
 }
-function openFinMonthPicker(){
-  var inp=document.getElementById('fin-month-input');
-  if(!inp)return;
-  inp.value=finY+'-'+(finM+1<10?'0':'')+(finM+1);
-  try{inp.showPicker();}catch(e){inp.click();}
+function openFinDateModal(){
+  var html='<div class="mbg" id="fin-date-modal" onclick="if(event.target===this)closeMdl(\'fin-date-modal\')" style="z-index:600;">'+
+    '<div class="modal" style="max-width:440px;">'+
+    '<div class="mtit">&#128197; Select period</div>'+
+    '<div class="msub">Choose how to filter the finance data</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:16px;">'+
+    '<button class="btn btnsm'+(finMode==='month'?' btnp':'')+'" onclick="setFinPickMode(\'month\')">By month</button>'+
+    '<button class="btn btnsm'+(finMode==='year'?' btnp':'')+'" onclick="setFinPickMode(\'year\')">By year</button>'+
+    '<button class="btn btnsm'+(finMode==='range'?' btnp':'')+'" onclick="setFinPickMode(\'range\')">Date range</button>'+
+    '</div>'+
+    '<div id="fin-pick-body"></div>'+
+    '<div class="mac"><button class="btn" onclick="closeMdl(\'fin-date-modal\')">Cancel</button>'+
+    '<button class="btn btnp" onclick="applyFinPeriod()">Apply</button></div>'+
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+  renderFinPickBody();
 }
+function setFinPickMode(m){
+  finMode=m;
+  // update buttons
+  document.querySelectorAll('#fin-date-modal .btnsm').forEach(function(b){
+    if(b.textContent.toLowerCase().includes(m==='month'?'month':m==='year'?'year':'range'))b.classList.add('btnp');
+    else b.classList.remove('btnp');
+  });
+  renderFinPickBody();
+}
+function renderFinPickBody(){
+  var el=document.getElementById('fin-pick-body');if(!el)return;
+  if(finMode==='month'){
+    el.innerHTML='<div class="fg">'+
+      '<div class="fgrp"><label class="flbl">Month</label>'+
+      '<select class="finp" id="fpick-month">'+
+      ['January','February','March','April','May','June','July','August','September','October','November','December']
+        .map(function(n,i){return '<option value="'+i+'"'+(i===finM?' selected':'')+'>'+n+'</option>';}).join('')+
+      '</select></div>'+
+      '<div class="fgrp"><label class="flbl">Year</label>'+
+      '<input class="finp" type="number" id="fpick-year" value="'+finY+'" min="2000" max="2099" style="max-width:120px;"></div>'+
+      '</div>';
+  } else if(finMode==='year'){
+    el.innerHTML='<div class="fgrp"><label class="flbl">Year</label>'+
+      '<input class="finp" type="number" id="fpick-ryear" value="'+finRangeYear+'" min="2000" max="2099" style="max-width:140px;"></div>';
+  } else {
+    el.innerHTML='<div class="fg">'+
+      '<div class="fgrp"><label class="flbl">From date</label>'+
+      '<input class="finp" type="date" id="fpick-start" value="'+(finRangeStart||'')+'"></div>'+
+      '<div class="fgrp"><label class="flbl">To date</label>'+
+      '<input class="finp" type="date" id="fpick-end" value="'+(finRangeEnd||'')+'"></div>'+
+      '</div>';
+  }
+}
+function applyFinPeriod(){
+  if(finMode==='month'){
+    var m=parseInt(document.getElementById('fpick-month').value);
+    var y=parseInt(document.getElementById('fpick-year').value);
+    if(isNaN(m)||isNaN(y))return;
+    finM=m;finY=y;
+  } else if(finMode==='year'){
+    var ry=parseInt(document.getElementById('fpick-ryear').value);
+    if(isNaN(ry))return;
+    finRangeYear=ry;
+  } else {
+    var s=document.getElementById('fpick-start').value,e=document.getElementById('fpick-end').value;
+    if(!s||!e){showToast('Please select both dates','error');return;}
+    if(s>e){showToast('Start date must be before end date','error');return;}
+    finRangeStart=s;finRangeEnd=e;
+  }
+  closeMdl('fin-date-modal');
+  buildFinUI();
+}
+function openFinMonthPicker(){openFinDateModal();}
 function onFinMonthPick(v){
   if(!v)return;
   var parts=v.split('-');
   finY=parseInt(parts[0]);finM=parseInt(parts[1])-1;
   buildFinUI();
 }
-function setFinM(m,y){finM=m;finY=y;buildFinUI();}
+function setFinM(m,y){finMode='month';finM=m;finY=y;buildFinUI();}
 function setFinT(t){finTab=t;buildFinUI();}
-function getMP(){return finProcs.filter(function(p){if(!p.date)return false;var d=new Date(p.date);return d.getMonth()===finM&&d.getFullYear()===finY;});}
-// get payments recorded this month
-function getMPays(){return finPays.filter(function(p){if(!p.date)return false;var d=new Date(p.date);return d.getMonth()===finM&&d.getFullYear()===finY;});}
+function _dateInPeriod(dateStr){
+  if(!dateStr)return false;
+  var d=dateStr.slice(0,10);
+  if(finMode==='range'&&finRangeStart&&finRangeEnd){return d>=finRangeStart&&d<=finRangeEnd;}
+  if(finMode==='year'){return d.slice(0,4)===String(finRangeYear);}
+  var dt=new Date(d);return dt.getMonth()===finM&&dt.getFullYear()===finY;
+}
+function getMP(){return finProcs.filter(function(p){return _dateInPeriod(p.date);});}
+function getMPays(){return finPays.filter(function(p){return _dateInPeriod(p.date);});}
+function getME(){return finExps.filter(function(e){return _dateInPeriod(e.date);});}
 // get invoice by id
 function getInv(id){return finInvs.find(function(i){return i.id===id;})||null;}
 // calculate split for a payment amount based on its invoice's rules
@@ -1916,7 +2020,6 @@ function calcPayDist(payAmt,inv){
   if(refIsP){var rates=getDR(t),pct=rates.refPct/100,tg=netPay*pct;return{treaterGets:tg,refGets:netPay-tg,vGets:0,type:'referred',pct:rates.refPct,dentist:t,referrer:r};}
   var r2=getDR(t),pct2=r2.ownPct/100,tg2=netPay*pct2;return{treaterGets:tg2,refGets:0,vGets:netPay-tg2,type:'own',pct:r2.ownPct,dentist:t};
 }
-function getME(){return finExps.filter(function(e){if(!e.date)return false;var d=new Date(e.date);return d.getMonth()===finM&&d.getFullYear()===finY;});}
 function calcDist(proc){
   var t=proc.treating_dentist||'',r=proc.referrer||'';
   var fee=Number(proc.net_fee||proc.fee||0);
@@ -1959,6 +2062,10 @@ function buildFO(){
   });
   var totalExp=exps.reduce(function(s,e){return s+Number(e.amount||0);},0),expPP=totalExp/3;
   var vPPiqd=vWiqd/3,vPPusd=vWusd/3;
+  // load any manual withdrawals from localStorage
+  var vWithdrawKey='vdc-vw-withdraw';
+  var vWithdrawals=JSON.parse(localStorage.getItem(vWithdrawKey)||'{}');
+  // vWithdrawals = { 'Dr. Sarmad': {iqd: 0, usd: 0}, ... }
   var totalCollectedIQD=pays.reduce(function(s,p){return s+Number(p.amount_iqd||0);},0);
   var totalCollectedUSD=pays.reduce(function(s,p){return s+Number(p.amount_usd||0);},0);
   var html=
@@ -1969,31 +2076,51 @@ function buildFO(){
     statC('var(--a50)','&#128176;','Expenses this month',fiqd(Math.round(totalExp)))+
     '</div>';
   var pC=[{bg:'#DBEAFE',border:'#2563EB',c:'#1D4ED8'},{bg:'#CCFBF1',border:'#0D9488',c:'#0F766E'},{bg:'#EDE9FE',border:'#7C3AED',c:'#6D28D9'}];
-  html+='<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px;">';
+  html+='<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px;">';
   PARTNERS.forEach(function(p,i){
     var c=pC[i],gIQD=walletsIQD[p]||0,gUSD=walletsUSD[p]||0;
+    var wdIQD=(vWithdrawals[p]||{}).iqd||0,wdUSD=(vWithdrawals[p]||{}).usd||0;
     html+='<div class="wallet-card" style="background:'+c.bg+';border-color:'+c.border+';">'+
       '<div style="font-size:10px;font-weight:700;color:'+c.c+';text-transform:uppercase;margin-bottom:6px;">'+p+'</div>'+
       '<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
       '<div style="font-size:9px;color:'+c.c+';font-weight:600;">🇮🇶 IQD</div>'+
-      '<div style="font-size:15px;font-weight:700;color:'+c.c+';">'+fiqd(Math.round(gIQD+vPPiqd))+'</div></div>'+
-      (gUSD>0||vPPusd>0?'<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
+      '<div style="font-size:15px;font-weight:700;color:'+c.c+';">'+fiqd(Math.round(gIQD))+'</div></div>'+
+      (gUSD>0?'<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
       '<div style="font-size:9px;color:'+c.c+';font-weight:600;">🇺🇸 USD</div>'+
-      '<div style="font-size:15px;font-weight:700;color:'+c.c+';">'+fusd(gUSD+vPPusd)+'</div></div>':'')+
+      '<div style="font-size:15px;font-weight:700;color:'+c.c+';">'+fusd(gUSD)+'</div></div>':'')+
       '<div style="font-size:10px;color:'+c.c+';margin-top:4px;border-top:1px solid '+c.border+';padding-top:4px;">- expenses: '+fiqd(Math.round(expPP))+'</div>'+
       '</div>';
   });
-  html+='<div class="wallet-card" style="background:#F5F3FF;border-color:#7C3AED;">'+
-    '<div style="font-size:10px;font-weight:700;color:#6D28D9;text-transform:uppercase;margin-bottom:6px;">Value Wallet</div>'+
-    '<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
-    '<div style="font-size:9px;color:#6D28D9;font-weight:600;">🇮🇶 IQD</div>'+
-    '<div style="font-size:15px;font-weight:700;color:#6D28D9;">'+fiqd(Math.round(vWiqd))+'</div>'+
-    '<div style="font-size:10px;color:#6D28D9;">'+fiqd(Math.round(vPPiqd))+'/partner</div></div>'+
-    (vWusd>0?'<div style="background:white;border-radius:6px;padding:6px 8px;">'+
-    '<div style="font-size:9px;color:#6D28D9;font-weight:600;">🇺🇸 USD</div>'+
-    '<div style="font-size:15px;font-weight:700;color:#6D28D9;">'+fusd(vWusd)+'</div>'+
-    '<div style="font-size:10px;color:#6D28D9;">'+fusd(vPPusd)+'/partner</div></div>':'')+
-    '</div></div>';
+  html+='</div>';
+  // Value Wallet with 3 sub-wallets
+  html+='<div class="vdc-card" style="margin-bottom:16px;border:2px solid #7C3AED;">'+
+    '<div class="vdc-card-hdr" style="background:#F5F3FF;">'+
+    '<div class="vdc-card-title" style="color:#6D28D9;">&#128176; Value Wallet — Partner Sub-wallets</div>'+
+    '<div style="font-size:11px;color:#7C3AED;">Total: '+fiqd(Math.round(vWiqd))+(vWusd>0?' + '+fusd(vWusd):'')+'</div>'+
+    '</div>'+
+    '<div class="vdc-card-body">'+
+    '<div style="font-size:11px;color:var(--s500);margin-bottom:10px;">Each partner\'s share is held here and can be withdrawn on demand. The split is calculated automatically (÷3) but not transferred until withdrawn.</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">'+
+    PARTNERS.map(function(p,i){
+      var c=pC[i];
+      var wdIQD=(vWithdrawals[p]||{}).iqd||0,wdUSD=(vWithdrawals[p]||{}).usd||0;
+      var availIQD=Math.max(0,vPPiqd-wdIQD),availUSD=Math.max(0,vPPusd-wdUSD);
+      return '<div style="background:'+c.bg+';border-radius:var(--radsm);border:1px solid '+c.border+';padding:10px;">'+
+        '<div style="font-size:10px;font-weight:700;color:'+c.c+';margin-bottom:6px;">'+p+'\'s share</div>'+
+        '<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
+        '<div style="font-size:9px;color:'+c.c+';font-weight:600;">🇮🇶 Available IQD</div>'+
+        '<div style="font-size:14px;font-weight:700;color:'+c.c+';">'+fiqd(Math.round(availIQD))+'</div>'+
+        (wdIQD>0?'<div style="font-size:9px;color:var(--s400);">Withdrawn: '+fiqd(Math.round(wdIQD))+'</div>':'')+
+        '</div>'+
+        (vWusd>0?'<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
+        '<div style="font-size:9px;color:'+c.c+';font-weight:600;">🇺🇸 Available USD</div>'+
+        '<div style="font-size:14px;font-weight:700;color:'+c.c+';">'+fusd(availUSD)+'</div>'+
+        (wdUSD>0?'<div style="font-size:9px;color:var(--s400);">Withdrawn: '+fusd(wdUSD)+'</div>':'')+
+        '</div>':'')+
+        '<button class="btn btnsm btnxs" style="width:100%;margin-top:4px;" onclick="openVWWithdraw(\''+p+'\','+Math.round(availIQD)+','+availUSD.toFixed(2)+')">Withdraw</button>'+
+        '</div>';
+    }).join('')+
+    '</div></div></div>';
   // regular dentist earnings from this month's payments
   html+='<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">Regular dentist earnings — from payments this month</div></div><div class="vdc-card-body">'+
     '<table class="tbl"><thead><tr><th>Dentist</th><th>Own%</th><th>Ref%</th><th>Payments</th><th>IQD earnings</th><th>USD earnings</th><th>To Value wallet</th></tr></thead><tbody>'+
@@ -2078,6 +2205,38 @@ function buildFD(){
   return html+'</div>';
 }
 function togDrPaidBtn(btn){togDrPaid(btn.dataset.dr);}
+function openVWWithdraw(partner,availIQD,availUSD){
+  var html='<div class="mbg" id="vw-modal" onclick="if(event.target===this)closeMdl(\'vw-modal\')" style="z-index:600;">'+
+    '<div class="modal" style="max-width:380px;">'+
+    '<div class="mtit">Withdraw from Value Wallet</div>'+
+    '<div class="msub">'+partner+'\'s sub-wallet</div>'+
+    '<div class="fg">'+
+    '<div class="fgrp"><label class="flbl">IQD amount (available: '+fiqd(availIQD)+')</label>'+
+    '<input class="finp" type="number" id="vw-iqd" min="0" max="'+availIQD+'" value="0" placeholder="0"></div>'+
+    (availUSD>0?'<div class="fgrp"><label class="flbl">USD amount (available: '+fusd(availUSD)+')</label>'+
+    '<input class="finp" type="number" id="vw-usd" min="0" max="'+availUSD.toFixed(2)+'" step="0.01" value="0" placeholder="0"></div>':'<input type="hidden" id="vw-usd" value="0">')+
+    '</div>'+
+    '<div class="mac">'+
+    '<button class="btn" onclick="closeMdl(\'vw-modal\')">Cancel</button>'+
+    '<button class="btn btnp" onclick="confirmVWWithdraw(\''+partner+'\','+availIQD+','+availUSD.toFixed(2)+')">Confirm withdrawal</button>'+
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+function confirmVWWithdraw(partner,availIQD,availUSD){
+  var wdIQD=Math.min(parseFloat(document.getElementById('vw-iqd').value)||0,availIQD);
+  var wdUSD=Math.min(parseFloat(document.getElementById('vw-usd').value)||0,availUSD);
+  if(wdIQD<0||wdUSD<0){showToast('Amount cannot be negative','error');return;}
+  if(wdIQD===0&&wdUSD===0){showToast('Enter an amount to withdraw','error');return;}
+  var key='vdc-vw-withdraw';
+  var data=JSON.parse(localStorage.getItem(key)||'{}');
+  if(!data[partner])data[partner]={iqd:0,usd:0};
+  data[partner].iqd=(data[partner].iqd||0)+wdIQD;
+  data[partner].usd=(data[partner].usd||0)+wdUSD;
+  localStorage.setItem(key,JSON.stringify(data));
+  closeMdl('vw-modal');
+  showToast('Withdrawal recorded for '+partner);
+  buildFinTab();
+}
 function togDrPaid(dr){var k='vdc-dr-paid-'+finY+'-'+finM,m=JSON.parse(localStorage.getItem(k)||'{}');m[dr]=!m[dr];localStorage.setItem(k,JSON.stringify(m));buildFinTab();}
 function openDRRbtn(btn){openDRR(btn.dataset.drr);}
 function openDRR(dr){var r=getDR(dr);document.getElementById('drr-name').textContent=dr;document.getElementById('drr-dr').value=dr;document.getElementById('drr-own').value=r.ownPct;document.getElementById('drr-ref').value=r.refPct;document.getElementById('drr-own-bar').style.width=r.ownPct+'%';document.getElementById('drr-ref-bar').style.width=r.refPct+'%';openMdl('drr-modal');}
@@ -3014,7 +3173,7 @@ async function openPayModalFromAppt(invId, invSummary){
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'+
     '<div style="font-weight:700;color:var(--s800);">'+(inv.procedure_name||'—')+'</div>'+
     '<span class="badge '+(bal<=0?'bg':paid>0?'ba':'br')+'">'+(bal<=0?'Paid':paid>0?'Partial':'Unpaid')+'</span></div>'+
-    (inv.teeth&&inv.teeth.length?'<div style="font-size:11px;color:var(--s500);margin-bottom:6px;">Teeth: '+inv.teeth.join(', ')+'</div>':'')+
+    (inv.teeth&&inv.teeth.length?'<div style="font-size:11px;color:var(--s500);margin-bottom:6px;">Teeth: '+fmtTeeth(inv.teeth)+'</div>':'')+
     (inv.treating_dentist?'<div style="font-size:11px;color:var(--s500);margin-bottom:6px;">Dentist: '+inv.treating_dentist+'</div>':'')+
     '<div style="display:flex;gap:16px;font-size:11px;color:var(--s500);">'+
     '<div>Total: <strong style="color:var(--s800);">'+fmtAmt(inv.fee,inv.fee_currency)+'</strong></div>'+
@@ -3397,7 +3556,7 @@ async function openPayModalFromAppt(invId, invSummary){
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'+
     '<div style="font-weight:700;color:var(--s800);">'+(inv.procedure_name||'—')+'</div>'+
     '<span class="badge '+(bal<=0?'bg':paidEquiv>0?'ba':'br')+'">'+(bal<=0?'Paid':paidEquiv>0?'Partial':'Unpaid')+'</span></div>'+
-    (inv.teeth&&inv.teeth.length?'<div style="font-size:11px;color:var(--s500);margin-bottom:4px;">Teeth: '+inv.teeth.join(', ')+'</div>':'')+
+    (inv.teeth&&inv.teeth.length?'<div style="font-size:11px;color:var(--s500);margin-bottom:4px;">Teeth: '+fmtTeeth(inv.teeth)+'</div>':'')+
     (inv.treating_dentist?'<div style="font-size:11px;color:var(--s500);margin-bottom:6px;">Dentist: '+inv.treating_dentist+'</div>':'')+
     '<div style="display:flex;gap:16px;font-size:11px;color:var(--s500);">'+
     '<div>Total: <strong style="color:var(--s800);">'+fiqd(fee)+'</strong></div>'+
