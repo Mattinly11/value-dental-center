@@ -433,6 +433,28 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <div style="margin-top:12px;">
       <button type="button" class="btn" style="width:100%;border-style:dashed;color:var(--b600);" onclick="addAnotherProc()">+ Add another procedure</button>
     </div>
+    <!-- TREATMENT PLAN SECTION -->
+    <div style="background:var(--b50);border:1.5px solid var(--b100);border-radius:var(--radsm);padding:14px;margin-bottom:10px;" id="treatment-plan-section">
+      <div style="font-size:12px;font-weight:700;color:var(--b700);margin-bottom:10px;">&#127973; Treatment plan</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <button type="button" id="tp-new-btn" class="btn btnsm btnp" onclick="setTPMode('new')" style="flex:1;">+ New plan</button>
+        <button type="button" id="tp-link-btn" class="btn btnsm" onclick="setTPMode('link')" style="flex:1;">&#128279; Add to existing plan</button>
+      </div>
+      <div id="tp-new-fields">
+        <div class="fgrp" style="margin-bottom:0;">
+          <label class="flbl">Total treatment cost <span id="tp-cost-currency-lbl" style="color:var(--b600);">(IQD)</span></label>
+          <input class="finp" type="number" id="tp-total-cost" placeholder="e.g. 1500000" min="0">
+          <div style="font-size:10px;color:var(--s400);margin-top:3px;">Agreed total for the full treatment — invoice will be created for this amount</div>
+        </div>
+      </div>
+      <div id="tp-link-fields" style="display:none;">
+        <div class="fgrp" style="margin-bottom:0;">
+          <label class="flbl">Select existing treatment plan</label>
+          <select class="finp" id="tp-plan-select"><option value="">Select plan...</option></select>
+          <div id="tp-plan-info" style="font-size:11px;color:var(--b700);margin-top:4px;font-weight:600;"></div>
+        </div>
+      </div>
+    </div>
     <div class="mac">
       <button class="btn btnr" id="proc-del-btn" style="display:none;margin-right:auto;" onclick="deleteProc()">Delete</button>
       <button class="btn" onclick="closeMdl('proc-modal')">Cancel</button>
@@ -1119,6 +1141,7 @@ async function openAddProc(pid){
   // load procedure definitions and labs
   await loadProcDefs();
   await loadLabsForProc();
+  var _pid=document.getElementById('proc-pid').value;if(_pid)loadPatientPlans(_pid);
   // populate select from definitions
   var sel=document.getElementById('proc-name');
   if(sel){
@@ -1218,22 +1241,43 @@ async function saveProc(){
   if(!id){
     var newP=r.data;
     var apptId2=document.getElementById('proc-appt-id').value||null;
-    var invRes=await db.from('invoices').insert([{
-      patient_id:pid,patient_name:pname,
-      procedure_id:newP?newP.id:null,
-      procedure_name:name,
-      treating_dentist:payload.treating_dentist,
-      fee:fee,fee_currency:feeCurrency,lab_fee:labFee,net_fee:netFee,
-      lab_name:labName||null,
-      teeth:teeth.length>0?teeth:null,
-      date:payload.date,
-      status:'unpaid',
-      referrer:payload.referrer,
-      appointment_id:apptId2
-    }]);
-    if(invRes.error){
-      showToast('Procedure saved but invoice failed: '+invRes.error.message,'error');
-      console.error('invoice error:',invRes.error);
+    var tpMode=_tpMode;
+    var tpPlanSel=document.getElementById('tp-plan-select');
+    var tpPlanId=tpMode==='link'&&tpPlanSel?tpPlanSel.value:'';
+    if(tpMode==='link'&&tpPlanId){
+      // Link this procedure to existing invoice/plan
+      // Just update the invoice to add this appointment as a visit
+      await db.from('invoices').update({
+        visits_count: db.rpc ? undefined : undefined // just link appt
+      }).eq('id',tpPlanId);
+      // Link appointment to this invoice
+      if(apptId2){
+        await db.from('invoices').update({appointment_id:apptId2}).eq('id',tpPlanId);
+        // store invoice_id on this procedure for finance tracking
+        await db.from('procedures').update({invoice_id:tpPlanId}).eq('id',newP?newP.id:'').maybeSingle();
+      }
+      showToast('Visit added to existing treatment plan ✅');
+    } else {
+      // Create new invoice with total treatment cost
+      var tpCostEl=document.getElementById('tp-total-cost');
+      var invoiceFee=parseFloat(tpCostEl?tpCostEl.value:fee)||fee;
+      var invRes=await db.from('invoices').insert([{
+        patient_id:pid,patient_name:pname,
+        procedure_id:newP?newP.id:null,
+        procedure_name:name,
+        treating_dentist:payload.treating_dentist,
+        fee:invoiceFee,fee_currency:feeCurrency,lab_fee:labFee,net_fee:netFee,
+        lab_name:labName||null,
+        teeth:teeth.length>0?teeth:null,
+        date:payload.date,
+        status:'unpaid',
+        referrer:payload.referrer,
+        appointment_id:apptId2
+      }]);
+      if(invRes.error){
+        showToast('Procedure saved but invoice failed: '+invRes.error.message,'error');
+        console.error('invoice error:',invRes.error);
+      }
     }
     if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
   }
@@ -2803,29 +2847,53 @@ async function loadApptInvoices(){
   apptInvoices = {};
   if(!allAppts.length) return;
   var apptIds = allAppts.map(function(a){return a.id;});
-  // load invoices linked to these appointments
+  // load invoices directly linked to appointments
   var ir = await db.from('invoices').select('*').in('appointment_id', apptIds);
-  var invs = ir.data || [];
-  // load payments for these invoices
-  var invIds = invs.map(function(i){return i.id;});
+  var directInvs = ir.data || [];
+  // load procedures for these appointments to find follow-up plan links
+  var procR = await db.from('procedures').select('id,invoice_id,appointment_id').in('appointment_id', apptIds);
+  var procInvIds = (procR.data||[]).filter(function(p){return p.invoice_id;}).map(function(p){return p.invoice_id;});
+  var extraInvs = [];
+  if(procInvIds.length){
+    var eir = await db.from('invoices').select('*').in('id', procInvIds);
+    extraInvs = eir.data || [];
+  }
+  var allInvs = directInvs.concat(extraInvs.filter(function(e){
+    return !directInvs.find(function(i){return i.id===e.id;});
+  }));
+  var invIds = allInvs.map(function(i){return i.id;});
   var pays = [];
   if(invIds.length){
     var pr = await db.from('payments').select('*').in('invoice_id', invIds);
     pays = pr.data || [];
   }
-  invs.forEach(function(inv){
-    var pd = pays.filter(function(p){return p.invoice_id===inv.id;})
-      .reduce(function(s,p){return s+Number(p.amount||0);},0);
-    var bal = Number(inv.fee||0) - pd;
-    apptInvoices[inv.appointment_id] = {
+  function buildEntry(inv, pd){
+    var feeIQD = toIQD(Number(inv.fee||0), inv.fee_currency);
+    return {
       id: inv.id, fee: Number(inv.fee||0),
-      paidAmt: pd, balance: bal,
-      paid: bal <= 0,
+      feeCurrency: inv.fee_currency||'IQD',
+      paidAmt: pd, balance: feeIQD - pd,
+      paid: (feeIQD - pd) <= 0,
       status: inv.status,
       procedure_name: inv.procedure_name,
       patient_name: inv.patient_name,
       patient_id: inv.patient_id
     };
+  }
+  // map direct invoices
+  directInvs.forEach(function(inv){
+    var pd = pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
+    if(inv.appointment_id) apptInvoices[inv.appointment_id] = buildEntry(inv, pd);
+  });
+  // map follow-up visits via procedure.invoice_id
+  (procR.data||[]).forEach(function(proc){
+    if(proc.invoice_id && proc.appointment_id && !apptInvoices[proc.appointment_id]){
+      var inv = allInvs.find(function(i){return i.id===proc.invoice_id;});
+      if(inv){
+        var pd = pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(s,p){return s+Number(p.amount||0);},0);
+        apptInvoices[proc.appointment_id] = buildEntry(inv, pd);
+      }
+    }
   });
 }
 
@@ -2909,6 +2977,10 @@ async function openAddProcFromAppt(appt){
     }
   }
   renderProcChart();
+  // load treatment plans for this patient
+  var pid2=document.getElementById('proc-pid').value;
+  resetTPSection(0,'IQD');
+  if(pid2)loadPatientPlans(pid2);
   openMdl('proc-modal');
 }
 
@@ -3489,6 +3561,90 @@ async function delLabFromDetail(labId,labName){
   showToast('Lab deleted');
   renderLabs();
 }
+
+
+// ══════════════ TREATMENT PLAN SYSTEM ════════════════════════════
+var _tpMode = 'new'; // 'new' or 'link'
+
+function setTPMode(mode){
+  _tpMode = mode;
+  var newFields = document.getElementById('tp-new-fields');
+  var linkFields = document.getElementById('tp-link-fields');
+  var newBtn = document.getElementById('tp-new-btn');
+  var linkBtn = document.getElementById('tp-link-btn');
+  if(mode === 'new'){
+    newFields.style.display = 'block';
+    linkFields.style.display = 'none';
+    newBtn.className = 'btn btnsm btnp';
+    linkBtn.className = 'btn btnsm';
+  } else {
+    newFields.style.display = 'none';
+    linkFields.style.display = 'block';
+    newBtn.className = 'btn btnsm';
+    linkBtn.className = 'btn btnsm btnp';
+  }
+}
+
+function syncTreatmentCost(){
+  // default total treatment cost to procedure fee
+  if(_tpMode !== 'new') return;
+  var fee = parseFloat(document.getElementById('proc-fee').value) || 0;
+  var costEl = document.getElementById('tp-total-cost');
+  if(costEl && (!costEl.value || costEl.dataset.autoSync !== 'false')) {
+    costEl.value = fee || '';
+  }
+}
+
+async function loadPatientPlans(pid){
+  // load existing treatment plans (open invoices) for this patient
+  var sel = document.getElementById('tp-plan-select');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">Loading...</option>';
+  var r = await db.from('invoices').select('*').eq('patient_id', pid).neq('status','paid').order('created_at', {ascending:false});
+  var invs = r.data || [];
+  if(!invs.length){
+    sel.innerHTML = '<option value="">No open treatment plans — create a new one</option>';
+    setTPMode('new');
+    document.getElementById('tp-link-btn').disabled = true;
+    document.getElementById('tp-link-btn').style.opacity = '0.4';
+    return;
+  }
+  document.getElementById('tp-link-btn').disabled = false;
+  document.getElementById('tp-link-btn').style.opacity = '1';
+  sel.innerHTML = '<option value="">Select plan...</option>' +
+    invs.map(function(inv){
+      var pays = 0; // we don't have pays here, show fee
+      return '<option value="'+inv.id+'" data-fee="'+inv.fee+'" data-currency="'+(inv.fee_currency||'IQD')+'" data-name="'+(inv.procedure_name||'')+'">'+
+        (inv.procedure_name||'—')+' · '+(inv.date||'')+ ' · '+fmtAmt(inv.fee, inv.fee_currency||'IQD')+
+        (inv.status==='partial'?' [Partial]':' [Unpaid]')+'</option>';
+    }).join('');
+  sel.onchange = function(){
+    var opt = sel.options[sel.selectedIndex];
+    var info = document.getElementById('tp-plan-info');
+    if(opt && opt.value && info){
+      info.textContent = 'Invoice: '+fmtAmt(opt.dataset.fee, opt.dataset.currency)+' · will add this visit to existing plan';
+    } else if(info){
+      info.textContent = '';
+    }
+  };
+}
+
+function resetTPSection(fee, currency){
+  _tpMode = 'new';
+  setTPMode('new');
+  var costEl = document.getElementById('tp-total-cost');
+  if(costEl){ costEl.value = fee || ''; costEl.dataset.autoSync = 'true'; }
+  var lbl = document.getElementById('tp-cost-currency-lbl');
+  if(lbl) lbl.textContent = '('+(currency||'IQD')+')';
+  var sel = document.getElementById('tp-plan-select');
+  if(sel) sel.innerHTML = '<option value="">Select plan...</option>';
+  var info = document.getElementById('tp-plan-info');
+  if(info) info.textContent = '';
+  document.getElementById('tp-link-btn').disabled = false;
+  document.getElementById('tp-link-btn').style.opacity = '1';
+}
+
+// ══════════ UPDATED saveProc — treatment plan logic ═══════════════
 
 </script>
 
