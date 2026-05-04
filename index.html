@@ -3586,11 +3586,29 @@ async function checkOpenCasesForPatient(patientName){
   var cR = await db.from('cases').select('*').eq('patient_id', pid).eq('status','active').order('created_at',{ascending:false});
   _amOpenCases = cR.data || [];
   if(!_amOpenCases.length) return;
-  // Build panel
+  // Build panel — show each case with balance info
   var infoEl = document.getElementById('am-case-info');
   if(infoEl){
+    // Load payment info for each case to show balance
+    var invIds = _amOpenCases.map(function(c){ return c.invoice_id; }).filter(Boolean);
+    var paysMap = {};
+    if(invIds.length){
+      var payR2 = await db.from('payments').select('invoice_id,amount').in('invoice_id', invIds);
+      (payR2.data||[]).forEach(function(p){ paysMap[p.invoice_id] = (paysMap[p.invoice_id]||0) + Number(p.amount||0); });
+    }
     infoEl.innerHTML = _amOpenCases.map(function(c){
-      return '<div style="font-weight:600;">&#127973; '+c.procedure_name+' — '+fu(Number(c.agreed_fee||0))+' agreed</div>';
+      var agreed = Number(c.agreed_fee||0);
+      var paid = paysMap[c.invoice_id] || 0;
+      var bal = Math.max(0, agreed - paid);
+      var pct = agreed > 0 ? Math.round(Math.min(100, paid/agreed*100)) : 0;
+      return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;padding:6px 8px;background:white;border-radius:6px;border:1px solid var(--b100);">'+
+        '<div><div style="font-size:12px;font-weight:700;color:var(--s800);">&#127973; '+c.procedure_name+'</div>'+
+        (c.dentist?'<div style="font-size:10px;color:var(--s400);">'+c.dentist+'</div>':'')+
+        '</div>'+
+        '<div style="text-align:right;">'+
+        '<div style="font-size:11px;font-weight:700;color:'+(bal>0?'var(--r600)':'var(--g700)')+';">'+( bal>0?fu(Math.round(bal))+' due':'Paid ✓')+'</div>'+
+        '<div style="font-size:10px;color:var(--s400);">'+pct+'% paid</div>'+
+        '</div></div>';
     }).join('');
   }
   // Populate session dropdown from all cases' procedure sessions
@@ -3620,7 +3638,29 @@ async function checkOpenCasesForPatient(patientName){
   }
   sel.onchange = function(){
     var opt = sel.options[sel.selectedIndex];
-    if(caseIdEl) caseIdEl.value = (opt&&opt.dataset.caseId) ? opt.dataset.caseId : '';
+    if(!opt) return;
+    var caseId = opt.dataset.caseId || '';
+    if(caseIdEl) caseIdEl.value = caseId;
+    // Auto-fill procedure type and dentist from the matched case
+    if(caseId){
+      var matchedCase = _amOpenCases.find(function(c){ return c.id === caseId; });
+      if(matchedCase){
+        // Set procedure type
+        var procSel = document.getElementById('am-proc');
+        if(procSel){
+          // Try to find exact match in options
+          var procOpt = Array.from(procSel.options).find(function(o){
+            return o.value === matchedCase.procedure_name;
+          });
+          if(procOpt) procSel.value = matchedCase.procedure_name;
+        }
+        // Set dentist if not already selected
+        var drSel = document.getElementById('am-dr');
+        if(drSel && !drSel.value && matchedCase.dentist){
+          drSel.value = matchedCase.dentist;
+        }
+      }
+    }
   };
   if(panel) panel.style.display = 'block';
 }
