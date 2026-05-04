@@ -192,6 +192,32 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .balance-warn-badge{font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(220,38,38,0.12);color:var(--r600);}
 /* BOOKING WARNING BANNER */
 .booking-warn{background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--a700);}
+/* SESSIONS SYSTEM */
+.session-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid;cursor:pointer;font-family:inherit;transition:all 0.1s;}
+.session-chip:hover{transform:scale(1.03);}
+.session-chip.done{background:var(--g50);color:var(--g700);border-color:var(--g100);}
+.session-chip.active{background:var(--b600);color:white;border-color:var(--b700);}
+.session-chip.pending{background:white;color:var(--s600);border-color:var(--s200);}
+.case-card{background:white;border-radius:var(--rad);border:1.5px solid var(--s200);margin-bottom:12px;overflow:hidden;}
+.case-card-hdr{padding:14px 16px;background:var(--b50);border-bottom:1px solid var(--b100);cursor:pointer;display:flex;align-items:center;gap:12px;}
+.case-card-hdr:hover{background:#E0EDFF;}
+.case-visits{border-top:1px solid var(--s100);}
+.case-visit-row{display:flex;align-items:stretch;border-bottom:1px solid var(--s100);background:white;}
+.case-visit-row:last-child{border-bottom:none;}
+.case-visit-row:hover{background:var(--b50);}
+.case-visit-num{width:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--s50);border-right:1px solid var(--s100);font-size:11px;font-weight:700;color:var(--s400);}
+.case-visit-body{flex:1;padding:10px 14px;min-width:0;}
+.case-visit-actions{display:flex;align-items:center;gap:4px;padding:8px 10px;border-left:1px solid var(--s100);}
+/* OPEN CASE BANNER IN BOOKING */
+.open-case-banner{background:var(--b50);border:1.5px solid var(--b100);border-radius:var(--radsm);padding:12px 14px;margin-bottom:12px;}
+/* SESSION ADMIN */
+.sess-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--s100);background:white;}
+.sess-row:last-child{border-bottom:none;}
+.sess-row:hover{background:var(--s50);}
+.sess-drag-handle{color:var(--s300);cursor:grab;font-size:16px;flex-shrink:0;}
+/* CASE RECORDING FORM */
+.case-summary-card{background:var(--b50);border:1.5px solid var(--b100);border-radius:var(--radsm);padding:14px;margin-bottom:14px;}
+.case-new-card{background:var(--g50);border:1.5px solid var(--g100);border-radius:var(--radsm);padding:14px;margin-bottom:14px;}
 
 @keyframes glow-green{0%,100%{box-shadow:0 0 6px 2px #22c55e80;}50%{box-shadow:0 0 14px 5px #22c55eb0;}}
 @keyframes glow-dollar{0%,100%{box-shadow:0 0 6px 2px #f59e0b80;}50%{box-shadow:0 0 14px 5px #f59e0bb0;}}
@@ -293,6 +319,20 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <div class="mtit" id="am-mtit">Book appointment</div>
     <div class="msub">Fill in appointment details</div>
     <div id="am-balance-warn" style="display:none;background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--a700);"></div>
+    <!-- OPEN CASE PANEL — shown if patient has active cases -->
+    <div id="am-case-panel" style="display:none;" class="open-case-banner">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--b700);">&#127973; Open case detected</div>
+      </div>
+      <div id="am-case-info" style="font-size:11px;color:var(--s600);margin-bottom:10px;"></div>
+      <div class="fgrp" style="margin-bottom:0;">
+        <label class="flbl">Which session is this appointment for?</label>
+        <select class="finp" id="am-session-select" style="margin-top:4px;">
+          <option value="">Select session...</option>
+        </select>
+        <input type="hidden" id="am-case-id">
+      </div>
+    </div>
     <input type="hidden" id="am-id">
     <div class="fg">
       <div class="fgrp"><label class="flbl">Patient <span class="req">*</span></label>
@@ -379,7 +419,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
   </div>
 </div>
 
-<!-- PROCEDURE MODAL -->
+<!-- PROCEDURE / CASE RECORDING MODAL -->
 <div class="mbg" id="proc-modal">
   <div class="modal mxl">
     <div class="mtit" id="proc-mtit">Record procedure</div>
@@ -388,6 +428,22 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <input type="hidden" id="proc-pid">
     <input type="hidden" id="proc-pname">
     <input type="hidden" id="proc-appt-id">
+    <input type="hidden" id="proc-case-id">
+    <!-- CASE SUMMARY (continuing existing case) -->
+    <div id="proc-case-summary" style="display:none;" class="case-summary-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+        <div style="font-size:13px;font-weight:700;color:var(--b700);" id="pcs-name">Case</div>
+        <div id="pcs-status-badge"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;" id="pcs-stats"></div>
+      <div style="margin-bottom:8px;"><div class="progress-bar-wrap" style="height:8px;"><div class="progress-bar-fill" id="pcs-bar" style="width:0%"></div></div></div>
+      <div id="pcs-visits" style="font-size:11px;color:var(--s500);"></div>
+    </div>
+    <!-- NEW CASE BANNER -->
+    <div id="proc-new-case-card" style="display:none;" class="case-new-card">
+      <div style="font-size:13px;font-weight:700;color:var(--g700);margin-bottom:4px;">&#10022; Starting a new case</div>
+      <div style="font-size:11px;color:var(--s500);">Fill in the procedure and agreed fee below. An invoice will be created for the total agreed amount.</div>
+    </div>
     <!-- Dental Chart -->
     <div style="margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
@@ -406,11 +462,18 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     </div>
     <div class="fg">
       <div class="fgrp"><label class="flbl">Procedure <span class="req">*</span></label>
-        <select class="finp" id="proc-name" onchange="onProcNameChange(this.value);onProcDefSelect(this.value)">
+        <select class="finp" id="proc-name" onchange="onProcNameChange(this.value);onProcDefSelect(this.value);onProcNameForSessions(this.value)">
           <option value="">Select procedure...</option>
         </select>
-        <div id="proc-def-hint" style="display:none;margin-top:5px;padding:6px 10px;background:var(--a50);border-radius:var(--radsm);border:1px solid var(--a100);font-size:11px;color:var(--a700);"></div></div>
+        <div id="proc-def-hint" style="display:none;margin-top:5px;padding:6px 10px;background:var(--a50);border-radius:var(--radsm);border:1px solid var(--a100);font-size:11px;color:var(--a700);"></div>
+      </div>
       <div class="fgrp"><label class="flbl">Date</label><input class="finp" type="date" id="proc-date"></div>
+    </div>
+    <!-- SESSION SELECTOR -->
+    <div class="fgrp" id="proc-session-wrap" style="display:none;">
+      <label class="flbl">&#128198; Session for this visit <span class="req">*</span></label>
+      <select class="finp" id="proc-session-select"><option value="">Select session...</option></select>
+      <div id="proc-session-hint" style="font-size:10px;color:var(--s400);margin-top:3px;"></div>
     </div>
     <div class="fg">
       <div class="fgrp"><label class="flbl">Treating dentist</label>
@@ -418,9 +481,9 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       <div class="fgrp"><label class="flbl">Referred by (partner only)</label>
         <select class="finp" id="proc-ref"><option value="">No referral</option><option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option></select></div>
     </div>
-    <!-- LAB SECTION - shown auto for crown/bridge/implant/veneer -->
+    <!-- LAB SECTION -->
     <div id="proc-lab-section" style="display:none;background:var(--p50);border:1px solid var(--p100);border-radius:var(--radsm);padding:12px 14px;margin-bottom:13px;">
-      <div style="font-size:11px;font-weight:700;color:var(--p700);margin-bottom:8px;">&#128300; Lab work</div>
+      <div style="font-size:11px;font-weight:700;color:var(--p700);margin-bottom:8px;">&#128300; Lab work <span style="font-size:10px;font-weight:400;color:var(--s400);">(fee deducted from agreed total for split)</span></div>
       <div class="fg" style="margin-bottom:0;">
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab</label>
           <select class="finp" id="proc-lab" onchange="onProcLabChange(this.value)"><option value="">Select lab...</option></select></div>
@@ -429,61 +492,46 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl" id="proc-lab-fee-lbl">Lab fee (IQD)</label>
           <input class="finp" type="number" id="proc-lab-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
       </div>
-      <!-- Implant fixture price -->
       <div id="proc-fixture-wrap" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--p200);">
         <label class="flbl">Implant fixture cost (IQD)</label>
         <input class="finp" type="number" id="proc-fixture-fee" placeholder="0" min="0" oninput="updateProcNet()">
-        <div style="font-size:10px;color:var(--s400);margin-top:3px;">Deducted from procedure fee before any split</div>
+        <div style="font-size:10px;color:var(--s400);margin-top:3px;">Deducted from agreed total before any split</div>
       </div>
     </div>
     <!-- NET DISPLAY -->
     <div id="proc-net-disp" style="display:none;background:var(--g50);border:1px solid var(--g100);border-radius:var(--radsm);padding:10px 14px;margin-bottom:13px;">
       <div style="display:flex;gap:20px;flex-wrap:wrap;">
-        <div><div style="font-size:10px;color:var(--s400);">Procedure fee</div><div style="font-size:14px;font-weight:700;" id="pnd-fee">/bin/sh</div></div>
-        <div><div style="font-size:10px;color:var(--s400);">Lab fee</div><div style="font-size:14px;font-weight:700;color:var(--r600);" id="pnd-lab">-/bin/sh</div></div>
-        <div><div style="font-size:10px;color:var(--s400);">Net (for split)</div><div style="font-size:14px;font-weight:700;color:var(--g700);" id="pnd-net">/bin/sh</div></div>
+        <div><div style="font-size:10px;color:var(--s400);">Agreed fee</div><div style="font-size:14px;font-weight:700;" id="pnd-fee">0</div></div>
+        <div><div style="font-size:10px;color:var(--s400);">Lab fee</div><div style="font-size:14px;font-weight:700;color:var(--r600);" id="pnd-lab">-0</div></div>
+        <div><div style="font-size:10px;color:var(--s400);">Net (for split)</div><div style="font-size:14px;font-weight:700;color:var(--g700);" id="pnd-net">0</div></div>
       </div>
     </div>
-    <div class="fg">
-      <div class="fgrp"><label class="flbl">Procedure fee <span id="proc-fee-currency-lbl" style="color:var(--b600);">(IQD)</span> <span class="req">*</span></label><input class="finp" type="number" id="proc-fee" placeholder="0" min="0" oninput="updateProcNet();syncTreatmentCost()"></div>
-      <div class="fgrp"><label class="flbl">Status</label>
-        <select class="finp" id="proc-status"><option value="planned">Planned</option><option value="inprogress">In progress</option><option value="completed" selected>Completed</option></select></div>
+    <!-- FEE — shown only for new case -->
+    <div id="proc-fee-wrap">
+      <div class="fg">
+        <div class="fgrp">
+          <label class="flbl" id="proc-fee-label">Agreed total with patient <span id="proc-fee-currency-lbl" style="color:var(--b600);">(IQD)</span> <span class="req">*</span></label>
+          <input class="finp" type="number" id="proc-fee" placeholder="0" min="0" oninput="updateProcNet()">
+          <div id="proc-fee-hint" style="font-size:10px;color:var(--s400);margin-top:3px;">This covers all sessions — one invoice will be created for this amount</div>
+        </div>
+        <div class="fgrp"><label class="flbl">Status</label>
+          <select class="finp" id="proc-status"><option value="planned">Planned</option><option value="inprogress">In progress</option><option value="completed" selected>Completed</option></select></div>
+      </div>
     </div>
-    <div class="fgrp"><label class="flbl">Notes</label><textarea class="finp" id="proc-notes" rows="2" placeholder="Clinical notes..."></textarea></div>
-    <!-- Extra procedures -->
+    <div class="fgrp"><label class="flbl">Session notes</label><textarea class="finp" id="proc-notes" rows="3" placeholder="Clinical notes for this session..."></textarea></div>
     <div id="extra-procs-container"></div>
-    <div style="margin-top:12px;">
+    <div id="proc-add-another-wrap" style="margin-top:12px;">
       <button type="button" class="btn" style="width:100%;border-style:dashed;color:var(--b600);" onclick="addAnotherProc()">+ Add another procedure</button>
-    </div>
-    <!-- TREATMENT PLAN SECTION -->
-    <div style="background:var(--b50);border:1.5px solid var(--b100);border-radius:var(--radsm);padding:14px;margin-bottom:10px;" id="treatment-plan-section">
-      <div style="font-size:12px;font-weight:700;color:var(--b700);margin-bottom:10px;">&#127973; Treatment plan</div>
-      <div style="display:flex;gap:8px;margin-bottom:10px;">
-        <button type="button" id="tp-new-btn" class="btn btnsm btnp" onclick="setTPMode('new')" style="flex:1;">+ New plan</button>
-        <button type="button" id="tp-link-btn" class="btn btnsm" onclick="setTPMode('link')" style="flex:1;">&#128279; Add to existing plan</button>
-      </div>
-      <div id="tp-new-fields">
-        <div class="fgrp" style="margin-bottom:0;">
-          <label class="flbl">Total treatment cost <span id="tp-cost-currency-lbl" style="color:var(--b600);">(IQD)</span></label>
-          <input class="finp" type="number" id="tp-total-cost" placeholder="e.g. 1500000" min="0">
-          <div style="font-size:10px;color:var(--s400);margin-top:3px;">Agreed total for the full treatment — invoice will be created for this amount</div>
-        </div>
-      </div>
-      <div id="tp-link-fields" style="display:none;">
-        <div class="fgrp" style="margin-bottom:0;">
-          <label class="flbl">Select existing treatment plan</label>
-          <select class="finp" id="tp-plan-select"><option value="">Select plan...</option></select>
-          <div id="tp-plan-info" style="font-size:11px;color:var(--b700);margin-top:4px;font-weight:600;"></div>
-        </div>
-      </div>
     </div>
     <div class="mac">
       <button class="btn btnr" id="proc-del-btn" style="display:none;margin-right:auto;" onclick="deleteProc()">Delete</button>
       <button class="btn" onclick="closeMdl('proc-modal')">Cancel</button>
-      <button class="btn btnp" onclick="saveProc()">Save &amp; create invoice</button>
+      <button class="btn btnp" onclick="saveProc()">Save &amp; record visit</button>
     </div>
   </div>
 </div>
+
+
 
 <!-- PAYMENT MODAL -->
 <div class="mbg" id="pay-modal">
@@ -942,173 +990,6 @@ async function deletePatient(){
 // ══════════════════════ PATIENT PROFILE ══════════════════════════
 async function openProf(id,name){profState.pid=id;profState.pname=name;profState.tab='timeline';renderProf(id,name);}
 
-async function renderProf(id,name,tab){
-  if(tab)profState.tab=tab;
-  document.getElementById('pg-title').textContent=name;
-  document.getElementById('pg-sub').textContent='Patient profile';
-  document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('act');});
-  document.getElementById('nav-patients').classList.add('act');
-  document.getElementById('pg-actions').innerHTML=
-    '<button class="btn" onclick="goTo(\'patients\')">&#8592; All patients</button>'+
-    '<button class="btn btnp" onclick="openEditPt(\''+id+'\')">Edit patient</button>';
-  document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading profile...</div>';
-  // Load everything in parallel
-  var results=await Promise.all([
-    db.from('patients').select('*').eq('id',id).single(),
-    db.from('invoices').select('*').eq('patient_id',id).order('date',{ascending:false}),
-    db.from('payments').select('*'),
-    db.from('procedures').select('*').eq('patient_id',id).order('date',{ascending:false}),
-    db.from('appointments').select('*').ilike('patient_name',name).order('date',{ascending:false}),
-    db.from('lab_orders').select('*').eq('patient_id',id).order('created_at',{ascending:false}).then(function(r){return r.error?{data:[]}:r;})
-  ]);
-  var p=results[0].data;
-  if(!p){showToast('Not found','error');goTo('patients');return;}
-  var invs=results[1].data||[];
-  var allPays=results[2].data||[];
-  var procs=results[3].data||[];
-  var appts=results[4].data||[];
-  var labOrders=results[5].data||[];
-
-  var c=ptCol(p.name||''),a=age(p.dob),av=ini(p.name||'?');
-  // compute summary numbers
-  var totalBilled=invs.reduce(function(s,i){return s+toIQD(Number(i.fee||0),i.fee_currency);},0);
-  var totalPaid=invs.reduce(function(s,inv){
-    return s+allPays.filter(function(py){return py.invoice_id===inv.id;}).reduce(function(t,py){return t+Number(py.amount||0);},0);
-  },0);
-  var totalDue=totalBilled-totalPaid;
-  var today=fd(new Date());
-
-  var html=
-    // Patient header card
-    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:16px 20px;margin-bottom:14px;">'+
-    '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'+
-    '<div style="width:52px;height:52px;border-radius:50%;background:'+c.bg+';color:'+c.c+';display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;">'+av+'</div>'+
-    '<div style="flex:1;min-width:0;">'+
-    '<div style="font-size:17px;font-weight:700;color:var(--s800);">'+p.name+'</div>'+
-    '<div style="font-size:12px;color:var(--s400);margin-top:2px;">'+(a?a+' years · ':'')+( p.gender?p.gender+' · ':'')+( p.primary_dentist||'No assigned dentist')+'</div>'+
-    (p.phone?'<div style="font-size:12px;color:var(--s500);margin-top:3px;">&#128222; '+p.phone+'</div>':'')+
-    '</div>'+
-    '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">'+
-    stBadge(p.status)+
-    (p.medical_notes?'<span style="font-size:10px;color:var(--a700);background:var(--a50);border:1px solid var(--a100);border-radius:4px;padding:2px 8px;">&#9888; Medical notes</span>':'')+
-    '</div>'+
-    '</div>'+
-    (p.medical_notes?'<div style="margin-top:10px;padding:8px 12px;background:var(--a50);border-radius:var(--radsm);border-left:3px solid var(--a500);font-size:12px;color:var(--s700);">'+p.medical_notes+'</div>':'')+
-    '</div>'+
-    // Summary stats
-    '<div class="stats-row" style="margin-bottom:14px;">'+
-    statC('var(--b50)','&#128203;','Total billed',fu(totalBilled))+
-    statC('var(--g50)','&#128176;','Total paid',fu(totalPaid))+
-    statC(totalDue>0?'var(--r50)':'var(--g50)','&#9888;','Balance due',fu(totalDue))+
-    statC('var(--s50)','&#9719;','Appointments',appts.length)+
-    '</div>'+
-    // Quick actions bar
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">'+
-    '<button class="btn btnp btnsm" onclick="openApptForPt(\''+p.name.replace(/'/g,'&#39;')+'\')">&#128197; Book appointment</button>'+
-    '<button class="btn btnsm" onclick="openAddProc(\''+id+'\')">&#10022; Record procedure</button>'+
-    '</div>';
-
-  // Build timeline — merge invoices + appointments into chronological events
-  var timelineEvents=[];
-  // Add invoice-based events (each invoice = one treatment event)
-  invs.forEach(function(inv){
-    var paidAmt=allPays.filter(function(py){return py.invoice_id===inv.id;}).reduce(function(s,py){return s+Number(py.amount||0);},0);
-    var bal=toIQD(Number(inv.fee||0),inv.fee_currency)-paidAmt;
-    var labOrder=labOrders.find(function(lo){return lo.invoice_id===inv.id;});
-    timelineEvents.push({type:'invoice',date:inv.date||'',inv:inv,paidAmt:paidAmt,bal:bal,labOrder:labOrder});
-  });
-  // Add upcoming appointments that don't have invoices yet
-  var invoicedApptIds=invs.map(function(i){return i.appointment_id;}).filter(Boolean);
-  appts.forEach(function(a){
-    if(a.date>=today&&!invoicedApptIds.includes(a.id)){
-      timelineEvents.push({type:'appointment',date:a.date,appt:a});
-    }
-  });
-  // Sort by date descending
-  timelineEvents.sort(function(a,b){return b.date.localeCompare(a.date);});
-
-  if(!timelineEvents.length){
-    html+='<div style="text-align:center;padding:40px;color:var(--s400);background:white;border-radius:var(--rad);border:1px solid var(--s200);">'+
-      '<div style="font-size:32px;margin-bottom:10px;">&#128100;</div>'+
-      '<div style="font-size:13px;font-weight:600;margin-bottom:6px;">No history yet</div>'+
-      '<div style="font-size:12px;">Book an appointment or record a procedure to start the patient journey.</div></div>';
-  } else {
-    html+='<div style="font-size:11px;font-weight:700;color:var(--s500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Patient timeline</div>';
-    html+='<div class="pt-timeline-body" style="border-radius:var(--rad);">';
-    timelineEvents.forEach(function(ev,idx){
-      if(ev.type==='appointment'){
-        var a=ev.appt,sc=STATUSES[a.status]||STATUSES.open;
-        html+='<div class="pt-visit-row">'+
-          '<div class="pt-visit-date">'+
-          '<div style="font-size:9px;font-weight:700;color:var(--s400);text-transform:uppercase;">'+ev.date.slice(5,7)+'/'+ev.date.slice(8,10)+'</div>'+
-          '<div style="font-size:11px;font-weight:700;color:var(--s600);">'+ev.date.slice(0,4)+'</div>'+
-          '<div style="font-size:14px;margin-top:3px;">'+sc.emoji+'</div>'+
-          '</div>'+
-          '<div class="pt-visit-body">'+
-          '<div style="font-size:12px;font-weight:700;color:var(--b700);">Upcoming: '+(a.procedure_type||'Appointment')+'</div>'+
-          '<div style="font-size:11px;color:var(--s400);margin-top:2px;">'+(a.start_time||'')+' · '+(a.dentist||'')+(a.room?' · '+a.room:'')+'</div>'+
-          '<span class="badge" style="margin-top:4px;background:'+sc.bg+';color:'+sc.color+';border:1px solid '+sc.border+';">'+sc.label+'</span>'+
-          '</div>'+
-          '<div class="pt-visit-actions">'+
-          '<button class="btn btnxs" onclick="openApptDetail(\''+a.id+'\')">View</button>'+
-          '</div></div>';
-      } else {
-        var inv=ev.inv,paidAmt=ev.paidAmt,bal=ev.bal,labOrder=ev.labOrder;
-        var sc2=bal<=0?'bg':paidAmt>0?'ba':'br';
-        var sl2=bal<=0?'Paid':paidAmt>0?'Partial':'Unpaid';
-        var tStr=fmtTeeth(inv.teeth)||null;
-        var pct=inv.fee>0?Math.round(Math.min(100,paidAmt/toIQD(Number(inv.fee),inv.fee_currency)*100)):0;
-        var labHtml='';
-        if(labOrder){
-          labHtml='<span class="lab-badge '+(labOrder.status==='received'?'lab-received':'lab-pending')+'">&#128300; Lab: '+(labOrder.lab_name||'Lab')+(labOrder.status==='received'?' ✓':' pending')+'</span>';
-        }
-        html+='<div class="pt-visit-row">'+
-          '<div class="pt-visit-date">'+
-          '<div style="font-size:9px;font-weight:700;color:var(--s400);text-transform:uppercase;">'+ev.date.slice(5,7)+'/'+ev.date.slice(8,10)+'</div>'+
-          '<div style="font-size:11px;font-weight:700;color:var(--s600);">'+ev.date.slice(0,4)+'</div>'+
-          '</div>'+
-          '<div class="pt-visit-body" onclick="openInvDetail(\''+inv.id+'\',\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')" style="cursor:pointer;">'+
-          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'+
-          '<div style="font-size:12px;font-weight:700;color:var(--s800);">'+(inv.procedure_name||'—')+'</div>'+
-          '<span class="badge '+sc2+'">'+sl2+'</span>'+
-          labHtml+
-          '</div>'+
-          (inv.treating_dentist?'<div style="font-size:11px;color:var(--s400);">&#9679; '+inv.treating_dentist+'</div>':'')+
-          (tStr?'<div style="font-size:11px;color:var(--b600);margin-top:2px;">&#129748; '+tStr+'</div>':'')+
-          '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;">'+
-          '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:'+pct+'%;'+(bal<=0?'background:var(--g600);':'')+'"></div></div>'+
-          '<div style="font-size:10px;font-weight:700;color:var(--s500);white-space:nowrap;">'+fu(paidAmt)+' / '+fmtAmt(inv.fee,inv.fee_currency||'IQD')+'</div>'+
-          '</div>'+
-          (bal>0?'<div style="font-size:11px;font-weight:700;color:var(--r600);margin-top:4px;">'+fu(Math.round(bal))+' remaining</div>':'')+
-          '</div>'+
-          '<div class="pt-visit-actions" style="flex-direction:column;gap:4px;">'+
-          (bal>0?'<button class="btn btnp btnxs" onclick="openInvDetail(\''+inv.id+'\',\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">Pay</button>':'')+
-          (labOrder&&labOrder.status!=='received'?'<button class="btn btnsm btnxs" style="font-size:9px;white-space:nowrap;" onclick="markLabReceived(\''+labOrder.id+'\',\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">&#10003; Lab rcvd</button>':'')+
-          '<button class="btn btnxs" onclick="deleteInvoice(\''+inv.id+'\',\''+id+'\')" title="Delete" style="color:var(--r600);">&#128465;</button>'+
-          '</div></div>';
-      }
-    });
-    html+='</div>';
-  }
-
-  // Clinical chart summary at the bottom
-  var clinTeeth={};
-  procs.slice().reverse().forEach(function(pr){
-    if(pr.teeth&&Array.isArray(pr.teeth))pr.teeth.forEach(function(t){
-      if(pr.status==='completed')clinTeeth[t]='completed';
-      else if(pr.status==='inprogress'&&clinTeeth[t]!=='completed')clinTeeth[t]='inprogress';
-      else if(pr.status==='planned'&&!clinTeeth[t])clinTeeth[t]='planned';
-    });
-  });
-  if(procs.length){
-    html+='<div class="vdc-card" style="margin-top:14px;">'+
-      '<div class="vdc-card-hdr"><div class="vdc-card-title">&#10022; Clinical chart</div>'+
-      '<button class="btn btnsm" onclick="openAddProc(\''+id+'\')">+ Record procedure</button></div>'+
-      '<div class="vdc-card-body">'+buildChart(clinTeeth,{},false)+'</div></div>';
-  }
-
-  document.getElementById('pg-content').innerHTML=html;
-}
 
 // Backward compatibility: switchTab now just re-renders the unified profile
 function switchTab(t,id,name){
@@ -1204,47 +1085,6 @@ async function goToClinical(apptId,pname){
   openAddProc(profState.pid);
 }
 // ══════════════════════ PROCEDURE MODAL ══════════════════════════
-async function openAddProc(pid){
-  procSelTeeth={};procIsPrim=false;
-  document.getElementById('proc-mtit').textContent='Record procedure';
-  document.getElementById('proc-msub').textContent='Patient: '+profState.pname;
-  document.getElementById('proc-id').value='';
-  document.getElementById('proc-pid').value=pid||profState.pid;
-  document.getElementById('proc-pname').value=profState.pname;
-  ['proc-name','proc-dr','proc-notes','proc-fee'].forEach(function(i){document.getElementById(i).value='';});
-  document.getElementById('proc-ref').value='';document.getElementById('proc-status').value='completed';
-  document.getElementById('proc-date').value=fd(new Date());
-  document.getElementById('proc-del-btn').style.display='none';
-  var apptIdEl=document.getElementById('proc-appt-id');if(apptIdEl)apptIdEl.value='';
-  resetExtraProcs();
-  // reset lab/fixture fields
-  var labSec=document.getElementById('proc-lab-section');if(labSec)labSec.style.display='none';
-  var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
-  var plf=document.getElementById('proc-lab-fee');if(plf)plf.value='';
-  var pff=document.getElementById('proc-fixture-fee');if(pff)pff.value='';
-  var pfw=document.getElementById('proc-fixture-wrap');if(pfw)pfw.style.display='none';
-  var pdh=document.getElementById('proc-def-hint');if(pdh)pdh.style.display='none';
-  var pfee=document.getElementById('proc-fee');if(pfee){pfee.readOnly=false;pfee.style.background='';}
-  // load procedure definitions and labs
-  await loadProcDefs();
-  await loadLabsForProc();
-  var _pid=document.getElementById('proc-pid').value;if(_pid)loadPatientPlans(_pid);
-  // populate select from definitions
-  var sel=document.getElementById('proc-name');
-  if(sel){
-    var cats={};
-    allProcDefs.forEach(function(p){if(!cats[p.category||'Other'])cats[p.category||'Other']=[];cats[p.category||'Other'].push(p);});
-    sel.innerHTML='<option value=>Select procedure...</option>';
-    Object.keys(cats).sort().forEach(function(cat){
-      var og=document.createElement('optgroup');og.label=cat;
-      cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+fmtAmt(p.price,p.currency||'IQD')+')';og.appendChild(o);});
-      sel.appendChild(og);
-    });
-    if(!allProcDefs.length){var o=document.createElement('option');o.value='Other';o.textContent='Other (no procedures defined yet)';sel.appendChild(o);}
-    sel.value='';
-  }
-  renderProcChart();openMdl('proc-modal');
-}
 async function openEditProc(id){
   var r=await db.from('procedures').select('*').eq('id',id).single();
   var pr=r.data;if(!pr)return;
@@ -1278,132 +1118,6 @@ async function openEditProc(id){
     var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
   }
   renderProcChart();openMdl('proc-modal');
-}
-async function saveProc(){
-  var rawVal=document.getElementById('proc-name').value;
-  if(!rawVal){showToast('Select a procedure','error');return;}
-  var name=rawVal;
-  var pid=document.getElementById('proc-pid').value;
-  var pname=document.getElementById('proc-pname').value;
-  if(!pid){showToast('No patient ID — please reopen from patient profile','error');return;}
-  var fee=parseFloat(document.getElementById('proc-fee').value)||0;
-  var feeCurrency=(document.getElementById('proc-fee').dataset.currency)||'IQD';
-  var labFeeBase=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
-  var labFeeCurrency=(document.getElementById('proc-lab-fee')||{dataset:{}}).dataset.currency||'IQD';
-  var fixtureFeeAmt=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
-  // convert lab fee to same currency as procedure fee if different
-  var labFeeConverted=labFeeBase;
-  if(labFeeCurrency!==feeCurrency){
-    if(labFeeCurrency==='USD'&&feeCurrency==='IQD')labFeeConverted=labFeeBase*IQD;
-    else if(labFeeCurrency==='IQD'&&feeCurrency==='USD')labFeeConverted=labFeeBase/IQD;
-  }
-  var fixtureFeeConverted=fixtureFeeAmt; // fixture always same currency as proc
-  var labFee=labFeeConverted+fixtureFeeConverted;
-  var netFee=fee-labFee;
-  var labId=(document.getElementById('proc-lab')||{}).value||null;
-  var labSvcId=(document.getElementById('proc-lab-svc')||{}).value||null;
-  var labName=labId?(procLabCache.find(function(l){return l.id===labId;})||{}).name||null:null;
-  var id=document.getElementById('proc-id').value;
-  var teeth=Object.keys(procSelTeeth).map(function(n){return parseInt(n);}).sort(function(a,b){return a-b;});
-  var payload={
-    patient_id:pid,patient_name:pname,procedure_name:name,
-    date:document.getElementById('proc-date').value||null,
-    treating_dentist:document.getElementById('proc-dr').value||null,
-    referrer:document.getElementById('proc-ref').value||null,
-    fee:fee,fee_currency:feeCurrency,lab_fee:labFee,net_fee:netFee,
-    lab_id:labId||null,lab_service_id:labSvcId||null,lab_name:labName||null,
-    status:document.getElementById('proc-status').value||'completed',
-    notes:document.getElementById('proc-notes').value.trim()||null,
-    teeth:teeth.length>0?teeth:null,
-    category:'general'
-  };
-  var r=id
-    ?await db.from('procedures').update(payload).eq('id',id)
-    :await db.from('procedures').insert([payload]).select().single();
-  if(r.error){
-    showToast('Failed: '+r.error.message,'error');
-    console.error('saveProc error:',r.error);
-    return;
-  }
-  if(!id){
-    var newP=r.data;
-    var apptId2=document.getElementById('proc-appt-id').value||null;
-    var tpMode=_tpMode;
-    var tpPlanSel=document.getElementById('tp-plan-select');
-    var tpPlanId=tpMode==='link'&&tpPlanSel?tpPlanSel.value:'';
-    if(tpMode==='link'&&tpPlanId){
-      // Link this procedure to existing invoice/plan
-      // Just update the invoice to add this appointment as a visit
-      await db.from('invoices').update({
-        visits_count: db.rpc ? undefined : undefined // just link appt
-      }).eq('id',tpPlanId);
-      // Link appointment to this invoice
-      if(apptId2){
-        await db.from('invoices').update({appointment_id:apptId2}).eq('id',tpPlanId);
-        // store invoice_id on this procedure for finance tracking
-        await db.from('procedures').update({invoice_id:tpPlanId}).eq('id',newP?newP.id:'').maybeSingle();
-      }
-      showToast('Visit added to existing treatment plan ✅');
-    } else {
-      // Create new invoice with total treatment cost
-      var tpCostEl=document.getElementById('tp-total-cost');
-      var invoiceFee=parseFloat(tpCostEl?tpCostEl.value:fee)||fee;
-      var invRes=await db.from('invoices').insert([{
-        patient_id:pid,patient_name:pname,
-        procedure_id:newP?newP.id:null,
-        procedure_name:name,
-        treating_dentist:payload.treating_dentist,
-        fee:invoiceFee,fee_currency:feeCurrency,lab_fee:labFee,net_fee:netFee,
-        lab_name:labName||null,
-        teeth:teeth.length>0?teeth:null,
-        date:payload.date,
-        status:'unpaid',
-        referrer:payload.referrer,
-        appointment_id:apptId2
-      }]);
-      if(invRes.error){
-        showToast('Procedure saved but invoice failed: '+invRes.error.message,'error');
-        console.error('invoice error:',invRes.error);
-      }
-    }
-    if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
-  }
-  // save any extra procedures added
-  if(!id&&procForms.length>0){
-    await saveExtraProcs(pid,pname,document.getElementById('proc-appt-id').value||null,payload.date,payload.treating_dentist);
-    if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
-  }
-  resetExtraProcs();
-  showToast(id?'Procedure updated':'Procedure saved & invoice created');
-  closeMdl('proc-modal');
-  // Create lab order if lab involved and this is a new procedure
-  if(!id&&labId){
-    var invIdForLab=null;
-    // Try to get the invoice we just created
-    try{
-      var latestInvR=await db.from('invoices').select('id').eq('patient_id',pid).order('created_at',{ascending:false}).limit(1).single();
-      if(latestInvR.data)invIdForLab=latestInvR.data.id;
-    }catch(e){}
-    await db.from('lab_orders').insert([{
-      lab_id:labId,
-      lab_name:labName||'Lab',
-      patient_id:pid,
-      patient_name:pname,
-      procedure_name:name,
-      invoice_id:invIdForLab,
-      appointment_id:document.getElementById('proc-appt-id').value||null,
-      dentist:payload.treating_dentist||null,
-      status:'pending',
-      date:payload.date||fd(new Date())
-    }]).then(function(r){if(r.error)console.warn('Lab order (table may not exist yet):',r.error.message);else showToast('Lab order created for '+labName);});
-  }
-  if(profState.pid&&(profState.tab==='clinical'||profState.tab==='timeline')){renderProf(profState.pid,profState.pname);}
-  // Show "book next visit" modal before patient status modal
-  if(pid&&pname&&!id){
-    openNextVisitModal(pid,pname,payload.treating_dentist||'',name);
-  } else if(pid&&pname){
-    openPtStatusModal(pid,pname);
-  }
 }
 async function deleteProc(){
   var id=document.getElementById('proc-id').value;
@@ -1749,25 +1463,6 @@ async function openNewAppt(){
 function openNewApptAt(room,time){openNewAppt().then(function(){document.getElementById('am-room').value=room;document.getElementById('am-start').value=time;var dur=parseInt((document.getElementById('am-dur')||{}).value||2);document.getElementById('am-end').value=m2t(t2m(time)+dur*15);});}
 function openApptForPt(pname){openNewAppt();document.getElementById('am-patient').value=pname;}
 function selAS(k){document.getElementById('am-status').value=k;buildSG('am-status-grid',k,'selAS');}
-async function saveAppt(){
-  var pt=document.getElementById('am-patient').value.trim(),dr=document.getElementById('am-dr').value;
-  var room=document.getElementById('am-room').value,date=document.getElementById('am-date').value;
-  var start=document.getElementById('am-start').value,end=document.getElementById('am-end').value;
-  if(!pt||!dr||!room||!date||!start||!end){showToast('Fill all required fields','error');return;}
-  if(t2m(end)<=t2m(start)){showToast('End must be after start','error');return;}
-  var id=document.getElementById('am-id').value;
-  var status=document.getElementById('am-status').value||'open';
-  var amTeeth=Object.keys(amSelTeeth).map(function(n){return parseInt(n);}).sort(function(a,b){return a-b;});
-  var payload={patient_name:pt,dentist:dr,room:room,date:date,start_time:start,end_time:end,
-    procedure_type:document.getElementById('am-proc').value||null,notes:document.getElementById('am-notes').value.trim()||null,status:status,
-    teeth:amTeeth.length>0?amTeeth:null};
-  if(status==='checkedin')payload.checkin_time=new Date().toISOString();
-  var r=id?await db.from('appointments').update(payload).eq('id',id):await db.from('appointments').insert([payload]);
-  if(r.error){showToast('Failed to save','error');console.error(r.error);return;}
-  showToast(id?'Appointment updated':'Appointment booked');closeMdl('am-modal');
-  var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
-  if(!ar.error)allAppts=ar.data||[];buildSched();
-}
 async function deleteAppt(){
   var id=document.getElementById('am-id').value;if(!id||!confirm('Cancel appointment?'))return;
   await db.from('appointments').delete().eq('id',id);showToast('Cancelled');closeMdl('am-modal');
@@ -2896,61 +2591,6 @@ async function renderProceduresAdmin(){
   }
 }
 
-function buildProcAdminUI(){
-  if(!allProcDefs.length){
-    document.getElementById('pg-content').innerHTML=
-      '<div style="text-align:center;padding:80px 20px;">'+
-      '<div style="font-size:48px;margin-bottom:16px;">&#10010;</div>'+
-      '<div style="font-size:14px;font-weight:700;color:var(--s600);margin-bottom:6px;">No procedures yet</div>'+
-      '<div style="font-size:12px;color:var(--s400);">Click &quot;+ Add procedure&quot; to build your list</div></div>';
-    return;
-  }
-  var cats={};
-  allProcDefs.forEach(function(p){var c=p.category||'Other';if(!cats[c])cats[c]=[];cats[c].push(p);});
-  var total=allProcDefs.length;
-  var labCnt=allProcDefs.filter(function(p){return p.lab_involved==='yes';}).length;
-  var fixCnt=allProcDefs.filter(function(p){return p.fixture_price>0;}).length;
-  var html=
-    '<div class="stats-row">'+
-    statC('var(--b50)','&#10010;','Total procedures',total)+
-    statC('var(--p50)','&#128300;','Lab involved',labCnt)+
-    statC('var(--a50)','&#129454;','With fixture price',fixCnt)+
-    statC('var(--g50)','&#128202;','Categories',Object.keys(cats).length)+
-    '</div>';
-  Object.keys(cats).sort().forEach(function(cat){
-    var procs=cats[cat];
-    html+='<div class="vdc-card" style="margin-bottom:14px;">'+
-      '<div class="vdc-card-hdr">'+
-      '<div style="display:flex;align-items:center;gap:8px;">'+
-      '<div class="vdc-card-title">'+cat+'</div>'+
-      '<span style="font-size:10px;color:var(--s400);">('+procs.length+')</span>'+
-      '</div></div>'+
-      '<div class="vdc-card-body" style="padding:0;">'+
-      '<table class="tbl"><thead><tr>'+
-      '<th>Name</th><th>Default price</th><th>Lab</th><th>Fixture fee</th><th>Override</th><th>Notes</th><th></th>'+
-      '</tr></thead><tbody>'+
-      procs.map(function(p){
-        var price=fmtAmt(p.price,p.currency||'IQD');
-        var priceUSD='';
-        return '<tr>'+
-          '<td style="font-weight:700;color:var(--s800);">'+p.name+'</td>'+
-          '<td><div style="font-weight:700;color:var(--b700);">'+price+'</div>'+
-
-          '</td>'+
-          '<td>'+(p.lab_involved==='yes'?'<span class="badge bp">&#128300; Yes</span>':'<span style="color:var(--s400);font-size:11px;">No</span>')+'</td>'+
-          '<td>'+(p.fixture_price>0?'<span style="font-weight:600;color:var(--a700);">'+fu(p.fixture_price)+'</span>':'<span style="color:var(--s400);">—</span>')+'</td>'+
-          '<td>'+(p.price_override==='no'?'<span class="badge br">Locked</span>':'<span class="badge bg">Editable</span>')+'</td>'+
-          '<td style="font-size:10px;color:var(--s400);font-style:italic;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(p.notes||'—')+'</td>'+
-          '<td><button class="btn btnxs" data-padm-id="'+p.id+'">Edit</button></td>'+
-          '</tr>';
-      }).join('')+'</tbody></table></div></div>';
-  });
-  document.getElementById('pg-content').innerHTML=html;
-  document.getElementById('pg-content').addEventListener('click',function(e){
-    var btn=e.target.closest('[data-padm-id]');
-    if(btn)openEditProcAdmin(btn.dataset.padmId);
-  });
-}
 
 function toggleFixturePrice(){
   var yn=document.getElementById('padm-implant-yn');
@@ -3164,69 +2804,6 @@ function clickDollar(e){
 }
 
 // Open procedure recording pre-filled from appointment
-async function openAddProcFromAppt(appt){
-  procSelTeeth = {}; procIsPrim = false;
-  document.getElementById('proc-mtit').textContent = 'Record procedure';
-  document.getElementById('proc-msub').textContent = 'Patient: ' + (appt.patient_name||'');
-  document.getElementById('proc-id').value = '';
-  document.getElementById('proc-pname').value = appt.patient_name || '';
-  // look up patient_id from name since appointments only store patient_name
-  var pid = appt.patient_id || '';
-  if(!pid && appt.patient_name){
-    var ptLookup = await db.from('patients').select('id').ilike('name', appt.patient_name).single();
-    if(ptLookup.data) pid = ptLookup.data.id;
-  }
-  document.getElementById('proc-pid').value = pid;
-  // store appt id so invoice links to it
-  document.getElementById('proc-appt-id').value = appt.id;
-  ['proc-dr','proc-notes','proc-fee'].forEach(function(i){
-    var el=document.getElementById(i);if(el)el.value='';
-  });
-  document.getElementById('proc-ref').value = '';
-  document.getElementById('proc-status').value = 'completed';
-  document.getElementById('proc-date').value = appt.date || fd(new Date());
-  // pre-fill dentist from appointment
-  if(appt.dentist){var dr=document.getElementById('proc-dr');if(dr)dr.value=appt.dentist;}
-  // pre-fill teeth from appointment if available
-  if(appt.teeth&&Array.isArray(appt.teeth)&&appt.teeth.length>0){
-    appt.teeth.forEach(function(t){procSelTeeth[t]=true;});
-  }
-  document.getElementById('proc-del-btn').style.display = 'none';
-  // reset lab/fixture
-  var labSec=document.getElementById('proc-lab-section');if(labSec)labSec.style.display='none';
-  var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
-  var plf=document.getElementById('proc-lab-fee');if(plf)plf.value='';
-  var pff=document.getElementById('proc-fixture-fee');if(pff)pff.value='';
-  var pfw=document.getElementById('proc-fixture-wrap');if(pfw)pfw.style.display='none';
-  var pdh=document.getElementById('proc-def-hint');if(pdh)pdh.style.display='none';
-  var pfee=document.getElementById('proc-fee');if(pfee){pfee.readOnly=false;pfee.style.background='';}
-  await loadProcDefs();
-  await loadLabsForProc();
-  // populate procedure select, pre-select from appointment if available
-  var sel=document.getElementById('proc-name');
-  if(sel){
-    var cats={};
-    allProcDefs.forEach(function(p){if(!cats[p.category||'Other'])cats[p.category||'Other']=[];cats[p.category||'Other'].push(p);});
-    sel.innerHTML='<option value="">Select procedure...</option>';
-    Object.keys(cats).sort().forEach(function(cat){
-      var og=document.createElement('optgroup');og.label=cat;
-      cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+fmtAmt(p.price,p.currency||'IQD')+')';og.appendChild(o);});
-      sel.appendChild(og);
-    });
-    // pre-select procedure type from appointment
-    if(appt.procedure_type && sel.querySelector('option[value="'+appt.procedure_type+'"]')){
-      sel.value=appt.procedure_type;
-      onProcNameChange(appt.procedure_type);
-      onProcDefSelect(appt.procedure_type);
-    }
-  }
-  renderProcChart();
-  // load treatment plans for this patient
-  var pid2=document.getElementById('proc-pid').value;
-  resetTPSection(0,'IQD');
-  if(pid2)loadPatientPlans(pid2);
-  openMdl('proc-modal');
-}
 
 // Open payment modal directly from $ icon
 async function openPayModalFromAppt(invId, invSummary){
@@ -3635,32 +3212,6 @@ async function markLabReceivedFromList(orderId, labId, labName){
 }
 
 // ══════════ PRIORITY 6: Balance warning when booking appointment ══
-async function checkPatientBalance(patientName){
-  if(!patientName||patientName.length<2)return;
-  var warn=document.getElementById('am-balance-warn');
-  if(!warn)return;
-  // find patient
-  var ptR=await db.from('patients').select('id').ilike('name',patientName).limit(1);
-  if(!ptR.data||!ptR.data.length){warn.style.display='none';return;}
-  var pid=ptR.data[0].id;
-  // check outstanding invoices
-  var invR=await db.from('invoices').select('id,fee,fee_currency,status').eq('patient_id',pid).neq('status','paid');
-  var unpaidInvs=invR.data||[];
-  if(!unpaidInvs.length){warn.style.display='none';return;}
-  // calculate total outstanding
-  var payR=await db.from('payments').select('invoice_id,amount').in('invoice_id',unpaidInvs.map(function(i){return i.id;}));
-  var pays=payR.data||[];
-  var totalDue=unpaidInvs.reduce(function(s,inv){
-    var paid=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
-    return s+Math.max(0,toIQD(Number(inv.fee||0),inv.fee_currency)-paid);
-  },0);
-  if(totalDue>0){
-    warn.style.display='block';
-    warn.innerHTML='&#9888; This patient has <strong>'+fu(Math.round(totalDue))+' outstanding</strong> from '+unpaidInvs.length+' unpaid invoice'+(unpaidInvs.length>1?'s':'')+'. You can still book the appointment.';
-  } else {
-    warn.style.display='none';
-  }
-}
 function saveIQDRate(){
   var el=document.getElementById('settings-iqd-rate');
   if(!el)return;
@@ -3920,90 +3471,869 @@ async function delLabFromDetail(labId,labName){
 }
 
 
-// ══════════════ TREATMENT PLAN SYSTEM ════════════════════════════
-var _tpMode = 'new'; // 'new' or 'link'
+// ══════════════ SESSIONS SYSTEM ══════════════════════════════════
+var allProcSessions = {}; // procDefId -> [{id, name, display_order}]
+var currentCaseData = null; // holds case data when continuing an existing case
 
-function setTPMode(mode){
-  _tpMode = mode;
-  var newFields = document.getElementById('tp-new-fields');
-  var linkFields = document.getElementById('tp-link-fields');
-  var newBtn = document.getElementById('tp-new-btn');
-  var linkBtn = document.getElementById('tp-link-btn');
-  if(mode === 'new'){
-    newFields.style.display = 'block';
-    linkFields.style.display = 'none';
-    newBtn.className = 'btn btnsm btnp';
-    linkBtn.className = 'btn btnsm';
-  } else {
-    newFields.style.display = 'none';
-    linkFields.style.display = 'block';
-    newBtn.className = 'btn btnsm';
-    linkBtn.className = 'btn btnsm btnp';
-  }
+// Load sessions for a procedure definition
+async function loadSessionsForProc(procDefId){
+  if(!procDefId) return [];
+  if(allProcSessions[procDefId]) return allProcSessions[procDefId];
+  var r = await db.from('procedure_sessions').select('*').eq('procedure_definition_id', procDefId).order('display_order').order('created_at');
+  if(r.error){ console.warn('Sessions table may not exist:', r.error.message); return []; }
+  allProcSessions[procDefId] = r.data || [];
+  return allProcSessions[procDefId];
 }
 
-function syncTreatmentCost(){
-  // default total treatment cost to procedure fee
-  if(_tpMode !== 'new') return;
-  var fee = parseFloat(document.getElementById('proc-fee').value) || 0;
-  var costEl = document.getElementById('tp-total-cost');
-  if(costEl && (!costEl.value || costEl.dataset.autoSync !== 'false')) {
-    costEl.value = fee || '';
+// Called when procedure name changes — load sessions into selector
+async function onProcNameForSessions(procName){
+  if(!procName){ hideProcSessionWrap(); return; }
+  var def = allProcDefs.find(function(d){ return d.name === procName; });
+  if(!def){ hideProcSessionWrap(); return; }
+  var sessions = await loadSessionsForProc(def.id);
+  var wrap = document.getElementById('proc-session-wrap');
+  var sel = document.getElementById('proc-session-select');
+  if(!sessions.length){ hideProcSessionWrap(); return; }
+  if(wrap) wrap.style.display = 'block';
+  sel.innerHTML = '<option value="">Select session...</option>' +
+    sessions.map(function(s){ return '<option value="'+s.id+'" data-name="'+s.name.replace(/"/g,'&quot;')+'">'+s.name+'</option>'; }).join('');
+  // If coming from appointment with pre-filled session
+  var preSession = document.getElementById('proc-appt-id') ? (window._prefilledSession||'') : '';
+  if(preSession){
+    sel.value = preSession;
+    window._prefilledSession = '';
   }
 }
+function hideProcSessionWrap(){
+  var w = document.getElementById('proc-session-wrap'); if(w) w.style.display='none';
+  var s = document.getElementById('proc-session-select'); if(s) s.innerHTML='<option value="">Select session...</option>';
+}
 
-async function loadPatientPlans(pid){
-  // load existing treatment plans (open invoices) for this patient
-  var sel = document.getElementById('tp-plan-select');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">Loading...</option>';
-  var r = await db.from('invoices').select('*').eq('patient_id', pid).neq('status','paid').order('created_at', {ascending:false});
-  var invs = r.data || [];
-  if(!invs.length){
-    sel.innerHTML = '<option value="">No open treatment plans — create a new one</option>';
-    setTPMode('new');
-    document.getElementById('tp-link-btn').disabled = true;
-    document.getElementById('tp-link-btn').style.opacity = '0.4';
-    return;
+// Show case summary in proc modal when continuing
+async function showCaseSummaryInModal(caseId, pid){
+  if(!caseId){ hideCaseSummary(); return; }
+  var cR = await db.from('cases').select('*').eq('id', caseId).single();
+  if(cR.error || !cR.data){ hideCaseSummary(); return; }
+  var c = cR.data;
+  currentCaseData = c;
+  // Load visits for this case
+  var vR = await db.from('case_visits').select('*').eq('case_id', caseId).order('date').order('created_at');
+  var visits = vR.data || [];
+  // Load payment info from invoice
+  var paid = 0;
+  if(c.invoice_id){
+    var pR = await db.from('payments').select('amount').eq('invoice_id', c.invoice_id);
+    paid = (pR.data||[]).reduce(function(s,p){ return s+Number(p.amount||0); }, 0);
   }
-  document.getElementById('tp-link-btn').disabled = false;
-  document.getElementById('tp-link-btn').style.opacity = '1';
-  sel.innerHTML = '<option value="">Select plan...</option>' +
-    invs.map(function(inv){
-      var pays = 0; // we don't have pays here, show fee
-      return '<option value="'+inv.id+'" data-fee="'+inv.fee+'" data-currency="'+(inv.fee_currency||'IQD')+'" data-name="'+(inv.procedure_name||'')+'">'+
-        (inv.procedure_name||'—')+' · '+(inv.date||'')+ ' · '+fmtAmt(inv.fee, inv.fee_currency||'IQD')+
-        (inv.status==='partial'?' [Partial]':' [Unpaid]')+'</option>';
+  var agreed = Number(c.agreed_fee||0);
+  var bal = Math.max(0, agreed - paid);
+  var pct = agreed > 0 ? Math.round(Math.min(100, paid/agreed*100)) : 0;
+  // Render summary
+  var sumEl = document.getElementById('proc-case-summary');
+  if(sumEl){ sumEl.style.display='block'; }
+  var nameEl = document.getElementById('pcs-name');
+  if(nameEl) nameEl.textContent = c.procedure_name || 'Case';
+  var badgeEl = document.getElementById('pcs-status-badge');
+  if(badgeEl) badgeEl.innerHTML = '<span class="badge '+(c.status==='completed'?'bg':c.status==='active'?'bb':'bs')+'">'+( c.status||'active')+'</span>';
+  var statsEl = document.getElementById('pcs-stats');
+  if(statsEl) statsEl.innerHTML =
+    '<div style="background:white;border-radius:6px;padding:6px 8px;"><div style="font-size:9px;color:var(--s400);">Agreed</div><div style="font-size:13px;font-weight:700;color:var(--b700);">'+fu(agreed)+'</div></div>'+
+    '<div style="background:white;border-radius:6px;padding:6px 8px;"><div style="font-size:9px;color:var(--s400);">Paid</div><div style="font-size:13px;font-weight:700;color:var(--g700);">'+fu(paid)+'</div></div>'+
+    '<div style="background:white;border-radius:6px;padding:6px 8px;"><div style="font-size:9px;color:var(--s400);">Remaining</div><div style="font-size:13px;font-weight:700;color:'+(bal>0?'var(--r600)':'var(--g700)')+';">'+fu(bal)+'</div></div>';
+  var barEl = document.getElementById('pcs-bar');
+  if(barEl){ barEl.style.width = pct+'%'; barEl.style.background = pct>=100?'var(--g600)':'var(--b600)'; }
+  var visEl = document.getElementById('pcs-visits');
+  if(visEl) visEl.innerHTML = visits.length ?
+    '<strong>'+visits.length+' session'+(visits.length!==1?'s':'')+' recorded:</strong> '+
+    visits.map(function(v){ return '<span style="background:var(--s100);border-radius:4px;padding:1px 6px;margin-right:3px;font-size:10px;">'+v.session_name+(v.date?' ('+v.date+')':'')+'</span>'; }).join('') :
+    'No sessions recorded yet — this will be the first.';
+  // Hide fee wrap (fee is already set) and show follow-up mode
+  var feeWrap = document.getElementById('proc-fee-wrap');
+  if(feeWrap) feeWrap.style.display = 'none';
+  var addWrap = document.getElementById('proc-add-another-wrap');
+  if(addWrap) addWrap.style.display = 'none';
+  var newCard = document.getElementById('proc-new-case-card');
+  if(newCard) newCard.style.display = 'none';
+}
+function hideCaseSummary(){
+  currentCaseData = null;
+  var sumEl = document.getElementById('proc-case-summary'); if(sumEl) sumEl.style.display='none';
+  var feeWrap = document.getElementById('proc-fee-wrap'); if(feeWrap) feeWrap.style.display='block';
+  var addWrap = document.getElementById('proc-add-another-wrap'); if(addWrap) addWrap.style.display='block';
+}
+function showNewCaseBanner(){
+  var newCard = document.getElementById('proc-new-case-card'); if(newCard) newCard.style.display='block';
+  var sumEl = document.getElementById('proc-case-summary'); if(sumEl) sumEl.style.display='none';
+  var feeWrap = document.getElementById('proc-fee-wrap'); if(feeWrap) feeWrap.style.display='block';
+}
+
+// ══════════════ APPOINTMENT — OPEN CASE DETECTION ════════════════
+var _amOpenCases = []; // open cases found for current patient in booking modal
+
+async function checkOpenCasesForPatient(patientName){
+  var panel = document.getElementById('am-case-panel');
+  var sel = document.getElementById('am-session-select');
+  var caseIdEl = document.getElementById('am-case-id');
+  if(panel){ panel.style.display='none'; }
+  if(caseIdEl) caseIdEl.value='';
+  _amOpenCases = [];
+  if(!patientName || patientName.length < 2) return;
+  // Find patient
+  var ptR = await db.from('patients').select('id').ilike('name', patientName).limit(1);
+  if(!ptR.data||!ptR.data.length) return;
+  var pid = ptR.data[0].id;
+  // Find active cases
+  var cR = await db.from('cases').select('*').eq('patient_id', pid).eq('status','active').order('created_at',{ascending:false});
+  _amOpenCases = cR.data || [];
+  if(!_amOpenCases.length) return;
+  // Build panel
+  var infoEl = document.getElementById('am-case-info');
+  if(infoEl){
+    infoEl.innerHTML = _amOpenCases.map(function(c){
+      return '<div style="font-weight:600;">&#127973; '+c.procedure_name+' — '+fu(Number(c.agreed_fee||0))+' agreed</div>';
     }).join('');
+  }
+  // Populate session dropdown from all cases' procedure sessions
+  sel.innerHTML = '<option value="">— No specific session (general visit) —</option>';
+  // Add case separator options
+  for(var i=0;i<_amOpenCases.length;i++){
+    var c = _amOpenCases[i];
+    var def = allProcDefs.find(function(d){ return d.name===c.procedure_name; });
+    sel.innerHTML += '<optgroup label="'+c.procedure_name+'">';
+    var sessions = def ? (allProcSessions[def.id]||[]) : [];
+    if(!sessions.length){
+      // Try to load if not cached
+      if(def){
+        var sr = await db.from('procedure_sessions').select('*').eq('procedure_definition_id', def.id).order('display_order');
+        sessions = sr.data||[];
+        allProcSessions[def.id] = sessions;
+      }
+    }
+    if(sessions.length){
+      sessions.forEach(function(s){
+        sel.innerHTML += '<option value="'+s.id+'" data-case-id="'+c.id+'" data-session-name="'+s.name.replace(/"/g,'&quot;')+'">'+s.name+'</option>';
+      });
+    } else {
+      sel.innerHTML += '<option value="" data-case-id="'+c.id+'">General follow-up visit</option>';
+    }
+    sel.innerHTML += '</optgroup>';
+  }
   sel.onchange = function(){
     var opt = sel.options[sel.selectedIndex];
-    var info = document.getElementById('tp-plan-info');
-    if(opt && opt.value && info){
-      info.textContent = 'Invoice: '+fmtAmt(opt.dataset.fee, opt.dataset.currency)+' · will add this visit to existing plan';
-    } else if(info){
-      info.textContent = '';
-    }
+    if(caseIdEl) caseIdEl.value = (opt&&opt.dataset.caseId) ? opt.dataset.caseId : '';
   };
+  if(panel) panel.style.display = 'block';
 }
 
-function resetTPSection(fee, currency){
-  _tpMode = 'new';
-  setTPMode('new');
-  var costEl = document.getElementById('tp-total-cost');
-  if(costEl){ costEl.value = fee || ''; costEl.dataset.autoSync = 'true'; }
-  var lbl = document.getElementById('tp-cost-currency-lbl');
-  if(lbl) lbl.textContent = '('+(currency||'IQD')+')';
-  var sel = document.getElementById('tp-plan-select');
-  if(sel) sel.innerHTML = '<option value="">Select plan...</option>';
-  var info = document.getElementById('tp-plan-info');
-  if(info) info.textContent = '';
-  document.getElementById('tp-link-btn').disabled = false;
-  document.getElementById('tp-link-btn').style.opacity = '1';
+// Override checkPatientBalance to also check open cases
+var _origCheckBalance = window.checkPatientBalance;
+async function checkPatientBalance(patientName){
+  // run balance check
+  var warn=document.getElementById('am-balance-warn');
+  if(warn) warn.style.display='none';
+  if(!patientName||patientName.length<2){ await checkOpenCasesForPatient(patientName); return; }
+  var ptR=await db.from('patients').select('id').ilike('name',patientName).limit(1);
+  if(!ptR.data||!ptR.data.length){ await checkOpenCasesForPatient(patientName); return; }
+  var pid=ptR.data[0].id;
+  var invR=await db.from('invoices').select('id,fee,fee_currency,status').eq('patient_id',pid).neq('status','paid');
+  var unpaidInvs=invR.data||[];
+  if(unpaidInvs.length){
+    var payR=await db.from('payments').select('invoice_id,amount').in('invoice_id',unpaidInvs.map(function(i){return i.id;}));
+    var pays=payR.data||[];
+    var totalDue=unpaidInvs.reduce(function(s,inv){
+      var paid=pays.filter(function(p){return p.invoice_id===inv.id;}).reduce(function(t,p){return t+Number(p.amount||0);},0);
+      return s+Math.max(0,toIQD(Number(inv.fee||0),inv.fee_currency)-paid);
+    },0);
+    if(totalDue>0&&warn){
+      warn.style.display='block';
+      warn.innerHTML='&#9888; This patient has <strong>'+fu(Math.round(totalDue))+' outstanding</strong> from '+unpaidInvs.length+' invoice'+(unpaidInvs.length>1?'s':'')+'. You can still book.';
+    }
+  }
+  await checkOpenCasesForPatient(patientName);
 }
 
+// ══════════════ SAVE APPOINTMENT — persist case_id + session_name ═
+// Override saveAppt to include case_id and session_name
+var _origSaveAppt = window.saveAppt;
+async function saveAppt(){
+  var pt=document.getElementById('am-patient').value.trim(),dr=document.getElementById('am-dr').value;
+  var room=document.getElementById('am-room').value,date=document.getElementById('am-date').value;
+  var start=document.getElementById('am-start').value,end=document.getElementById('am-end').value;
+  if(!pt||!dr||!room||!date||!start||!end){showToast('Fill all required fields','error');return;}
+  if(t2m(end)<=t2m(start)){showToast('End must be after start','error');return;}
+  var id=document.getElementById('am-id').value;
+  var status=document.getElementById('am-status').value||'open';
+  var amTeeth=Object.keys(amSelTeeth).map(function(n){return parseInt(n);}).sort(function(a,b){return a-b;});
+  // Get case/session info from panel
+  var caseIdEl=document.getElementById('am-case-id');
+  var sessSel=document.getElementById('am-session-select');
+  var caseId=caseIdEl?caseIdEl.value||null:null;
+  var sessOpt=sessSel?sessSel.options[sessSel.selectedIndex]:null;
+  var sessionName=sessOpt&&sessOpt.dataset.sessionName?sessOpt.dataset.sessionName:null;
+  var sessionId=sessSel&&sessSel.value?sessSel.value:null;
+  var payload={patient_name:pt,dentist:dr,room:room,date:date,start_time:start,end_time:end,
+    procedure_type:document.getElementById('am-proc').value||null,
+    notes:document.getElementById('am-notes').value.trim()||null,
+    status:status,teeth:amTeeth.length>0?amTeeth:null,
+    case_id:caseId||null,session_name:sessionName||null};
+  if(status==='checkedin')payload.checkin_time=new Date().toISOString();
+  var r=id?await db.from('appointments').update(payload).eq('id',id):await db.from('appointments').insert([payload]);
+  if(r.error){showToast('Failed to save','error');console.error(r.error);return;}
+  showToast(id?'Appointment updated':'Appointment booked');closeMdl('am-modal');
+  var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
+  if(!ar.error)allAppts=ar.data||[];buildSched();
+}
+
+// ══════════════ PROC MODAL OPEN — NEW VS CONTINUING CASE ═════════
+async function openAddProc(pid){
+  currentCaseData=null;
+  procSelTeeth={};procIsPrim=false;
+  document.getElementById('proc-mtit').textContent='Record procedure';
+  document.getElementById('proc-msub').textContent='Patient: '+profState.pname;
+  document.getElementById('proc-id').value='';
+  document.getElementById('proc-pid').value=pid||profState.pid;
+  document.getElementById('proc-pname').value=profState.pname;
+  document.getElementById('proc-case-id').value='';
+  ['proc-name','proc-dr','proc-notes','proc-fee'].forEach(function(i){
+    var el=document.getElementById(i); if(el)el.value='';
+  });
+  document.getElementById('proc-ref').value='';
+  document.getElementById('proc-status').value='completed';
+  document.getElementById('proc-date').value=fd(new Date());
+  document.getElementById('proc-del-btn').style.display='none';
+  var apptIdEl=document.getElementById('proc-appt-id'); if(apptIdEl)apptIdEl.value='';
+  resetExtraProcs();
+  hideCaseSummary(); hideProcSessionWrap();
+  showNewCaseBanner();
+  var labSec=document.getElementById('proc-lab-section'); if(labSec)labSec.style.display='none';
+  var pnd=document.getElementById('proc-net-disp'); if(pnd)pnd.style.display='none';
+  var plf=document.getElementById('proc-lab-fee'); if(plf)plf.value='';
+  var pff=document.getElementById('proc-fixture-fee'); if(pff)pff.value='';
+  var pfw=document.getElementById('proc-fixture-wrap'); if(pfw)pfw.style.display='none';
+  var pdh=document.getElementById('proc-def-hint'); if(pdh)pdh.style.display='none';
+  var pfee=document.getElementById('proc-fee'); if(pfee){pfee.readOnly=false;pfee.style.background='';}
+  await loadProcDefs();
+  await loadLabsForProc();
+  var _pid=document.getElementById('proc-pid').value;
+  // populate procedure select
+  var sel=document.getElementById('proc-name');
+  if(sel){
+    var cats={};
+    allProcDefs.forEach(function(p){if(!cats[p.category||'Other'])cats[p.category||'Other']=[];cats[p.category||'Other'].push(p);});
+    sel.innerHTML='<option value="">Select procedure...</option>';
+    Object.keys(cats).sort().forEach(function(cat){
+      var og=document.createElement('optgroup');og.label=cat;
+      cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+fmtAmt(p.price,p.currency||'IQD')+')';og.appendChild(o);});
+      sel.appendChild(og);
+    });
+    if(!allProcDefs.length){var o=document.createElement('option');o.value='Other';o.textContent='Other (no procedures defined yet)';sel.appendChild(o);}
+    sel.value='';
+  }
+  renderProcChart();openMdl('proc-modal');
+}
+
+async function openAddProcFromAppt(appt){
+  currentCaseData=null;
+  procSelTeeth={}; procIsPrim=false;
+  document.getElementById('proc-mtit').textContent='Record procedure';
+  document.getElementById('proc-msub').textContent='Patient: '+(appt.patient_name||'');
+  document.getElementById('proc-id').value='';
+  document.getElementById('proc-pname').value=appt.patient_name||'';
+  var pid=appt.patient_id||'';
+  if(!pid&&appt.patient_name){
+    var ptLookup=await db.from('patients').select('id').ilike('name',appt.patient_name).single();
+    if(ptLookup.data)pid=ptLookup.data.id;
+  }
+  document.getElementById('proc-pid').value=pid;
+  document.getElementById('proc-appt-id').value=appt.id;
+  document.getElementById('proc-case-id').value=appt.case_id||'';
+  ['proc-dr','proc-notes','proc-fee'].forEach(function(i){
+    var el=document.getElementById(i);if(el)el.value='';
+  });
+  document.getElementById('proc-ref').value='';
+  document.getElementById('proc-status').value='completed';
+  document.getElementById('proc-date').value=appt.date||fd(new Date());
+  if(appt.dentist){var dr=document.getElementById('proc-dr');if(dr)dr.value=appt.dentist;}
+  if(appt.teeth&&Array.isArray(appt.teeth)&&appt.teeth.length>0){
+    appt.teeth.forEach(function(t){procSelTeeth[t]=true;});
+  }
+  document.getElementById('proc-del-btn').style.display='none';
+  var labSec=document.getElementById('proc-lab-section');if(labSec)labSec.style.display='none';
+  var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
+  var plf=document.getElementById('proc-lab-fee');if(plf)plf.value='';
+  var pff=document.getElementById('proc-fixture-fee');if(pff)pff.value='';
+  var pfw=document.getElementById('proc-fixture-wrap');if(pfw)pfw.style.display='none';
+  var pdh=document.getElementById('proc-def-hint');if(pdh)pdh.style.display='none';
+  var pfee=document.getElementById('proc-fee');if(pfee){pfee.readOnly=false;pfee.style.background='';}
+  resetExtraProcs();
+  await loadProcDefs();
+  await loadLabsForProc();
+  // populate procedure select
+  var sel=document.getElementById('proc-name');
+  if(sel){
+    var cats={};
+    allProcDefs.forEach(function(p){if(!cats[p.category||'Other'])cats[p.category||'Other']=[];cats[p.category||'Other'].push(p);});
+    sel.innerHTML='<option value="">Select procedure...</option>';
+    Object.keys(cats).sort().forEach(function(cat){
+      var og=document.createElement('optgroup');og.label=cat;
+      cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+' ('+fmtAmt(p.price,p.currency||'IQD')+')';og.appendChild(o);});
+      sel.appendChild(og);
+    });
+    if(appt.procedure_type&&sel.querySelector('option[value="'+appt.procedure_type+'"]')){
+      sel.value=appt.procedure_type;
+      onProcNameChange(appt.procedure_type);
+      onProcDefSelect(appt.procedure_type);
+      await onProcNameForSessions(appt.procedure_type);
+    }
+  }
+  // Pre-fill session from appointment if available
+  if(appt.session_name){
+    var sessSel=document.getElementById('proc-session-select');
+    if(sessSel){
+      var opt=Array.from(sessSel.options).find(function(o){return o.dataset.name===appt.session_name;});
+      if(opt) sessSel.value=opt.value;
+    }
+  }
+  // If appointment has a case_id — show case summary (continuing)
+  if(appt.case_id){
+    await showCaseSummaryInModal(appt.case_id, pid);
+    var newCard=document.getElementById('proc-new-case-card');if(newCard)newCard.style.display='none';
+  } else {
+    hideCaseSummary();
+    showNewCaseBanner();
+  }
+  renderProcChart();
+  openMdl('proc-modal');
+}
+
+// ══════════════ SAVE PROCEDURE — SESSIONS-BASED ═══════════════════
+async function saveProc(){
+  var rawVal=document.getElementById('proc-name').value;
+  if(!rawVal){showToast('Select a procedure','error');return;}
+  var name=rawVal;
+  var pid=document.getElementById('proc-pid').value;
+  var pname=document.getElementById('proc-pname').value;
+  if(!pid){showToast('No patient ID — please reopen from patient profile','error');return;}
+  var existingCaseId=document.getElementById('proc-case-id').value||'';
+  var isContinuing=!!existingCaseId;
+  var id=document.getElementById('proc-id').value; // editing existing record
+  // Session info
+  var sessSel=document.getElementById('proc-session-select');
+  var sessOpt=sessSel?sessSel.options[sessSel.selectedIndex]:null;
+  var sessionName='';
+  var sessionId='';
+  if(sessSel&&sessSel.value){
+    sessionId=sessSel.value;
+    sessionName=sessOpt&&sessOpt.dataset.name?sessOpt.dataset.name:sessSel.options[sessSel.selectedIndex].textContent;
+  }
+  // Fee / lab
+  var isContinuingCase=isContinuing&&!id;
+  var fee=parseFloat(document.getElementById('proc-fee').value)||0;
+  var feeCurrency=(document.getElementById('proc-fee').dataset.currency)||'IQD';
+  var labFeeBase=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
+  var labFeeCurrency=(document.getElementById('proc-lab-fee')||{dataset:{}}).dataset.currency||'IQD';
+  var fixtureFeeAmt=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
+  var labFeeConverted=labFeeBase;
+  if(labFeeCurrency!==feeCurrency){
+    if(labFeeCurrency==='USD'&&feeCurrency==='IQD')labFeeConverted=labFeeBase*IQD;
+    else if(labFeeCurrency==='IQD'&&feeCurrency==='USD')labFeeConverted=labFeeBase/IQD;
+  }
+  var labFee=labFeeConverted+fixtureFeeAmt;
+  var labId=(document.getElementById('proc-lab')||{}).value||null;
+  var labSvcId=(document.getElementById('proc-lab-svc')||{}).value||null;
+  var labName=labId?(procLabCache.find(function(l){return l.id===labId;})||{}).name||null:null;
+  var teeth=Object.keys(procSelTeeth).map(function(n){return parseInt(n);}).sort(function(a,b){return a-b;});
+  var apptId=document.getElementById('proc-appt-id').value||null;
+  var notes=document.getElementById('proc-notes').value.trim()||null;
+  var dentist=document.getElementById('proc-dr').value||null;
+  var referrer=document.getElementById('proc-ref').value||null;
+  var status=document.getElementById('proc-status').value||'completed';
+  var date=document.getElementById('proc-date').value||null;
+
+  if(isContinuingCase){
+    // ── CONTINUING EXISTING CASE ──────────────────────────────────
+    if(!sessionName){showToast('Please select a session for this visit','error');return;}
+    // Update invoice lab_fee if lab involved in this visit
+    if(labId&&currentCaseData&&currentCaseData.invoice_id){
+      var invR=await db.from('invoices').select('lab_fee,fee,fee_currency').eq('id',currentCaseData.invoice_id).single();
+      if(!invR.error&&invR.data){
+        var newLabFee=Number(invR.data.lab_fee||0)+labFee;
+        var newNet=Number(invR.data.fee||0)-newLabFee;
+        await db.from('invoices').update({lab_fee:newLabFee,net_fee:newNet}).eq('id',currentCaseData.invoice_id);
+      }
+    }
+    // Create case_visit record
+    var visitPayload={
+      case_id:existingCaseId,
+      appointment_id:apptId||null,
+      session_name:sessionName,
+      date:date,
+      dentist:dentist,
+      notes:notes,
+      lab_id:labId||null,
+      lab_name:labName||null,
+      lab_service_id:labSvcId||null,
+      lab_fee:labFee||0,
+      lab_fee_currency:feeCurrency,
+      lab_status:labId?'pending':'none'
+    };
+    var vR=await db.from('case_visits').insert([visitPayload]);
+    if(vR.error){showToast('Failed to save visit: '+vR.error.message,'error');return;}
+    // Also record in procedures table for clinical history
+    var procPayload={
+      patient_id:pid,patient_name:pname,procedure_name:name,
+      date:date,treating_dentist:dentist,referrer:referrer,
+      fee:currentCaseData?currentCaseData.agreed_fee:0,
+      fee_currency:currentCaseData?currentCaseData.fee_currency:feeCurrency,
+      lab_fee:labFee,net_fee:(currentCaseData?Number(currentCaseData.agreed_fee):0)-labFee,
+      lab_id:labId||null,lab_service_id:labSvcId||null,lab_name:labName||null,
+      status:status,notes:notes,teeth:teeth.length>0?teeth:null,category:'general',
+      invoice_id:currentCaseData?currentCaseData.invoice_id:null
+    };
+    await db.from('procedures').insert([procPayload]);
+    // Create lab order if lab involved
+    if(labId){
+      await db.from('lab_orders').insert([{
+        lab_id:labId,lab_name:labName||'Lab',patient_id:pid,patient_name:pname,
+        procedure_name:name+'  — '+sessionName,
+        invoice_id:currentCaseData?currentCaseData.invoice_id:null,
+        appointment_id:apptId||null,dentist:dentist||null,status:'pending',date:date||fd(new Date())
+      }]).then(function(r){if(r.error)console.warn('Lab order warn:',r.error.message);});
+    }
+    // Link appointment to case
+    if(apptId) await db.from('appointments').update({case_id:existingCaseId,session_name:sessionName}).eq('id',apptId);
+    showToast('Session recorded ✅');
+    if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
+  } else {
+    // ── NEW CASE ──────────────────────────────────────────────────
+    if(!fee){showToast('Enter the agreed fee for this case','error');return;}
+    // Insert procedure record
+    var newProcPayload={
+      patient_id:pid,patient_name:pname,procedure_name:name,
+      date:date,treating_dentist:dentist,referrer:referrer,
+      fee:fee,fee_currency:feeCurrency,lab_fee:labFee,net_fee:fee-labFee,
+      lab_id:labId||null,lab_service_id:labSvcId||null,lab_name:labName||null,
+      status:status,notes:notes,teeth:teeth.length>0?teeth:null,category:'general'
+    };
+    var pR2=await db.from('procedures').insert([newProcPayload]).select().single();
+    if(pR2.error){showToast('Failed: '+pR2.error.message,'error');return;}
+    // Create invoice
+    var invPayload={
+      patient_id:pid,patient_name:pname,
+      procedure_id:pR2.data?pR2.data.id:null,
+      procedure_name:name,treating_dentist:dentist,referrer:referrer,
+      fee:fee,fee_currency:feeCurrency,lab_fee:labFee,net_fee:fee-labFee,
+      lab_name:labName||null,teeth:teeth.length>0?teeth:null,
+      date:date,status:'unpaid',appointment_id:apptId||null
+    };
+    var invR2=await db.from('invoices').insert([invPayload]).select().single();
+    if(invR2.error){showToast('Procedure saved but invoice failed: '+invR2.error.message,'error');console.error(invR2.error);}
+    var newInvId=invR2.data?invR2.data.id:null;
+    // Create case
+    var casePayload={
+      patient_id:pid,patient_name:pname,procedure_name:name,
+      agreed_fee:fee,fee_currency:feeCurrency,invoice_id:newInvId,
+      dentist:dentist,status:'active'
+    };
+    var def2=allProcDefs.find(function(d){return d.name===name;});
+    if(def2)casePayload.procedure_definition_id=def2.id;
+    var caseR=await db.from('cases').insert([casePayload]).select().single();
+    var newCaseId=caseR.data?caseR.data.id:null;
+    // Update procedure with invoice_id and case_id
+    if(pR2.data&&newInvId) await db.from('procedures').update({invoice_id:newInvId}).eq('id',pR2.data.id);
+    // Create first case_visit
+    if(newCaseId){
+      await db.from('case_visits').insert([{
+        case_id:newCaseId,appointment_id:apptId||null,
+        session_name:sessionName||'Session 1',
+        date:date,dentist:dentist,notes:notes,
+        lab_id:labId||null,lab_name:labName||null,lab_service_id:labSvcId||null,
+        lab_fee:labFee||0,lab_fee_currency:feeCurrency,
+        lab_status:labId?'pending':'none'
+      }]).then(function(r){if(r.error)console.warn('Visit create warn:',r.error.message);});
+      // Link appointment to case
+      if(apptId) await db.from('appointments').update({case_id:newCaseId,session_name:sessionName||'Session 1'}).eq('id',apptId);
+    }
+    // Create lab order if lab involved
+    if(labId&&newInvId){
+      await db.from('lab_orders').insert([{
+        lab_id:labId,lab_name:labName||'Lab',patient_id:pid,patient_name:pname,
+        procedure_name:name+(sessionName?' — '+sessionName:''),
+        invoice_id:newInvId,appointment_id:apptId||null,dentist:dentist||null,
+        status:'pending',date:date||fd(new Date())
+      }]).then(function(r){if(r.error)console.warn('Lab order warn:',r.error.message);});
+    }
+    if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
+    showToast('Case started & invoice created ✅');
+  }
+  closeMdl('proc-modal');
+  if(profState.pid){renderProf(profState.pid,profState.pname);}
+  if(pid&&pname&&!id){
+    openNextVisitModal(pid,pname,dentist||'',name);
+  } else if(pid&&pname){
+    openPtStatusModal(pid,pname);
+  }
+}
+
+// ══════════════ SESSIONS ADMIN (Procedures section) ═══════════════
+async function openSessionsAdmin(procDefId, procName){
+  document.getElementById('sessions-proc-def-id').value=procDefId;
+  document.getElementById('sessions-modal-title').textContent='Sessions — '+procName;
+  document.getElementById('sessions-modal-sub').textContent='Define sessions for '+procName;
+  document.getElementById('new-session-name').value='';
+  // Clear cache so we reload fresh
+  delete allProcSessions[procDefId];
+  await renderSessionsList(procDefId);
+  openMdl('sessions-modal');
+}
+async function renderSessionsList(procDefId){
+  var r=await db.from('procedure_sessions').select('*').eq('procedure_definition_id',procDefId).order('display_order').order('created_at');
+  allProcSessions[procDefId]=r.data||[];
+  var sessions=allProcSessions[procDefId];
+  var el=document.getElementById('sessions-list');
+  if(!sessions.length){
+    el.innerHTML='<div style="text-align:center;padding:20px;color:var(--s400);font-size:12px;">No sessions yet — add your first session below</div>';
+    return;
+  }
+  el.innerHTML=sessions.map(function(s,idx){
+    return '<div class="sess-row" data-sid="'+s.id+'">'+
+      '<span class="sess-drag-handle">&#9776;</span>'+
+      '<span style="font-size:12px;font-weight:600;color:var(--s700);flex:1;">'+s.name+'</span>'+
+      '<button class="btn btnr btnxs" onclick="deleteSession(\''+s.id+'\',\''+procDefId+'\')" title="Delete session">&#128465;</button>'+
+      '</div>';
+  }).join('');
+}
+async function addSession(){
+  var nameEl=document.getElementById('new-session-name');
+  var name=(nameEl?nameEl.value.trim():'');
+  if(!name){showToast('Enter a session name','error');return;}
+  var procDefId=document.getElementById('sessions-proc-def-id').value;
+  if(!procDefId){showToast('No procedure selected','error');return;}
+  var existing=allProcSessions[procDefId]||[];
+  var r=await db.from('procedure_sessions').insert([{
+    procedure_definition_id:procDefId,
+    name:name,
+    display_order:existing.length
+  }]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  if(nameEl)nameEl.value='';
+  await renderSessionsList(procDefId);
+  showToast('Session added');
+}
+async function deleteSession(sessId,procDefId){
+  if(!confirm('Delete this session?'))return;
+  await db.from('procedure_sessions').delete().eq('id',sessId);
+  delete allProcSessions[procDefId];
+  await renderSessionsList(procDefId);
+}
+// Allow Enter key to add session
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&document.activeElement&&document.activeElement.id==='new-session-name'){
+    addSession();
+  }
+});
+
+// ══════════════ PROCEDURES ADMIN — add Sessions button ════════════
+// Override buildProcAdminUI to add Sessions button per procedure
+var _origBuildProcAdminUI = window.buildProcAdminUI;
+
+// ══════════════ PATIENT TIMELINE — CASES VIEW ═════════════════════
+async function renderProf(id,name,tab){
+  if(tab)profState.tab=tab;
+  document.getElementById('pg-title').textContent=name;
+  document.getElementById('pg-sub').textContent='Patient profile';
+  document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('act');});
+  document.getElementById('nav-patients').classList.add('act');
+  document.getElementById('pg-actions').innerHTML=
+    '<button class="btn" onclick="goTo(\'patients\')">&#8592; All patients</button>'+
+    '<button class="btn btnp" onclick="openEditPt(\''+id+'\')">Edit patient</button>';
+  document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading profile...</div>';
+  var results=await Promise.all([
+    db.from('patients').select('*').eq('id',id).single(),
+    db.from('invoices').select('*').eq('patient_id',id).order('date',{ascending:false}),
+    db.from('payments').select('*'),
+    db.from('procedures').select('*').eq('patient_id',id).order('date',{ascending:false}),
+    db.from('appointments').select('*').ilike('patient_name',name).order('date',{ascending:false}),
+    db.from('lab_orders').select('*').eq('patient_id',id).order('created_at',{ascending:false}).then(function(r){return r.error?{data:[]}:r;}),
+    db.from('cases').select('*').eq('patient_id',id).order('created_at',{ascending:false}).then(function(r){return r.error?{data:[]}:r;}),
+    db.from('case_visits').select('*').eq('patient_id',id).order('date').order('created_at').then(function(r){return r.error?{data:[]}:r;})
+  ]);
+  var p=results[0].data;
+  if(!p){showToast('Not found','error');goTo('patients');return;}
+  var invs=results[1].data||[];
+  var allPaysData=results[2].data||[];
+  var procs=results[3].data||[];
+  var appts=results[4].data||[];
+  var labOrders=results[5].data||[];
+  var cases=results[6].data||[];
+  var allVisits=results[7].data||[];
+  var c=ptCol(p.name||''),a=age(p.dob),av=ini(p.name||'?');
+  var totalBilled=invs.reduce(function(s,i){return s+toIQD(Number(i.fee||0),i.fee_currency);},0);
+  var totalPaid=invs.reduce(function(s,inv){
+    return s+allPaysData.filter(function(py){return py.invoice_id===inv.id;}).reduce(function(t,py){return t+Number(py.amount||0);},0);
+  },0);
+  var totalDue=totalBilled-totalPaid;
+  var today=fd(new Date());
+  var html=
+    '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:16px 20px;margin-bottom:14px;">'+
+    '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'+
+    '<div style="width:52px;height:52px;border-radius:50%;background:'+c.bg+';color:'+c.c+';display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;">'+av+'</div>'+
+    '<div style="flex:1;min-width:0;"><div style="font-size:17px;font-weight:700;color:var(--s800);">'+p.name+'</div>'+
+    '<div style="font-size:12px;color:var(--s400);margin-top:2px;">'+(a?a+' years · ':'')+( p.gender?p.gender+' · ':'')+( p.primary_dentist||'No assigned dentist')+'</div>'+
+    (p.phone?'<div style="font-size:12px;color:var(--s500);margin-top:3px;">&#128222; '+p.phone+'</div>':'')+
+    '</div>'+
+    '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">'+stBadge(p.status)+
+    (p.medical_notes?'<span style="font-size:10px;color:var(--a700);background:var(--a50);border:1px solid var(--a100);border-radius:4px;padding:2px 8px;">&#9888; Medical notes</span>':'')+
+    '</div></div>'+
+    (p.medical_notes?'<div style="margin-top:10px;padding:8px 12px;background:var(--a50);border-radius:var(--radsm);border-left:3px solid var(--a500);font-size:12px;color:var(--s700);">'+p.medical_notes+'</div>':'')+
+    '</div>'+
+    '<div class="stats-row" style="margin-bottom:14px;">'+
+    statC('var(--b50)','&#128203;','Total billed',fu(totalBilled))+
+    statC('var(--g50)','&#128176;','Total paid',fu(totalPaid))+
+    statC(totalDue>0?'var(--r50)':'var(--g50)','&#9888;','Balance due',fu(totalDue))+
+    statC('var(--s50)','&#9719;','Appointments',appts.length)+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">'+
+    '<button class="btn btnp btnsm" onclick="openApptForPt(\''+p.name.replace(/'/g,'&#39;')+'\')">&#128197; Book appointment</button>'+
+    '<button class="btn btnsm" onclick="openAddProc(\''+id+'\')">&#10022; Record procedure</button>'+
+    '</div>';
+
+  // Build cases section
+  if(cases.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--s500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">&#127973; Cases & sessions</div>';
+    cases.forEach(function(cs){
+      var caseInv=invs.find(function(i){return i.id===cs.invoice_id;});
+      var casePaid=caseInv?allPaysData.filter(function(p){return p.invoice_id===caseInv.id;}).reduce(function(s,p){return s+Number(p.amount||0);},0):0;
+      var caseAgreed=Number(cs.agreed_fee||0);
+      var caseBal=Math.max(0,caseAgreed-casePaid);
+      var casePct=caseAgreed>0?Math.round(Math.min(100,casePaid/caseAgreed*100)):0;
+      var caseVisits=allVisits.filter(function(v){return v.case_id===cs.id;});
+      var caseLabOrders=labOrders.filter(function(lo){return caseVisits.some(function(v){return v.id===lo.case_visit_id||v.appointment_id===lo.appointment_id;});});
+      html+='<div class="case-card">'+
+        '<div class="case-card-hdr" onclick="toggleCaseVisits(\''+cs.id+'\')">'+
+        '<div style="flex:1;min-width:0;">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'+
+        '<div style="font-size:13px;font-weight:700;color:var(--s800);">'+cs.procedure_name+'</div>'+
+        '<span class="badge '+(cs.status==='completed'?'bg':cs.status==='active'?'bb':'ba')+'">'+cs.status+'</span>'+
+        (caseBal>0?'<span class="badge br">'+fu(Math.round(caseBal))+' due</span>':'<span class="badge bg">Paid ✓</span>')+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:8px;">'+
+        '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:'+casePct+'%;'+(casePct>=100?'background:var(--g600);':'')+'"></div></div>'+
+        '<span style="font-size:10px;color:var(--s400);white-space:nowrap;">'+fu(casePaid)+' / '+fu(caseAgreed)+'</span>'+
+        '</div>'+
+        '<div style="font-size:10px;color:var(--s400);margin-top:3px;">'+caseVisits.length+' session'+(caseVisits.length!==1?'s':'')+' · '+(cs.dentist||'')+(cs.created_at?' · Started '+ cs.created_at.slice(0,10):'')+
+        '</div></div>'+
+        '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">'+
+        (caseBal>0&&cs.invoice_id?'<button class="btn btnp btnxs" onclick="event.stopPropagation();openInvDetail(\''+cs.invoice_id+'\',\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">Pay</button>':'')+
+        '<button class="btn btnxs" onclick="event.stopPropagation();openApptForContinue(\''+p.name.replace(/'/g,'&#39;')+'\',\''+cs.id+'\',\''+cs.procedure_name.replace(/'/g,'&#39;')+'\')">+ Session</button>'+
+        '</div></div>'+
+        // Visits list
+        '<div class="case-visits" id="case-visits-'+cs.id+'" style="display:none;">'+
+        (caseVisits.length?caseVisits.map(function(v,i){
+          var vLabOrd=labOrders.find(function(lo){return lo.appointment_id===v.appointment_id||(lo.case_id===v.case_id&&lo.procedure_name&&lo.procedure_name.includes(v.session_name));});
+          return '<div class="case-visit-row">'+
+            '<div class="case-visit-num">'+(i+1)+'</div>'+
+            '<div class="case-visit-body">'+
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
+            '<span style="font-size:12px;font-weight:700;color:var(--s800);">'+v.session_name+'</span>'+
+            (v.date?'<span style="font-size:10px;color:var(--s400);">'+v.date+'</span>':'')+
+            (v.dentist?'<span style="font-size:10px;color:var(--s500);">'+v.dentist+'</span>':'')+
+            (v.lab_name&&v.lab_status!=='none'?'<span class="lab-badge '+(v.lab_status==='received'?'lab-received':'lab-pending')+'">&#128300; '+v.lab_name+(v.lab_status==='received'?' ✓':' pending')+'</span>':'')+
+            '</div>'+
+            (v.notes?'<div style="font-size:11px;color:var(--s500);margin-top:3px;font-style:italic;">'+v.notes+'</div>':'')+
+            '</div>'+
+            '<div class="case-visit-actions">'+
+            (v.lab_status==='pending'&&v.lab_name?'<button class="btn btnsm btnxs btng" onclick="markVisitLabReceived(\''+v.id+'\',\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">&#10003; Lab rcvd</button>':'')+
+            '</div></div>';
+        }).join(''):
+        '<div style="padding:16px;text-align:center;font-size:12px;color:var(--s400);">No sessions recorded yet</div>')+
+        '</div></div>';
+    });
+  }
+
+  // Invoices not linked to a case (legacy)
+  var caseInvIds=cases.map(function(cs){return cs.invoice_id;}).filter(Boolean);
+  var standaloneInvs=invs.filter(function(inv){return !caseInvIds.includes(inv.id);});
+  if(standaloneInvs.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--s500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;margin-top:16px;">Other invoices</div>';
+    html+='<div class="pt-timeline-body" style="border-radius:var(--rad);">';
+    standaloneInvs.forEach(function(inv){
+      var paidAmt=allPaysData.filter(function(py){return py.invoice_id===inv.id;}).reduce(function(s,py){return s+Number(py.amount||0);},0);
+      var bal=toIQD(Number(inv.fee||0),inv.fee_currency)-paidAmt;
+      var sc2=bal<=0?'bg':paidAmt>0?'ba':'br';
+      var sl2=bal<=0?'Paid':paidAmt>0?'Partial':'Unpaid';
+      var tStr=fmtTeeth(inv.teeth)||null;
+      var pct=inv.fee>0?Math.round(Math.min(100,paidAmt/toIQD(Number(inv.fee),inv.fee_currency)*100)):0;
+      html+='<div class="pt-visit-row"><div class="pt-visit-date">'+
+        '<div style="font-size:9px;font-weight:700;color:var(--s400);text-transform:uppercase;">'+(inv.date||'').slice(5,7)+'/'+(inv.date||'').slice(8,10)+'</div>'+
+        '<div style="font-size:11px;font-weight:700;color:var(--s600);">'+(inv.date||'').slice(0,4)+'</div>'+
+        '</div>'+
+        '<div class="pt-visit-body" onclick="openInvDetail(\''+inv.id+'\',\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')" style="cursor:pointer;">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'+
+        '<div style="font-size:12px;font-weight:700;color:var(--s800);">'+(inv.procedure_name||'—')+'</div>'+
+        '<span class="badge '+sc2+'">'+sl2+'</span></div>'+
+        (inv.treating_dentist?'<div style="font-size:11px;color:var(--s400);">'+inv.treating_dentist+'</div>':'')+
+        (tStr?'<div style="font-size:11px;color:var(--b600);">&#129748; '+tStr+'</div>':'')+
+        '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'+
+        '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:'+pct+'%;"></div></div>'+
+        '<div style="font-size:10px;font-weight:700;color:var(--s500);white-space:nowrap;">'+fu(paidAmt)+' / '+fmtAmt(inv.fee,inv.fee_currency||'IQD')+'</div>'+
+        '</div>'+
+        '</div>'+
+        '<div class="pt-visit-actions" style="flex-direction:column;gap:4px;">'+
+        (bal>0?'<button class="btn btnp btnxs" onclick="openInvDetail(\''+inv.id+'\',\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">Pay</button>':'')+
+        '<button class="btn btnxs" onclick="deleteInvoice(\''+inv.id+'\',\''+id+'\')" style="color:var(--r600);">&#128465;</button>'+
+        '</div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Upcoming appointments without cases
+  var caseApptIds=[];
+  appts.forEach(function(a){if(a.case_id)caseApptIds.push(a.id);});
+  var upcomingNoCases=appts.filter(function(a){return a.date>=today&&!a.case_id;});
+  if(upcomingNoCases.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--s500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;margin-top:16px;">Upcoming appointments</div>';
+    html+='<div class="pt-timeline-body" style="border-radius:var(--rad);">';
+    upcomingNoCases.forEach(function(a){
+      var sc=STATUSES[a.status]||STATUSES.open;
+      html+='<div class="pt-visit-row">'+
+        '<div class="pt-visit-date"><div style="font-size:14px;">'+sc.emoji+'</div></div>'+
+        '<div class="pt-visit-body">'+
+        '<div style="font-size:12px;font-weight:700;color:var(--b700);">'+(a.procedure_type||'Appointment')+'</div>'+
+        '<div style="font-size:11px;color:var(--s400);">'+(a.date||'')+(a.start_time?' at '+a.start_time:'')+' · '+(a.dentist||'')+(a.room?' · '+a.room:'')+'</div>'+
+        '</div><div class="pt-visit-actions">'+
+        '<button class="btn btnxs" onclick="openApptDetail(\''+a.id+'\')">View</button></div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Clinical chart
+  var clinTeeth={};
+  procs.slice().reverse().forEach(function(pr){
+    if(pr.teeth&&Array.isArray(pr.teeth))pr.teeth.forEach(function(t){
+      if(pr.status==='completed')clinTeeth[t]='completed';
+      else if(pr.status==='inprogress'&&clinTeeth[t]!=='completed')clinTeeth[t]='inprogress';
+      else if(pr.status==='planned'&&!clinTeeth[t])clinTeeth[t]='planned';
+    });
+  });
+  if(procs.length){
+    html+='<div class="vdc-card" style="margin-top:14px;"><div class="vdc-card-hdr"><div class="vdc-card-title">&#10022; Clinical chart</div>'+
+      '<button class="btn btnsm" onclick="openAddProc(\''+id+'\')">+ Record procedure</button></div>'+
+      '<div class="vdc-card-body">'+buildChart(clinTeeth,{},false)+'</div></div>';
+  }
+
+  document.getElementById('pg-content').innerHTML=html;
+}
+
+function toggleCaseVisits(caseId){
+  var el=document.getElementById('case-visits-'+caseId);
+  if(!el)return;
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+
+async function markVisitLabReceived(visitId, pid, pname){
+  var r=await db.from('case_visits').update({lab_status:'received',lab_received_date:fd(new Date())}).eq('id',visitId);
+  if(r.error){showToast('Failed','error');return;}
+  showToast('Lab work marked as received ✅');
+  renderProf(pid,pname);
+}
+
+async function openApptForContinue(pname, caseId, procName){
+  await openNewAppt();
+  document.getElementById('am-patient').value=pname;
+  // Trigger open case detection
+  await checkPatientBalance(pname);
+  // Pre-select the case in the session dropdown
+  var caseIdEl=document.getElementById('am-case-id');
+  if(caseIdEl) caseIdEl.value=caseId;
+}
+
+// ══════════════ PROCEDURES ADMIN — Sessions button ════════════════
+function buildProcAdminUI(){
+  if(!allProcDefs.length){
+    document.getElementById('pg-content').innerHTML=
+      '<div style="text-align:center;padding:80px 20px;">'+
+      '<div style="font-size:48px;margin-bottom:16px;">&#10010;</div>'+
+      '<div style="font-size:14px;font-weight:700;color:var(--s600);margin-bottom:6px;">No procedures yet</div>'+
+      '<div style="font-size:12px;color:var(--s400);">Click &quot;+ Add procedure&quot; to build your list</div></div>';
+    return;
+  }
+  var cats={};
+  allProcDefs.forEach(function(p){var c=p.category||'Other';if(!cats[c])cats[c]=[];cats[c].push(p);});
+  var total=allProcDefs.length;
+  var labCnt=allProcDefs.filter(function(p){return p.lab_involved==='yes';}).length;
+  var fixCnt=allProcDefs.filter(function(p){return p.fixture_price>0;}).length;
+  var html=
+    '<div class="stats-row">'+
+    statC('var(--b50)','&#10010;','Total procedures',total)+
+    statC('var(--p50)','&#128300;','Lab involved',labCnt)+
+    statC('var(--a50)','&#129454;','With fixture price',fixCnt)+
+    statC('var(--g50)','&#128202;','Categories',Object.keys(cats).length)+
+    '</div>';
+  Object.keys(cats).sort().forEach(function(cat){
+    var procs=cats[cat];
+    html+='<div class="vdc-card" style="margin-bottom:14px;">'+
+      '<div class="vdc-card-hdr">'+
+      '<div style="display:flex;align-items:center;gap:8px;">'+
+      '<div class="vdc-card-title">'+cat+'</div>'+
+      '<span style="font-size:10px;color:var(--s400);">('+procs.length+')</span>'+
+      '</div></div>'+
+      '<div class="vdc-card-body" style="padding:0;">'+
+      '<table class="tbl"><thead><tr>'+
+      '<th>Name</th><th>Default price</th><th>Lab</th><th>Sessions</th><th>Override</th><th>Notes</th><th></th>'+
+      '</tr></thead><tbody>'+
+      procs.map(function(p){
+        var price=fmtAmt(p.price,p.currency||'IQD');
+        var sessCnt=(allProcSessions[p.id]||[]).length;
+        return '<tr>'+
+          '<td style="font-weight:700;color:var(--s800);">'+p.name+'</td>'+
+          '<td><div style="font-weight:700;color:var(--b700);">'+price+'</div></td>'+
+          '<td>'+(p.lab_involved==='yes'?'<span class="badge bp">&#128300; Yes</span>':'<span style="color:var(--s400);font-size:11px;">No</span>')+'</td>'+
+          '<td><button class="btn btnxs" style="background:var(--p50);color:var(--p700);border-color:var(--p100);" data-sess-id="'+p.id+'" data-sess-name="'+p.name.replace(/"/g,'&quot;')+'">&#128198; '+sessCnt+' session'+(sessCnt!==1?'s':'')+'</button></td>'+
+          '<td>'+(p.price_override==='no'?'<span class="badge br">Locked</span>':'<span class="badge bg">Editable</span>')+'</td>'+
+          '<td style="font-size:10px;color:var(--s400);font-style:italic;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(p.notes||'—')+'</td>'+
+          '<td><button class="btn btnxs" data-padm-id="'+p.id+'">Edit</button></td>'+
+          '</tr>';
+      }).join('')+'</tbody></table></div></div>';
+  });
+  document.getElementById('pg-content').innerHTML=html;
+  document.getElementById('pg-content').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-padm-id]');
+    if(btn){openEditProcAdmin(btn.dataset.padmId);return;}
+    var sb=e.target.closest('[data-sess-id]');
+    if(sb){openSessionsAdmin(sb.dataset.sessId,sb.dataset.sessName);return;}
+  });
+}
+
+// ══════════ COMPAT — old treatment plan functions (stubs) ══════════
+function setTPMode(mode){}
+function syncTreatmentCost(){}
+function resetTPSection(fee,currency){}
+async function loadPatientPlans(pid){}
 // ══════════ UPDATED saveProc — treatment plan logic ═══════════════
 
 </script>
+
+<!-- SESSIONS ADMIN MODAL -->
+<div class="mbg" id="sessions-modal">
+  <div class="modal mw">
+    <div class="mtit" id="sessions-modal-title">Manage sessions</div>
+    <div class="msub" id="sessions-modal-sub">Define the sessions for this procedure</div>
+    <input type="hidden" id="sessions-proc-def-id">
+    <div id="sessions-list" style="background:var(--s50);border-radius:var(--radsm);border:1px solid var(--s200);overflow:hidden;margin-bottom:14px;min-height:48px;">
+      <div style="text-align:center;padding:20px;color:var(--s400);font-size:12px;">No sessions yet</div>
+    </div>
+    <!-- Add new session row -->
+    <div style="display:flex;gap:8px;margin-bottom:4px;">
+      <input class="finp" id="new-session-name" placeholder="Session name (e.g. CBC &amp; Scan)" style="flex:1;">
+      <button class="btn btnp btnsm" onclick="addSession()" style="flex-shrink:0;">+ Add</button>
+    </div>
+    <div style="font-size:10px;color:var(--s400);margin-bottom:14px;">Press Enter or click Add. Sessions can be done in any order and repeated.</div>
+    <div class="mac">
+      <button class="btn btnp" onclick="closeMdl('sessions-modal')">Done</button>
+    </div>
+  </div>
+</div>
 
 <!-- LAB MODAL -->
 <div class="mbg" id="lab-modal">
