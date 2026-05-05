@@ -4375,7 +4375,7 @@ async function renderProf(id,name,tab){
     html+='</div>';
   }
 
-  // Clinical chart
+  // Clinical chart — always show, build teeth from procedures AND case_visits
   var clinTeeth={};
   procs.slice().reverse().forEach(function(pr){
     if(pr.teeth&&Array.isArray(pr.teeth))pr.teeth.forEach(function(t){
@@ -4384,11 +4384,18 @@ async function renderProf(id,name,tab){
       else if(pr.status==='planned'&&!clinTeeth[t])clinTeeth[t]='planned';
     });
   });
-  if(procs.length){
-    html+='<div class="vdc-card" style="margin-top:14px;"><div class="vdc-card-hdr"><div class="vdc-card-title">&#10022; Clinical chart</div>'+
-      '<button class="btn btnsm" onclick="openAddProc(\''+id+'\')">+ Record procedure</button></div>'+
-      '<div class="vdc-card-body">'+buildChart(clinTeeth,{},false)+'</div></div>';
-  }
+  // Also pull teeth from appointments (stored on appointment.teeth)
+  appts.forEach(function(a){
+    if(a.teeth&&Array.isArray(a.teeth)&&a.status==='completed'){
+      a.teeth.forEach(function(t){
+        if(!clinTeeth[t])clinTeeth[t]='completed';
+      });
+    }
+  });
+  // Always render clinical chart
+  html+='<div class="vdc-card" style="margin-top:14px;"><div class="vdc-card-hdr"><div class="vdc-card-title">&#10022; Clinical chart</div>'+
+    '<button class="btn btnsm" onclick="openAddProc(\''+id+'\')">+ Record procedure</button></div>'+
+    '<div class="vdc-card-body">'+buildChart(clinTeeth,{},false)+'</div></div>';
 
   document.getElementById('pg-content').innerHTML=html;
 }
