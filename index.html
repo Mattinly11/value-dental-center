@@ -3597,10 +3597,26 @@ async function showCaseSummaryInModal(caseId, pid){
   var barEl = document.getElementById('pcs-bar');
   if(barEl){ barEl.style.width = pct+'%'; barEl.style.background = pct>=100?'var(--g600)':'var(--b600)'; }
   var visEl = document.getElementById('pcs-visits');
-  if(visEl) visEl.innerHTML = visits.length ?
-    '<strong>'+visits.length+' session'+(visits.length!==1?'s':'')+' recorded:</strong> '+
-    visits.map(function(v){ return '<span style="background:var(--s100);border-radius:4px;padding:1px 6px;margin-right:3px;font-size:10px;">'+v.session_name+(v.date?' ('+v.date+')':'')+'</span>'; }).join('') :
-    'No sessions recorded yet — this will be the first.';
+  if(visEl){
+    var visHtml = visits.length ?
+      '<strong>'+visits.length+' session'+(visits.length!==1?'s':'')+' recorded:</strong> '+
+      visits.map(function(v){ return '<span style="background:var(--s100);border-radius:4px;padding:1px 6px;margin-right:3px;font-size:10px;">'+v.session_name+(v.date?' ('+v.date+')':'')+'</span>'; }).join('') :
+      'No sessions recorded yet — this will be the first.';
+    // Also show all previously treated teeth from case procedures
+    var prevTeethDisp={};
+    if(c.invoice_id){
+      var tR=await db.from('procedures').select('teeth').eq('invoice_id',c.invoice_id);
+      (tR.data||[]).forEach(function(pr){
+        if(pr.teeth&&Array.isArray(pr.teeth))pr.teeth.forEach(function(t){prevTeethDisp[t]=true;});
+      });
+    }
+    var teethKeys=Object.keys(prevTeethDisp);
+    if(teethKeys.length){
+      var tStr=fmtTeeth(teethKeys.map(Number))||teethKeys.sort(function(a,b){return a-b;}).join(', ');
+      visHtml+='<div style="margin-top:6px;font-size:10px;color:var(--b700);">&#129748; Previously treated: <strong>'+tStr+'</strong></div>';
+    }
+    visEl.innerHTML=visHtml;
+  }
   // Hide fee wrap (fee is already set) and show follow-up mode
   var feeWrap = document.getElementById('proc-fee-wrap');
   if(feeWrap) feeWrap.style.display = 'none';
@@ -3892,17 +3908,35 @@ async function openAddProcFromAppt(appt){
   if(appt.case_id){
     await showCaseSummaryInModal(appt.case_id, pid);
     var newCard=document.getElementById('proc-new-case-card');if(newCard)newCard.style.display='none';
-    // Pre-highlight previously treated teeth from all case visits
+    // Pre-highlight ALL teeth ever treated in this case
+    // Strategy: use EVERY available path to ensure old and new data is covered
     if(currentCaseData){
+      var prevTeeth={};
+      // PATH 1: procedures linked by invoice_id (works for all records old and new)
+      if(currentCaseData.invoice_id){
+        var invProcsR=await db.from('procedures').select('teeth').eq('invoice_id',currentCaseData.invoice_id);
+        (invProcsR.data||[]).forEach(function(pr){
+          if(pr.teeth&&Array.isArray(pr.teeth))pr.teeth.forEach(function(t){prevTeeth[t]=true;});
+        });
+      }
+      // PATH 2: procedures linked by patient_id + procedure_name (catches any unlinked old records)
+      if(currentCaseData.procedure_name&&pid){
+        var ptProcsR=await db.from('procedures').select('teeth').eq('patient_id',pid).eq('procedure_name',currentCaseData.procedure_name);
+        (ptProcsR.data||[]).forEach(function(pr){
+          if(pr.teeth&&Array.isArray(pr.teeth))pr.teeth.forEach(function(t){prevTeeth[t]=true;});
+        });
+      }
+      // PATH 3: case_visits that have appointment_id → procedures (covers new sessions)
       var prevVisitsR=await db.from('case_visits').select('appointment_id').eq('case_id',appt.case_id);
       var prevApptIds=(prevVisitsR.data||[]).map(function(v){return v.appointment_id;}).filter(Boolean);
       if(prevApptIds.length){
         var prevProcsR=await db.from('procedures').select('teeth').in('appointment_id',prevApptIds);
-        var prevTeeth={};
         (prevProcsR.data||[]).forEach(function(pr){
           if(pr.teeth&&Array.isArray(pr.teeth))pr.teeth.forEach(function(t){prevTeeth[t]=true;});
         });
-        // Only pre-fill if appointment itself has no teeth selected
+      }
+      // Apply collected teeth — only pre-fill if the appointment itself has no teeth already
+      if(Object.keys(prevTeeth).length>0){
         if(!appt.teeth||!appt.teeth.length){
           Object.keys(prevTeeth).forEach(function(t){procSelTeeth[parseInt(t)]=true;});
         }
