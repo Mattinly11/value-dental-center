@@ -3455,13 +3455,27 @@ async function deleteInvoice(invId, pid){
   if(!invId)return;
   var payR=await db.from('payments').select('id').eq('invoice_id',invId);
   var payCount=(payR.data||[]).length;
-  var msg='Delete this invoice?'+(payCount>0?' This will also remove '+payCount+' payment'+(payCount>1?'s':'')+' recorded against it.':'');
+  var msg='Delete this invoice and all connected records?'+(payCount>0?' ('+payCount+' payment'+(payCount>1?'s':'')+' will also be removed)':'');
   if(!confirm(msg))return;
-  if(payCount>0)await db.from('payments').delete().eq('invoice_id',invId);
+  // Delete payments
+  if(payCount>0) await db.from('payments').delete().eq('invoice_id',invId);
+  // Delete case_visits and cases linked to this invoice
+  var caseR=await db.from('cases').select('id').eq('invoice_id',invId);
+  var caseIds=(caseR.data||[]).map(function(c){return c.id;});
+  if(caseIds.length){
+    await db.from('case_visits').delete().in('case_id',caseIds);
+    await db.from('cases').delete().eq('invoice_id',invId);
+  }
+  // Delete lab orders linked to this invoice
+  await db.from('lab_orders').delete().eq('invoice_id',invId).then(function(){});
+  // Delete procedures linked to this invoice
+  await db.from('procedures').delete().eq('invoice_id',invId);
+  // Delete the invoice itself
   await db.from('invoices').delete().eq('id',invId);
-  showToast('Invoice deleted');
+  showToast('Invoice and all connected records deleted');
   closeMdl('pay-modal');
-  if(pid&&profState.tab==='billing')loadBillingTab(pid,profState.pname);
+  // Refresh patient profile if open
+  if(profState.pid) renderProf(profState.pid, profState.pname);
 }
 
 // ══════════ DELETE PAYMENT (undo) ════════════════════════════════
@@ -4365,31 +4379,51 @@ async function renderProf(id,name,tab){
   }
 
   // Upcoming appointments without cases — show ALL upcoming (with or without case)
-  var upcomingAppts=appts.filter(function(a){return a.date>=today;}).sort(function(a,b){return a.date.localeCompare(b.date)||a.start_time.localeCompare(b.start_time);});
+  // Split appointments into upcoming (not completed) and previous (completed or past)
+  var upcomingAppts=appts.filter(function(a){
+    return a.date>=today && a.status!=='completed' && a.status!=='no_show';
+  }).sort(function(a,b){return a.date.localeCompare(b.date)||(a.start_time||'').localeCompare(b.start_time||'');});
+
+  var previousAppts=appts.filter(function(a){
+    return a.status==='completed' || a.status==='no_show' || a.date<today;
+  }).sort(function(a,b){return b.date.localeCompare(a.date)||(b.start_time||'').localeCompare(a.start_time||'');});
+
+  function apptRowHtml(a){
+    var sc=STATUSES[a.status]||STATUSES.open;
+    var linkedCase=cases.find(function(cs){return cs.id===a.case_id;});
+    return '<div class="pt-visit-row">'+
+      '<div class="pt-visit-date">'+
+      '<div style="font-size:9px;font-weight:700;color:var(--s400);text-transform:uppercase;">'+(a.date||'').slice(5,7)+'/'+(a.date||'').slice(8,10)+'</div>'+
+      '<div style="font-size:11px;font-weight:700;color:var(--s600);">'+(a.date||'').slice(0,4)+'</div>'+
+      '</div>'+
+      '<div class="pt-visit-body">'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px;">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--b700);">'+(a.procedure_type||'Appointment')+'</div>'+
+      (a.session_name?'<span class="badge bb">'+a.session_name+'</span>':'')+
+      '<span class="badge" style="background:'+sc.bg+';color:'+sc.color+';border:1px solid '+sc.border+';">'+sc.emoji+' '+sc.label+'</span>'+
+      '</div>'+
+      '<div style="font-size:11px;color:var(--s400);">'+(a.start_time?a.start_time+' – '+(a.end_time||''):'')+' · '+(a.dentist||'')+(a.room?' · '+a.room:'')+'</div>'+
+      (linkedCase?'<div style="font-size:10px;color:var(--b600);margin-top:2px;">&#127973; '+linkedCase.procedure_name+'</div>':'')+
+      '</div>'+
+      '<div class="pt-visit-actions">'+
+      '<button class="btn btnxs" onclick="goToApptOnCalendar(\''+a.id+'\',\''+a.date+'\')">View</button>'+
+      '</div></div>';
+  }
+
   if(upcomingAppts.length){
     html+='<div style="font-size:11px;font-weight:700;color:var(--s500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;margin-top:16px;">Upcoming appointments</div>';
     html+='<div class="pt-timeline-body" style="border-radius:var(--rad);">';
-    upcomingAppts.forEach(function(a){
-      var sc=STATUSES[a.status]||STATUSES.open;
-      var linkedCase=cases.find(function(cs){return cs.id===a.case_id;});
-      html+='<div class="pt-visit-row">'+
-        '<div class="pt-visit-date">'+
-        '<div style="font-size:9px;font-weight:700;color:var(--s400);text-transform:uppercase;">'+(a.date||'').slice(5,7)+'/'+(a.date||'').slice(8,10)+'</div>'+
-        '<div style="font-size:11px;font-weight:700;color:var(--s600);">'+(a.date||'').slice(0,4)+'</div>'+
-        '</div>'+
-        '<div class="pt-visit-body">'+
-        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px;">'+
-        '<div style="font-size:12px;font-weight:700;color:var(--b700);">'+(a.procedure_type||'Appointment')+'</div>'+
-        (a.session_name?'<span class="badge bb">'+a.session_name+'</span>':'')+
-        '<span class="badge" style="background:'+sc.bg+';color:'+sc.color+';border:1px solid '+sc.border+';">'+sc.emoji+' '+sc.label+'</span>'+
-        '</div>'+
-        '<div style="font-size:11px;color:var(--s400);">'+(a.start_time?a.start_time+' – '+(a.end_time||''):'')+' · '+(a.dentist||'')+(a.room?' · '+a.room:'')+'</div>'+
-        (linkedCase?'<div style="font-size:10px;color:var(--b600);margin-top:2px;">&#127973; '+linkedCase.procedure_name+'</div>':'')+
-        '</div>'+
-        '<div class="pt-visit-actions">'+
-        '<button class="btn btnxs" onclick="openApptDetailFromProfile(\''+a.id+'\')">View</button>'+
-        '</div></div>';
-    });
+    upcomingAppts.forEach(function(a){ html+=apptRowHtml(a); });
+    html+='</div>';
+  }
+
+  if(previousAppts.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--s500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;margin-top:16px;">Previous appointments</div>';
+    html+='<div class="pt-timeline-body" style="border-radius:var(--rad);">';
+    previousAppts.slice(0,10).forEach(function(a){ html+=apptRowHtml(a); });
+    if(previousAppts.length>10){
+      html+='<div style="padding:10px 14px;font-size:11px;color:var(--s400);text-align:center;">'+previousAppts.length-10+' more previous appointments not shown</div>';
+    }
     html+='</div>';
   }
 
@@ -4416,6 +4450,28 @@ async function renderProf(id,name,tab){
     '<div class="vdc-card-body">'+buildChart(clinTeeth,{},false)+'</div></div>';
 
   document.getElementById('pg-content').innerHTML=html;
+}
+
+// Navigate to the appointment's date on the calendar, then open it
+async function goToApptOnCalendar(apptId, apptDate){
+  // Navigate to appointments section
+  goTo('appointments');
+  // Set the calendar to the appointment's date
+  if(apptDate){
+    var parts=apptDate.split('-');
+    currentDate=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
+  }
+  // Load appointments for that date
+  var r=await db.from('appointments').select('*').eq('date',apptDate||fd(currentDate));
+  if(!r.error) allAppts=r.data||[];
+  await loadApptInvoices();
+  buildSched();
+  // Open the appointment detail after a short delay so the calendar renders first
+  setTimeout(function(){
+    var a=allAppts.find(function(x){return x.id===apptId;});
+    if(a) openApptDetail(apptId);
+    else showToast('Appointment found on calendar for '+apptDate);
+  },300);
 }
 
 function toggleCaseVisits(caseId){
