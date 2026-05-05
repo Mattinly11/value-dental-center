@@ -4454,24 +4454,19 @@ async function renderProf(id,name,tab){
 
 // Navigate to the appointment's date on the calendar, then open it
 async function goToApptOnCalendar(apptId, apptDate){
-  // Navigate to appointments section
-  goTo('appointments');
-  // Set the calendar to the appointment's date
+  // Set the date FIRST before navigating — this way renderAppointments loads the correct date
   if(apptDate){
     var parts=apptDate.split('-');
     currentDate=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
   }
-  // Load appointments for that date
-  var r=await db.from('appointments').select('*').eq('date',apptDate||fd(currentDate));
-  if(!r.error) allAppts=r.data||[];
-  await loadApptInvoices();
-  buildSched();
-  // Open the appointment detail after a short delay so the calendar renders first
+  // Now navigate — renderAppointments will use the date we just set
+  await renderAppointments();
+  goTo('appointments');
+  // Open the specific appointment detail after calendar renders
   setTimeout(function(){
     var a=allAppts.find(function(x){return x.id===apptId;});
     if(a) openApptDetail(apptId);
-    else showToast('Appointment found on calendar for '+apptDate);
-  },300);
+  },400);
 }
 
 function toggleCaseVisits(caseId){
