@@ -977,13 +977,21 @@ async function deletePatient(){
     showToast('Cannot delete: patient has '+unpaid.length+' unpaid invoice'+(unpaid.length>1?'s':'')+'. Settle all invoices first.','error');
     return;
   }
-  if(!confirm('Delete patient "'+name+'"? This will also delete all their procedures, invoices, payments and appointments. This cannot be undone.'))return;
-  // cascade delete
+  if(!confirm('Delete patient "'+name+'"? This will also delete all their records. This cannot be undone.'))return;
+  // Delete case_visits first (child of cases)
+  var casesR=await db.from('cases').select('id').eq('patient_id',id);
+  var caseIds=(casesR.data||[]).map(function(c){return c.id;});
+  if(caseIds.length){await db.from('case_visits').delete().in('case_id',caseIds);}
+  // Delete cases
+  await db.from('cases').delete().eq('patient_id',id);
+  // Delete lab orders
+  await db.from('lab_orders').delete().eq('patient_id',id).then(function(){});
+  // Delete payments, invoices, procedures, appointments, then patient
   var invIds=invs.map(function(i){return i.id;});
   if(invIds.length){await db.from('payments').delete().in('invoice_id',invIds);}
   await db.from('invoices').delete().eq('patient_id',id);
   await db.from('procedures').delete().eq('patient_id',id);
-  await db.from('appointments').delete().eq('patient_id',id);
+  await db.from('appointments').delete().ilike('patient_name',name);
   await db.from('patients').delete().eq('id',id);
   showToast('Patient deleted');closeMdl('pt-modal');renderPatients();
 }
@@ -1145,18 +1153,28 @@ async function deleteProc(){
 
 // ══════════════════════ INVOICE DETAIL ═══════════════════════════
 async function openInvDetail(invId,pid,pname){
+  if(!invId){showToast('No invoice found','error');return;}
   var r=await db.from('invoices').select('*').eq('id',invId).single();
-  var inv=r.data;if(!inv)return;
+  var inv=r.data;if(!inv){showToast('Invoice not found','error');return;}
   var pr=await db.from('payments').select('*').eq('invoice_id',invId);
   var pays=pr.data||[];
   var paid=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
-  var invFeeIQD2=toIQD(Number(inv.fee||0),inv.fee_currency);
-  var bal=invFeeIQD2-paid;
-  // always open — even fully paid invoices can be viewed
-  // delegate to the full dual-currency payment modal
-  document.getElementById('pay-pid').value=pid||'';
-  document.getElementById('pay-pname').value=pname||'';
-  await openPayModalFromAppt(invId, {});
+  var feeIQD=toIQD(Number(inv.fee||0),inv.fee_currency);
+  var bal=feeIQD-paid;
+  var invSummary={
+    id:invId,
+    fee:Number(inv.fee||0),
+    feeCurrency:inv.fee_currency||'IQD',
+    paidAmt:paid,
+    balance:bal,
+    paid:bal<=0,
+    procedure_name:inv.procedure_name,
+    patient_name:pname||inv.patient_name,
+    patient_id:pid||inv.patient_id
+  };
+  document.getElementById('pay-pid').value=pid||inv.patient_id||'';
+  document.getElementById('pay-pname').value=pname||inv.patient_name||'';
+  await openPayModalFromAppt(invId, invSummary);
 }
 function updatePayBal(){
   var invFee=parseFloat(document.getElementById('pay-modal').dataset.invFee)||0;
