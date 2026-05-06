@@ -700,8 +700,8 @@ var STATUSES={
 // helpers
 function ptCol(n){var h=0;for(var i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))%PT_COL.length;return PT_COL[h];}
 function ini(n){return(n||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();}
-function age(d){if(!d)return null;return Math.floor((Date.now()-new Date(d))/(365.25*24*3600*1000));}
-function fd(d){return d.toISOString().split('T')[0];}
+function age(d){if(!d)return null;var parts=d.split('-');var dob=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));return Math.floor((Date.now()-dob)/(365.25*24*3600*1000));}
+function fd(d){var y=d.getFullYear(),m=d.getMonth()+1,day=d.getDate();return y+'-'+(m<10?'0':'')+m+'-'+(day<10?'0':'')+day;}
 function dd(d){return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 function t2m(t){if(!t)return 0;var p=t.split(':');return +p[0]*60+ +p[1];}
 function m2t(m){var h=Math.floor(m/60),mn=m%60;return(h<10?'0':'')+h+':'+(mn<10?'0':'')+mn;}
@@ -4454,15 +4454,12 @@ async function renderProf(id,name,tab){
 
 // Navigate to the appointment's date on the calendar, then open it
 async function goToApptOnCalendar(apptId, apptDate){
-  // Set the date FIRST before navigating — this way renderAppointments loads the correct date
   if(apptDate){
     var parts=apptDate.split('-');
     currentDate=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
   }
-  // Now navigate — renderAppointments will use the date we just set
   await renderAppointments();
   goTo('appointments');
-  // Open the specific appointment detail after calendar renders
   setTimeout(function(){
     var a=allAppts.find(function(x){return x.id===apptId;});
     if(a) openApptDetail(apptId);
@@ -4477,15 +4474,15 @@ function toggleCaseVisits(caseId){
 
 // Open appointment detail from patient profile (allAppts may not have this date loaded)
 async function openApptDetailFromProfile(apptId){
-  // Try allAppts first (if calendar is on same date)
-  var a = allAppts.find(function(x){return x.id===apptId;});
+  var a=allAppts.find(function(x){return x.id===apptId;});
   if(!a){
-    // Load fresh from DB
-    var r = await db.from('appointments').select('*').eq('id',apptId).single();
+    var r=await db.from('appointments').select('*').eq('id',apptId).single();
     if(r.error||!r.data){showToast('Appointment not found','error');return;}
-    a = r.data;
-    // Temporarily add to allAppts so openApptDetail can find it
-    allAppts.push(a);
+    a=r.data;
+    // Only add if not already in allAppts (prevent duplicates)
+    if(!allAppts.find(function(x){return x.id===apptId;})){
+      allAppts.push(a);
+    }
   }
   openApptDetail(apptId);
 }
