@@ -1517,8 +1517,8 @@ async function openNewAppt(){
   var ci=document.getElementById('am-case-id');if(ci)ci.value='';
   var ss=document.getElementById('am-session-select');if(ss)ss.innerHTML='<option value="">Select session...</option>';
   _amOpenCases=[];
-  // reset teeth selection
-  amSelTeeth={};amIsPrim=false;
+  // reset teeth selection and treated state
+  amSelTeeth={};amIsPrim=false;amTreatedTeeth={};
   // reset duration slider
   var durEl=document.getElementById('am-dur');if(durEl)durEl.value=2;
   document.getElementById('am-dur-label').textContent='30 min';
@@ -3166,12 +3166,19 @@ function updateAmEnd(){
   var mins=DUR_STEPS[durVal-1]||30;
   document.getElementById('am-end').value=m2t(t2m(start)+mins);
 }
+var amSelTeeth={}, amIsPrim=false, amTreatedTeeth={};
+
 function renderAmChart(){
   var el=document.getElementById('am-chart');if(!el)return;
-  el.innerHTML=buildChart({},amSelTeeth,amIsPrim);
+  el.innerHTML=buildChart(amTreatedTeeth,amSelTeeth,amIsPrim);
   var lbl=document.getElementById('am-sel-lbl');
   var c=Object.keys(amSelTeeth).length;
-  if(lbl)lbl.textContent=c>0?c+' '+(c===1?'tooth':'teeth')+' selected':'No teeth selected (optional)';
+  var t=Object.keys(amTreatedTeeth).length;
+  if(lbl){
+    var txt=c>0?c+' '+(c===1?'tooth':'teeth')+' selected':'No teeth selected (optional)';
+    if(t>0)txt+=' &nbsp;·&nbsp; <span style="color:var(--g700);font-size:10px;font-weight:700;">&#10003; '+t+' previously treated</span>';
+    lbl.innerHTML=txt;
+  }
   document.getElementById('am-perm-btn').style.cssText=!amIsPrim?'background:var(--b600);color:white;border-color:var(--b600);':'';
   document.getElementById('am-prim-btn').style.cssText=amIsPrim?'background:var(--b600);color:white;border-color:var(--b600);':'';
 }
@@ -3993,6 +4000,27 @@ async function checkOpenCasesForPatient(patientName){
     }
   };
   if(panel) panel.style.display = 'block';
+
+  // ── Load previously treated teeth for ALL active cases and show on chart ──
+  amTreatedTeeth={};
+  var allInvIds=_amOpenCases.map(function(c){return c.invoice_id;}).filter(Boolean);
+  if(allInvIds.length){
+    // Path 1: procedures by invoice_id (most reliable)
+    var tR=await db.from('procedures').select('teeth').in('invoice_id',allInvIds);
+    (tR.data||[]).forEach(function(pr){
+      if(pr.teeth&&Array.isArray(pr.teeth))pr.teeth.forEach(function(t){amTreatedTeeth[t]='completed';});
+    });
+  }
+  // Path 2: procedures by patient_id + procedure names (catches any older records)
+  if(_amOpenCases.length){
+    var procNames=_amOpenCases.map(function(c){return c.procedure_name;}).filter(function(n,i,a){return a.indexOf(n)===i;});
+    var ptProcsR=await db.from('procedures').select('teeth').eq('patient_id',pid).in('procedure_name',procNames);
+    (ptProcsR.data||[]).forEach(function(pr){
+      if(pr.teeth&&Array.isArray(pr.teeth))pr.teeth.forEach(function(t){amTreatedTeeth[t]='completed';});
+    });
+  }
+  // Re-render the appointment chart with treated teeth highlighted
+  if(Object.keys(amTreatedTeeth).length>0){renderAmChart();}
 }
 
 // Override checkPatientBalance to also check open cases
