@@ -171,6 +171,11 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .set-sec{background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:20px;margin-bottom:16px;}
 .set-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--s100);}
 .set-row:last-child{border:none;padding-bottom:0;}
+/* UNIT PRICING */
+.unit-calc-bar{background:var(--b50);border:1px solid var(--b100);border-radius:var(--radsm);padding:8px 12px;margin-bottom:10px;font-size:11px;color:var(--b700);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.unit-calc-bar strong{font-size:13px;font-weight:700;color:var(--b700);}
+/* FIXTURE LINES */
+.fixture-line{display:flex;align-items:center;gap:8px;margin-bottom:6px;background:var(--p50);border-radius:var(--radsm);padding:8px 10px;border:1px solid var(--p100);}
 /* PATIENT TIMELINE */
 .pt-timeline-section{margin-bottom:20px;}
 .pt-timeline-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--s50);border-radius:var(--rad) var(--rad) 0 0;border:1px solid var(--s200);border-bottom:none;}
@@ -484,7 +489,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <!-- LAB SECTION -->
     <div id="proc-lab-section" style="display:none;background:var(--p50);border:1px solid var(--p100);border-radius:var(--radsm);padding:12px 14px;margin-bottom:13px;">
       <div style="font-size:11px;font-weight:700;color:var(--p700);margin-bottom:8px;">&#128300; Lab work <span style="font-size:10px;font-weight:400;color:var(--s400);">(fee deducted from agreed total for split)</span></div>
-      <div class="fg" style="margin-bottom:0;">
+      <div class="fg" style="margin-bottom:8px;">
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab</label>
           <select class="finp" id="proc-lab" onchange="onProcLabChange(this.value)"><option value="">Select lab...</option></select></div>
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab service</label>
@@ -492,10 +497,14 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl" id="proc-lab-fee-lbl">Lab fee (IQD)</label>
           <input class="finp" type="number" id="proc-lab-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
       </div>
-      <div id="proc-fixture-wrap" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--p200);">
-        <label class="flbl">Implant fixture cost (IQD)</label>
-        <input class="finp" type="number" id="proc-fixture-fee" placeholder="0" min="0" oninput="updateProcNet()">
-        <div style="font-size:10px;color:var(--s400);margin-top:3px;">Deducted from agreed total before any split</div>
+      <!-- FIXTURES SECTION — shown when lab is involved -->
+      <div id="proc-fixtures-section" style="border-top:1px solid var(--p200);padding-top:8px;margin-top:4px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:11px;font-weight:700;color:var(--p700);">&#129454; Implant fixtures placed</div>
+          <button type="button" class="btn btnsm" onclick="addFixtureLine()" style="font-size:10px;padding:3px 10px;">+ Add fixture</button>
+        </div>
+        <div id="proc-fixture-lines"></div>
+        <div style="font-size:10px;color:var(--s400);margin-top:4px;">Add fixtures only if this session involves implant placement. Each fixture line = brand × qty.</div>
       </div>
     </div>
     <!-- NET DISPLAY -->
@@ -505,6 +514,10 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         <div><div style="font-size:10px;color:var(--s400);">Lab fee</div><div style="font-size:14px;font-weight:700;color:var(--r600);" id="pnd-lab">-0</div></div>
         <div><div style="font-size:10px;color:var(--s400);">Net (for split)</div><div style="font-size:14px;font-weight:700;color:var(--g700);" id="pnd-net">0</div></div>
       </div>
+    </div>
+    <!-- UNIT CALCULATION BAR — shown when procedure is per_unit -->
+    <div id="proc-unit-bar" style="display:none;" class="unit-calc-bar">
+      <span id="proc-unit-text">Select teeth to calculate</span>
     </div>
     <!-- FEE — shown only for new case -->
     <div id="proc-fee-wrap">
@@ -592,6 +605,35 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       <button class="btn btnr" id="pay-del-inv-btn" style="margin-right:auto;display:none;" onclick="deleteInvoice(document.getElementById('pay-inv-id').value, document.getElementById('pay-pid').value)">&#128465; Delete invoice</button>
       <button class="btn" onclick="closeMdl('pay-modal')">Cancel</button>
       <button class="btn btnp" onclick="savePayment()">Record payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPLANT FIXTURE MODAL -->
+<div class="mbg" id="fixture-modal">
+  <div class="modal">
+    <div class="mtit" id="fixture-modal-title">Add implant fixture</div>
+    <div class="msub">Add a fixture brand/model to your catalog</div>
+    <input type="hidden" id="fixture-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Brand name <span class="req">*</span></label>
+        <input class="finp" id="fixture-brand" placeholder="e.g. Straumann, Nobel, Osstem"></div>
+      <div class="fgrp"><label class="flbl">Model / size (optional)</label>
+        <input class="finp" id="fixture-model" placeholder="e.g. BL 4.1mm, Active 3.5mm"></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Unit price <span class="req">*</span></label>
+        <input class="finp" type="number" id="fixture-price" placeholder="0" min="0"></div>
+      <div class="fgrp"><label class="flbl">Currency</label>
+        <select class="finp" id="fixture-currency">
+          <option value="IQD">IQD</option>
+          <option value="USD">USD</option>
+        </select></div>
+    </div>
+    <div class="mac">
+      <button class="btn btnr" id="fixture-del-btn" style="display:none;margin-right:auto;" onclick="deleteFixture()">Delete</button>
+      <button class="btn" onclick="closeMdl('fixture-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveFixture()">Save fixture</button>
     </div>
   </div>
 </div>
@@ -1070,6 +1112,8 @@ function renderProcChart(){
   var pb=document.getElementById('perm-btn'),prb=document.getElementById('prim-btn');
   if(pb)pb.style.cssText=!procIsPrim?'background:var(--b600);color:white;border-color:var(--b600);':'';
   if(prb)prb.style.cssText=procIsPrim?'background:var(--b600);color:white;border-color:var(--b600);':'';
+  // Recalculate unit price whenever teeth selection changes
+  calcUnitPrice();
 }
 
 // BILLING TAB (backward compat — now redirects to unified profile)
@@ -2151,37 +2195,54 @@ function getLabProcs(){
 }
 var allLabs=[],allSvcs=[],procLabCache=[],procSvcCache=[];
 
+var labsTab='labs'; // 'labs' or 'fixtures'
 async function renderLabs(){
-  document.getElementById('pg-actions').innerHTML='<button class="btn btnp" onclick="openAddLab()">+ Add lab</button>';
-  document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading labs...</div>';
-  var lr=await db.from('labs').select('*').order('name');
-  var sr=await db.from('lab_services').select('*').order('name');
-  allLabs=lr.data||[];allSvcs=sr.data||[];
-  buildLabsUI();
+  document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading...</div>';
+  if(labsTab==='fixtures'){
+    document.getElementById('pg-actions').innerHTML='<button class="btn btnp" onclick="openAddFixture()">+ Add fixture</button>';
+    var lr=await db.from('labs').select('*').order('name');
+    var sr=await db.from('lab_services').select('*').order('name');
+    allLabs=lr.data||[];allSvcs=sr.data||[];
+    await loadFixtures();
+    var html=buildLabTabs()+await renderFixtures();
+    document.getElementById('pg-content').innerHTML=html;
+  } else {
+    document.getElementById('pg-actions').innerHTML='<button class="btn btnp" onclick="openAddLab()">+ Add lab</button>';
+    var lr2=await db.from('labs').select('*').order('name');
+    var sr2=await db.from('lab_services').select('*').order('name');
+    allLabs=lr2.data||[];allSvcs=sr2.data||[];
+    await loadFixtures();
+    buildLabsUI();
+  }
+}
+function buildLabTabs(){
+  return '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:14px;">'+
+    '<button class="fin-tab'+(labsTab==='labs'?' act':'')+'" onclick="labsTab=\'labs\';renderLabs()">&#128300; Labs</button>'+
+    '<button class="fin-tab'+(labsTab==='fixtures'?' act':'')+'" onclick="labsTab=\'fixtures\';renderLabs()">&#129454; Implant Fixtures</button>'+
+    '</div>';
 }
 function buildLabsUI(){
   document.getElementById('pg-actions').innerHTML='<button class="btn btnp" onclick="openAddLab()">+ Add lab</button>';
+  var html=buildLabTabs();
   if(!allLabs.length){
-    document.getElementById('pg-content').innerHTML=
-      '<div style="text-align:center;padding:80px 20px;"><div style="font-size:48px;margin-bottom:16px;">&#128300;</div>'+
+    html+='<div style="text-align:center;padding:80px 20px;"><div style="font-size:48px;margin-bottom:16px;">&#128300;</div>'+
       '<div style="font-size:14px;font-weight:700;color:var(--s600);margin-bottom:6px;">No labs yet</div>'+
       '<div style="font-size:12px;color:var(--s400);">Click &quot;+ Add lab&quot; to add your first lab</div></div>';
+    document.getElementById('pg-content').innerHTML=html;
     return;
   }
-  var html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">'+
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;">'+
     allLabs.map(function(lab){
       var svcs=allSvcs.filter(function(s){return s.lab_id===lab.id;});
-      var card='<div data-labid="'+lab.id+'" style="background:white;border-radius:var(--rad);border:1.5px solid var(--s200);padding:24px 20px;cursor:pointer;transition:all 0.12s;">'+
+      return '<div data-labid="'+lab.id+'" style="background:white;border-radius:var(--rad);border:1.5px solid var(--s200);padding:24px 20px;cursor:pointer;transition:all 0.12s;">'+
         '<div style="font-size:28px;margin-bottom:10px;">&#128300;</div>'+
         '<div style="font-size:16px;font-weight:700;color:var(--s800);margin-bottom:4px;">'+lab.name+'</div>'+
         (lab.notes?'<div style="font-size:11px;color:var(--s400);margin-bottom:10px;">'+lab.notes+'</div>':'<div style="margin-bottom:10px;"></div>')+
         '<span style="display:inline-flex;padding:3px 10px;border-radius:20px;background:var(--p50);color:var(--p700);font-size:11px;font-weight:600;border:1px solid var(--p100);">'+
         svcs.length+' service'+(svcs.length!==1?'s':'')+'</span>'+
         '</div>';
-      return card;
     }).join('')+'</div>';
   document.getElementById('pg-content').innerHTML=html;
-  // attach click via event delegation to avoid inline onclick quote issues
   document.getElementById('pg-content').addEventListener('click',function(e){
     var card=e.target.closest('[data-labid]');
     if(card)openLabDetail(card.dataset.labid);
@@ -2434,8 +2495,22 @@ function onProcSvcChange(svcId){
   var opt=svcSel?Array.from(svcSel.options).find(function(o){return o.value===svcId;}):null;
   if(opt&&opt.dataset.price){
     var pf=document.getElementById('proc-lab-fee');
-    if(pf){pf.value=opt.dataset.price;pf.dataset.currency=opt.dataset.currency||'IQD';}
-    // update lab fee label
+    if(pf){
+      var procName=document.getElementById('proc-name').value;
+      var def=allProcDefs.find(function(d){return d.name===procName;});
+      var labFeeType=def?def.lab_fee_type||'fixed':'fixed';
+      var units=Object.keys(procSelTeeth).length;
+      var unitPrice=parseFloat(opt.dataset.price)||0;
+      // Store unit price for later multiplication
+      pf.dataset.unitPrice=unitPrice;
+      pf.dataset.currency=opt.dataset.currency||'IQD';
+      // Apply multiplication if per_unit
+      if(labFeeType==='per_unit'&&units>0){
+        pf.value=units*unitPrice;
+      } else {
+        pf.value=unitPrice;
+      }
+    }
     var lbl=document.getElementById('proc-lab-fee-lbl');
     if(lbl)lbl.textContent='Lab fee ('+(opt.dataset.currency||'IQD')+')';
     updateProcNet();
@@ -2457,6 +2532,52 @@ function autoMatchLabSvc(procName){
     updateProcNet();
   }
 }
+// Called whenever teeth selection or fee changes — recalculates if procedure is per_unit
+function calcUnitPrice(){
+  var bar=document.getElementById('proc-unit-bar');
+  var feeEl=document.getElementById('proc-fee');
+  var labEl=document.getElementById('proc-lab-fee');
+  if(!bar||!feeEl)return;
+  var procName=document.getElementById('proc-name').value;
+  var def=allProcDefs.find(function(d){return d.name===procName;});
+  if(!def){bar.style.display='none';return;}
+  var units=Object.keys(procSelTeeth).length;
+  var unitPrice=Number(def.price||0);
+  var curr=def.currency||'IQD';
+  var feeType=def.fee_type||'fixed';
+  var labFeeType=def.lab_fee_type||'fixed';
+  if(feeType==='per_unit'&&units>0&&unitPrice>0){
+    var total=units*unitPrice;
+    bar.style.display='flex';
+    var txt=document.getElementById('proc-unit-text');
+    if(txt)txt.innerHTML='&#128176; <strong>'+units+' units</strong> × '+fmtAmt(unitPrice,curr)+' = <strong>'+fmtAmt(total,curr)+'</strong> &nbsp;|&nbsp; You can override below';
+    // Auto-fill fee only if the field hasn't been manually changed (or is empty / matches previous auto)
+    if(def.price_override!=='no'){
+      if(!feeEl.dataset.manualOverride||feeEl.dataset.lastAuto===feeEl.value){
+        feeEl.value=total;
+        feeEl.dataset.lastAuto=total;
+      }
+    } else {
+      feeEl.value=total;
+    }
+    // Auto-multiply lab fee if per_unit
+    if(labFeeType==='per_unit'&&labEl){
+      var labUnit=parseFloat(labEl.dataset.unitPrice||labEl.value)||0;
+      if(labUnit>0){
+        labEl.value=units*labUnit;
+      }
+    }
+  } else if(feeType==='per_unit'&&units===0){
+    bar.style.display='flex';
+    var txt2=document.getElementById('proc-unit-text');
+    if(txt2)txt2.innerHTML='Select teeth to calculate price ('+fmtAmt(unitPrice,curr)+' per unit)';
+    if(!feeEl.dataset.manualOverride) feeEl.value='';
+  } else {
+    bar.style.display='none';
+  }
+  updateProcNet();
+}
+
 function updateProcNet(){
   var feeEl=document.getElementById('proc-fee');
   var fee=parseFloat((feeEl||{}).value)||0;
@@ -2464,13 +2585,20 @@ function updateProcNet(){
   var labEl=document.getElementById('proc-lab-fee');
   var labFeeRaw=parseFloat((labEl||{}).value)||0;
   var labCurr=(labEl||{dataset:{}}).dataset.currency||'IQD';
-  // convert lab fee to proc fee currency for display
   var labFee=labFeeRaw;
   if(labCurr!==feeCurr){
     if(labCurr==='USD'&&feeCurr==='IQD')labFee=labFeeRaw*IQD;
     else if(labCurr==='IQD'&&feeCurr==='USD')labFee=labFeeRaw/IQD;
   }
-  var fixtureFee=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
+  // Sum all fixture lines
+  var fixtureFee=0;
+  document.querySelectorAll('.fixture-qty-inp,.fixture-price-inp').forEach(function(){});
+  var fixtureLines=document.querySelectorAll('[data-fixture-line]');
+  fixtureLines.forEach(function(line){
+    var qty=parseFloat(line.querySelector('.fixture-qty-inp').value)||0;
+    var price=parseFloat(line.querySelector('.fixture-price-inp').value)||0;
+    fixtureFee+=qty*price;
+  });
   var totalDeductions=labFee+fixtureFee;
   var net=fee-totalDeductions;
   var disp=document.getElementById('proc-net-disp');
@@ -2481,6 +2609,109 @@ function updateProcNet(){
     if(pl)pl.textContent='-'+fmtAmt(totalDeductions,feeCurr)+(fixtureFee>0?' (lab+fixture)':'');
     if(pn){pn.textContent=fmtAmt(net,feeCurr);pn.style.color=net>=0?'var(--g700)':'var(--r600)';}
   }else{if(disp)disp.style.display='none';}
+}
+
+// ══════════════ FIXTURE CATALOG (in Labs section) ═════════════════
+var allFixtures=[];
+
+async function loadFixtures(){
+  var r=await db.from('implant_fixtures').select('*').order('brand').order('model');
+  if(r.error){allFixtures=[];return;}
+  allFixtures=r.data||[];
+}
+async function renderFixtures(){
+  await loadFixtures();
+  var html='<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">&#129454; Implant fixture catalog</div></div>'+
+    '<div class="vdc-card-body">';
+  if(!allFixtures.length){
+    html+='<div style="text-align:center;padding:30px;color:var(--s400);font-size:12px;">No fixtures yet — click &quot;+ Add fixture&quot; to add your first</div>';
+  } else {
+    html+='<table class="tbl"><thead><tr><th>Brand</th><th>Model / Size</th><th>Unit price</th><th></th></tr></thead><tbody>'+
+      allFixtures.map(function(f){
+        return '<tr><td style="font-weight:700;">'+f.brand+'</td>'+
+          '<td style="color:var(--s500);">'+(f.model||'—')+'</td>'+
+          '<td style="font-weight:700;color:var(--b700);">'+fmtAmt(f.price,f.currency||'IQD')+'</td>'+
+          '<td><button class="btn btnxs" onclick="openEditFixture(\''+f.id+'\')">Edit</button></td></tr>';
+      }).join('')+'</tbody></table>';
+  }
+  html+='</div></div>';
+  return html;
+}
+function openAddFixture(){
+  document.getElementById('fixture-modal-title').textContent='Add implant fixture';
+  document.getElementById('fixture-id').value='';
+  document.getElementById('fixture-brand').value='';
+  document.getElementById('fixture-model').value='';
+  document.getElementById('fixture-price').value='';
+  document.getElementById('fixture-currency').value='IQD';
+  document.getElementById('fixture-del-btn').style.display='none';
+  openMdl('fixture-modal');
+}
+function openEditFixture(id){
+  var f=allFixtures.find(function(x){return x.id===id;});if(!f)return;
+  document.getElementById('fixture-modal-title').textContent='Edit fixture';
+  document.getElementById('fixture-id').value=f.id;
+  document.getElementById('fixture-brand').value=f.brand||'';
+  document.getElementById('fixture-model').value=f.model||'';
+  document.getElementById('fixture-price').value=f.price||'';
+  document.getElementById('fixture-currency').value=f.currency||'IQD';
+  document.getElementById('fixture-del-btn').style.display='inline-flex';
+  openMdl('fixture-modal');
+}
+async function saveFixture(){
+  var brand=document.getElementById('fixture-brand').value.trim();
+  if(!brand){showToast('Enter brand name','error');return;}
+  var id=document.getElementById('fixture-id').value;
+  var payload={brand:brand,model:document.getElementById('fixture-model').value.trim()||null,
+    price:parseFloat(document.getElementById('fixture-price').value)||0,
+    currency:document.getElementById('fixture-currency').value||'IQD'};
+  var r=id?await db.from('implant_fixtures').update(payload).eq('id',id):await db.from('implant_fixtures').insert([payload]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast(id?'Fixture updated':'Fixture added');
+  closeMdl('fixture-modal');
+  allFixtures=[];
+  renderLabs();
+}
+async function deleteFixture(){
+  var id=document.getElementById('fixture-id').value;
+  if(!id||!confirm('Delete this fixture?'))return;
+  await db.from('implant_fixtures').delete().eq('id',id);
+  showToast('Fixture deleted');closeMdl('fixture-modal');allFixtures=[];renderLabs();
+}
+
+// Add a fixture line in the record procedure form
+function addFixtureLine(){
+  var container=document.getElementById('proc-fixture-lines');
+  if(!container)return;
+  var idx=Date.now();
+  var fixtureOpts=allFixtures.map(function(f){
+    return '<option value="'+f.id+'" data-price="'+f.price+'" data-currency="'+(f.currency||'IQD')+'">'+(f.brand+(f.model?' '+f.model:''))+' ('+fmtAmt(f.price,f.currency||'IQD')+')</option>';
+  }).join('');
+  var html='<div class="fixture-line" data-fixture-line="'+idx+'">'+
+    '<select class="finp fixture-cat-sel" style="flex:2;" onchange="onFixturePicked(this)">'+
+    '<option value="">Select fixture...</option>'+fixtureOpts+'</select>'+
+    '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'+
+    '<label style="font-size:10px;color:var(--p700);font-weight:600;white-space:nowrap;">Qty</label>'+
+    '<input type="number" class="finp fixture-qty-inp" value="1" min="1" style="width:55px;" oninput="updateProcNet()"></div>'+
+    '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'+
+    '<label style="font-size:10px;color:var(--p700);font-weight:600;white-space:nowrap;">Price</label>'+
+    '<input type="number" class="finp fixture-price-inp" value="" min="0" style="width:90px;" placeholder="unit price" oninput="updateProcNet()"></div>'+
+    '<div style="font-size:10px;font-weight:700;color:var(--p700);white-space:nowrap;min-width:60px;" id="ftotal-'+idx+'">0</div>'+
+    '<button type="button" class="btn btnr btnxs" onclick="removeFixtureLine(this)" style="flex-shrink:0;">&#128465;</button>'+
+    '</div>';
+  container.insertAdjacentHTML('beforeend',html);
+  if(!allFixtures.length) showToast('No fixtures in catalog — add fixtures in Labs first','error');
+}
+function onFixturePicked(sel){
+  var line=sel.closest('[data-fixture-line]');if(!line)return;
+  var opt=sel.options[sel.selectedIndex];
+  var priceEl=line.querySelector('.fixture-price-inp');
+  if(opt&&opt.dataset.price&&priceEl){priceEl.value=opt.dataset.price;}
+  updateProcNet();
+}
+function removeFixtureLine(btn){
+  var line=btn.closest('[data-fixture-line]');if(line)line.remove();
+  updateProcNet();
 }
 
 // ══════════════════════ DASHBOARD ════════════════════════════════
@@ -2644,15 +2875,13 @@ function openAddProcAdmin(){
   document.getElementById('padm-name').value='';
   document.getElementById('padm-cat').value='Restorative';
   document.getElementById('padm-price').value='';
-  document.getElementById('padm-currency').value='USD';
+  document.getElementById('padm-currency').value='IQD';
   document.getElementById('padm-override').value='yes';
+  document.getElementById('padm-fee-type').value='fixed';
   document.getElementById('padm-lab').value='no';
-  document.getElementById('padm-fixture').value='';
-  document.getElementById('padm-implant-yn')&&(document.getElementById('padm-implant-yn').value='no');
-  document.getElementById('padm-fixture-wrap')&&(document.getElementById('padm-fixture-wrap').style.display='none');
+  document.getElementById('padm-lab-fee-type').value='fixed';
   document.getElementById('padm-notes').value='';
   document.getElementById('padm-del-btn').style.display='none';
-  toggleImplantField();
   openMdl('padm-modal');
 }
 
@@ -2663,16 +2892,13 @@ function openEditProcAdmin(id){
   document.getElementById('padm-name').value=p.name||'';
   document.getElementById('padm-cat').value=p.category||'Other';
   document.getElementById('padm-price').value=p.price||'';
-  document.getElementById('padm-currency').value=p.currency||'USD';
+  document.getElementById('padm-currency').value=p.currency||'IQD';
   document.getElementById('padm-override').value=p.price_override||'yes';
+  document.getElementById('padm-fee-type').value=p.fee_type||'fixed';
   document.getElementById('padm-lab').value=p.lab_involved||'no';
-  var hasFixture=(p.fixture_price||0)>0;
-  document.getElementById('padm-implant-yn')&&(document.getElementById('padm-implant-yn').value=hasFixture?'yes':'no');
-  document.getElementById('padm-fixture-wrap')&&(document.getElementById('padm-fixture-wrap').style.display=hasFixture?'block':'none');
-  document.getElementById('padm-fixture').value=p.fixture_price||'';
+  document.getElementById('padm-lab-fee-type').value=p.lab_fee_type||'fixed';
   document.getElementById('padm-notes').value=p.notes||'';
   document.getElementById('padm-del-btn').style.display='inline-flex';
-  toggleImplantField();
   openMdl('padm-modal');
 }
 
@@ -2686,8 +2912,10 @@ async function saveProcAdmin(){
     price:parseFloat(document.getElementById('padm-price').value)||0,
     currency:document.getElementById('padm-currency').value||'IQD',
     price_override:document.getElementById('padm-override').value,
+    fee_type:document.getElementById('padm-fee-type').value||'fixed',
     lab_involved:document.getElementById('padm-lab').value,
-    fixture_price:(document.getElementById('padm-implant-yn')&&document.getElementById('padm-implant-yn').value==='yes')?parseFloat(document.getElementById('padm-fixture').value)||0:0,
+    lab_fee_type:document.getElementById('padm-lab-fee-type').value||'fixed',
+    fixture_price:0,
     notes:document.getElementById('padm-notes').value.trim()||null
   };
   var r=id
@@ -3856,7 +4084,9 @@ async function openAddProc(pid){
   var pfee=document.getElementById('proc-fee'); if(pfee){pfee.readOnly=false;pfee.style.background='';}
   await loadProcDefs();
   await loadLabsForProc();
-  var _pid=document.getElementById('proc-pid').value;
+  await loadFixtures();
+  // clear fixture lines
+  var fl=document.getElementById('proc-fixture-lines');if(fl)fl.innerHTML='';
   // populate procedure select
   var sel=document.getElementById('proc-name');
   if(sel){
@@ -4008,7 +4238,21 @@ async function saveProc(){
   var feeCurrency=(document.getElementById('proc-fee').dataset.currency)||'IQD';
   var labFeeBase=parseFloat((document.getElementById('proc-lab-fee')||{}).value)||0;
   var labFeeCurrency=(document.getElementById('proc-lab-fee')||{dataset:{}}).dataset.currency||'IQD';
-  var fixtureFeeAmt=parseFloat((document.getElementById('proc-fixture-fee')||{}).value)||0;
+  // Collect fixture lines total
+  var fixtureFeeAmt=0;
+  var fixtureLinesSummary=[];
+  document.querySelectorAll('[data-fixture-line]').forEach(function(line){
+    var selEl=line.querySelector('.fixture-cat-sel');
+    var qtyEl=line.querySelector('.fixture-qty-inp');
+    var priceEl=line.querySelector('.fixture-price-inp');
+    var qty=parseFloat((qtyEl||{}).value)||0;
+    var price=parseFloat((priceEl||{}).value)||0;
+    if(qty>0&&price>0){
+      fixtureFeeAmt+=qty*price;
+      var opt=selEl?selEl.options[selEl.selectedIndex]:null;
+      fixtureLinesSummary.push({brand:opt?opt.textContent:'Fixture',qty:qty,price:price});
+    }
+  });
   var labFeeConverted=labFeeBase;
   if(labFeeCurrency!==feeCurrency){
     if(labFeeCurrency==='USD'&&feeCurrency==='IQD')labFeeConverted=labFeeBase*IQD;
@@ -4542,18 +4786,25 @@ function buildProcAdminUI(){
       '</div></div>'+
       '<div class="vdc-card-body" style="padding:0;">'+
       '<table class="tbl"><thead><tr>'+
-      '<th>Name</th><th>Default price</th><th>Lab</th><th>Sessions</th><th>Override</th><th>Notes</th><th></th>'+
+      '<th>Name</th><th>Default price</th><th>Fee type</th><th>Lab</th><th>Lab fee type</th><th>Sessions</th><th>Override</th><th></th>'+
       '</tr></thead><tbody>'+
       procs.map(function(p){
         var price=fmtAmt(p.price,p.currency||'IQD');
         var sessCnt=(allProcSessions[p.id]||[]).length;
+        var feeTypeBadge=p.fee_type==='per_unit'?
+          '<span class="badge bp">Per unit</span>':
+          '<span class="badge bs">Fixed</span>';
+        var labFeeTypeBadge=p.lab_fee_type==='per_unit'?
+          '<span class="badge bp">Per unit</span>':
+          '<span class="badge bs">Fixed</span>';
         return '<tr>'+
           '<td style="font-weight:700;color:var(--s800);">'+p.name+'</td>'+
           '<td><div style="font-weight:700;color:var(--b700);">'+price+'</div></td>'+
+          '<td>'+feeTypeBadge+'</td>'+
           '<td>'+(p.lab_involved==='yes'?'<span class="badge bp">&#128300; Yes</span>':'<span style="color:var(--s400);font-size:11px;">No</span>')+'</td>'+
+          '<td>'+(p.lab_involved==='yes'?labFeeTypeBadge:'<span style="color:var(--s300);font-size:10px;">—</span>')+'</td>'+
           '<td><button class="btn btnxs" style="background:var(--p50);color:var(--p700);border-color:var(--p100);" data-sess-id="'+p.id+'" data-sess-name="'+p.name.replace(/"/g,'&quot;')+'">&#128198; '+sessCnt+' session'+(sessCnt!==1?'s':'')+'</button></td>'+
           '<td>'+(p.price_override==='no'?'<span class="badge br">Locked</span>':'<span class="badge bg">Editable</span>')+'</td>'+
-          '<td style="font-size:10px;color:var(--s400);font-style:italic;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(p.notes||'—')+'</td>'+
           '<td><button class="btn btnxs" data-padm-id="'+p.id+'">Edit</button></td>'+
           '</tr>';
       }).join('')+'</tbody></table></div></div>';
@@ -4838,26 +5089,29 @@ async function loadPatientPlans(pid){}
         </select></div>
     </div>
     <div class="fg">
+      <div class="fgrp">
+        <label class="flbl">&#128176; Procedure fee type</label>
+        <select class="finp" id="padm-fee-type">
+          <option value="fixed">Fixed — same price regardless of teeth count</option>
+          <option value="per_unit">Per unit — price × number of teeth selected</option>
+        </select>
+        <div style="font-size:10px;color:var(--s400);margin-top:3px;">e.g. "Fixed" for cleaning, "Per unit" for fillings, veneers, implants</div>
+      </div>
+      <div class="fgrp">
+        <label class="flbl">&#128300; Lab fee type</label>
+        <select class="finp" id="padm-lab-fee-type">
+          <option value="fixed">Fixed — one lab fee for the whole case</option>
+          <option value="per_unit">Per unit — lab fee × number of teeth selected</option>
+        </select>
+        <div style="font-size:10px;color:var(--s400);margin-top:3px;">e.g. "Fixed" for temporary, "Per unit" for crowns, veneers</div>
+      </div>
+    </div>
+    <div class="fg">
       <div class="fgrp"><label class="flbl">Lab involved?</label>
         <select class="finp" id="padm-lab" onchange="toggleImplantField()">
           <option value="no">No lab</option>
           <option value="yes">Yes — requires lab work</option>
         </select></div>
-      <div class="fgrp" id="padm-implant-wrap" style="display:none;">
-        <label class="flbl">Implant involved?</label>
-        <select class="finp" id="padm-implant-yn" onchange="toggleFixturePrice()">
-          <option value="no">No</option>
-          <option value="yes">Yes — has implant fixture cost</option>
-        </select>
-        <div id="padm-fixture-wrap" style="display:none;margin-top:8px;">
-          <label class="flbl">Implant fixture price</label>
-          <div style="display:flex;gap:8px;">
-            <input class="finp" type="number" id="padm-fixture" placeholder="0" min="0" style="flex:1;">
-            <select class="finp" id="padm-fixture-currency" style="width:90px;"><option value="IQD" selected>IQD</option><option value="USD">USD</option></select>
-          </div>
-          <div style="font-size:10px;color:var(--s400);margin-top:3px;">Deducted from fee before any split</div>
-        </div>
-      </div>
     </div>
     <div class="fgrp"><label class="flbl">Clinical notes / instructions</label>
       <textarea class="finp" id="padm-notes" rows="2" placeholder="Internal notes for staff, e.g. requires X-ray before, needs 2 appointments..."></textarea></div>
