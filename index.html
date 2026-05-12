@@ -1096,6 +1096,13 @@ function getPerms(){ return ROLE_PERMS[currentUser?currentUser.role:'admin']||RO
 function can(action){ return !!(getPerms()[action]); }
 function canAccessSection(s){ return getPerms().sections.indexOf(s)>=0; }
 
+// Load admin-customized permissions from localStorage
+function loadCustomPerms(){
+  var saved=localStorage.getItem('vdc-role-perms');
+  if(saved){try{var p=JSON.parse(saved);Object.keys(p).forEach(function(role){if(ROLE_PERMS[role])ROLE_PERMS[role]=p[role];});}catch(e){}}
+}
+loadCustomPerms();
+
 async function doLogin(){
   var u=document.getElementById('li-u').value.trim();
   var p=document.getElementById('li-p').value;
@@ -1214,13 +1221,13 @@ window.onload=function(){_attachChipDelegation();
 
 // goTo with permission check
 function goTo(s){
-  // Permission check — skip for dashboard (always allowed)
   if(s!=='dashboard'&&!canAccessSection(s)){accessDenied(s);return;}
-
   document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('act');});
   var nav=document.getElementById('nav-'+s);if(nav)nav.classList.add('act');
   if(waitInt){clearInterval(waitInt);waitInt=null;}
   if(nowInt){clearInterval(nowInt);nowInt=null;}
+  // Immediately clear content so old section never bleeds through
+  document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading...</div>';
   var T={dashboard:'Dashboard',patients:'Patients',procedures:'Procedures',appointments:'Appointments',billing:'Billing',finance:'Staff & Finance',labs:'Labs',stocks:'Stocks',files:'X-rays & Files',settings:'Settings'};
   var S={patients:'Manage patients & clinical records',appointments:'Daily schedule & room management',billing:'Financial overview — all patients',finance:'Payroll & partner wallets',stocks:'Inventory management & stock tracking',settings:'Clinic preferences'};
   document.getElementById('pg-title').textContent=T[s]||s;
@@ -2549,6 +2556,255 @@ async function saveExp(){
 }
 
 // ══════════════════════ SETTINGS ═════════════════════════════════
+// ══════════════════════ SETTINGS ═════════════════════════════════
+var settingsTab='general';
+
+function renderSettings(){
+  if(!canAccessSection('settings')){accessDenied('settings');return;}
+  document.getElementById('pg-content').innerHTML=
+    '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:18px;" id="settings-tabs">'+
+    '<button class="fin-tab'+(settingsTab==='general'?' act':'')+'" onclick="settingsTab=\'general\';renderSettings()">&#9881; General</button>'+
+    (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='accounts'?' act':'')+'" onclick="settingsTab=\'accounts\';renderSettings()">&#128100; Accounts</button>':'')  +
+    (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='permissions'?' act':'')+'" onclick="settingsTab=\'permissions\';renderSettings()">&#128274; Permissions</button>':'')+
+    '</div>'+
+    '<div id="settings-body"></div>';
+  if(settingsTab==='accounts'&&can('canManageAccounts')){
+    renderAccountsTab();
+  } else if(settingsTab==='permissions'&&can('canManageAccounts')){
+    renderPermissionsTab();
+  } else {
+    renderGeneralTab();
+  }
+}
+
+function renderGeneralTab(){
+  document.getElementById('settings-body').innerHTML=
+    '<div class="set-sec">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:4px;">&#128336; Working hours</div>'+
+    '<div style="font-size:11px;color:var(--s400);margin-bottom:14px;">Set your clinic opening and closing times</div>'+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Opening time</div></div>'+
+    '<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:14px;font-weight:700;color:var(--b600);">'+clinicOpen+'</span><button class="btn btnsm" onclick="loadHours();openMdl(\'hrs-modal\')">Change</button></div></div>'+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Closing time</div></div>'+
+    '<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:14px;font-weight:700;color:var(--b600);">'+clinicClose+'</span><button class="btn btnsm" onclick="loadHours();openMdl(\'hrs-modal\')">Change</button></div></div>'+
+    '</div>'+
+    '<div class="set-sec">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:14px;">&#127973; Clinic info</div>'+
+    '<div class="set-row"><div style="font-size:12px;font-weight:600;">Clinic name</div><div style="font-size:13px;color:var(--s600);">Value Dental Center</div></div>'+
+    '<div class="set-row"><div style="font-size:12px;font-weight:600;">Location</div><div style="font-size:13px;color:var(--s600);">Duhok, Iraq</div></div>'+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">IQD exchange rate</div><div style="font-size:10px;color:var(--s400);margin-top:2px;">Updated daily — for USD conversion</div></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:13px;">1 USD =</span>'+
+    '<input type="number" id="settings-iqd-rate" value="'+IQD+'" style="width:90px;padding:5px 8px;border-radius:var(--radsm);border:1.5px solid var(--s200);font-size:13px;font-weight:700;font-family:inherit;text-align:center;">'+
+    '<span style="font-size:13px;">IQD</span>'+
+    '<button class="btn btnsm btnp" onclick="saveIQDRate()">Save</button></div></div>'+
+    '</div>'+
+    '<div class="set-sec">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:8px;">&#128272; Your session</div>'+
+    '<div class="set-row"><div style="font-size:12px;font-weight:600;">Logged in as</div><div style="font-size:12px;color:var(--s600);">'+(currentUser?currentUser.name+' ('+currentUser.role+')':'—')+'</div></div>'+
+    '</div>';
+}
+
+// ══════════════════════ ACCOUNTS MANAGEMENT ══════════════════════
+var allAccounts=[];
+
+async function renderAccountsTab(){
+  var el=document.getElementById('settings-body');
+  el.innerHTML='<div class="loader"><div class="spinner"></div>Loading accounts...</div>';
+  var r=await db.from('staff_accounts').select('id,name,username,role,linked_dentist,is_active,last_login,created_at').order('role').order('name');
+  allAccounts=r.data||[];
+  var roleColors={admin:'#185FA5',partner:'#6D28D9',dentist:'#059669',assistant:'#B45309',receptionist:'#0E7490'};
+  var roleLabels={admin:'Admin',partner:'Partner',dentist:'Dentist',assistant:'Assistant',receptionist:'Receptionist'};
+  var html=
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;">'+
+    '<button class="btn btnp" onclick="openAddAccount()">+ Add account</button></div>'+
+    '<div class="vdc-card"><div class="vdc-card-body" style="padding:0;overflow-x:auto;">'+
+    '<table class="tbl"><thead><tr>'+
+    '<th>Name</th><th>Username</th><th>Role</th><th>Linked to</th><th>Status</th><th>Last login</th><th></th>'+
+    '</tr></thead><tbody>'+
+    allAccounts.map(function(acc){
+      var isSelf=currentUser&&currentUser.id===acc.id;
+      var rc=roleColors[acc.role]||'#6B7280';
+      return '<tr>'+
+        '<td style="font-weight:700;">'+(acc.name)+(isSelf?' <span style="font-size:9px;background:#DBEAFE;color:#1D4ED8;padding:1px 5px;border-radius:10px;">You</span>':'')+'</td>'+
+        '<td style="font-family:monospace;font-size:11px;">'+(acc.username)+'</td>'+
+        '<td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+rc+'22;color:'+rc+';">'+(roleLabels[acc.role]||acc.role)+'</span></td>'+
+        '<td style="font-size:11px;color:var(--s500);">'+(acc.linked_dentist||'—')+'</td>'+
+        '<td><span class="badge '+(acc.is_active?'bg':'br')+'">'+(acc.is_active?'Active':'Inactive')+'</span></td>'+
+        '<td style="font-size:10px;color:var(--s400);">'+(acc.last_login?acc.last_login.slice(0,16).replace('T',' '):'Never')+'</td>'+
+        '<td><button class="btn btnxs" onclick="openEditAccount(\''+acc.id+'\')">Edit</button></td>'+
+        '</tr>';
+    }).join('')+'</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+
+function onAccRoleChange(){
+  var role=document.getElementById('acc-role').value;
+  var linkedWrap=document.getElementById('acc-linked-wrap');
+  var descEl=document.getElementById('acc-role-desc');
+  var descs={
+    admin:'Full access to everything including accounts, settings, and all finance.',
+    partner:'Full clinical access. In Finance: sees only own wallet and the Value Wallet.',
+    dentist:'Sees only their own patients and appointments. Can record procedures. No finance access.',
+    assistant:'Can view all appointments and use stock items. No finance.',
+    receptionist:'Can manage all patients, book appointments, and record payments. No finance details.'
+  };
+  linkedWrap.style.display=(role==='partner'||role==='dentist')?'block':'none';
+  if(role&&descs[role]){descEl.style.display='block';descEl.textContent=descs[role];}
+  else descEl.style.display='none';
+}
+function openAddAccount(){
+  document.getElementById('acc-modal-title').textContent='Add account';
+  document.getElementById('acc-id').value='';
+  ['acc-name','acc-username','acc-password'].forEach(function(i){document.getElementById(i).value='';});
+  document.getElementById('acc-role').value='';
+  document.getElementById('acc-linked').value='';
+  document.getElementById('acc-active').value='true';
+  document.getElementById('acc-del-btn').style.display='none';
+  document.getElementById('acc-pass-hint').style.display='none';
+  document.getElementById('acc-pass-label').innerHTML='Password <span class="req">*</span>';
+  document.getElementById('acc-linked-wrap').style.display='none';
+  document.getElementById('acc-role-desc').style.display='none';
+  openMdl('acc-modal');
+}
+function openEditAccount(id){
+  var acc=allAccounts.find(function(a){return a.id===id;});if(!acc)return;
+  document.getElementById('acc-modal-title').textContent='Edit account';
+  document.getElementById('acc-id').value=acc.id;
+  document.getElementById('acc-name').value=acc.name||'';
+  document.getElementById('acc-username').value=acc.username||'';
+  document.getElementById('acc-password').value='';
+  document.getElementById('acc-role').value=acc.role||'';
+  document.getElementById('acc-linked').value=acc.linked_dentist||'';
+  document.getElementById('acc-active').value=acc.is_active?'true':'false';
+  document.getElementById('acc-del-btn').style.display='inline-flex';
+  document.getElementById('acc-pass-hint').style.display='block';
+  document.getElementById('acc-pass-label').innerHTML='New password <span style="font-size:10px;color:var(--s400);font-weight:400;">(leave blank to keep current)</span>';
+  onAccRoleChange();
+  openMdl('acc-modal');
+}
+async function saveAccount(){
+  var name=document.getElementById('acc-name').value.trim();
+  var username=document.getElementById('acc-username').value.trim().toLowerCase();
+  var password=document.getElementById('acc-password').value;
+  var role=document.getElementById('acc-role').value;
+  var linked=document.getElementById('acc-linked').value||null;
+  var isActive=document.getElementById('acc-active').value==='true';
+  var id=document.getElementById('acc-id').value;
+  if(!name){showToast('Enter full name','error');return;}
+  if(!username){showToast('Enter username','error');return;}
+  if(!role){showToast('Select a role','error');return;}
+  if(!id&&!password){showToast('Enter a password','error');return;}
+  if((role==='partner'||role==='dentist')&&!linked){showToast('Select which dentist this account belongs to','error');return;}
+  var payload={name:name,username:username,role:role,linked_dentist:linked,is_active:isActive};
+  if(password)payload.password_hash=await sha256(password);
+  var r=id?await db.from('staff_accounts').update(payload).eq('id',id):await db.from('staff_accounts').insert([payload]);
+  if(r.error){
+    if(r.error.message&&(r.error.message.includes('unique')||r.error.code==='23505'))showToast('Username already taken — choose another','error');
+    else showToast('Failed: '+r.error.message,'error');
+    return;
+  }
+  showToast(id?'Account updated':'Account created ✅');
+  closeMdl('acc-modal');
+  renderAccountsTab();
+}
+async function deleteAccount(){
+  var id=document.getElementById('acc-id').value;
+  if(!id)return;
+  if(currentUser&&currentUser.id===id){showToast('Cannot delete your own account','error');return;}
+  if(!confirm('Delete this account? The person will no longer be able to login.'))return;
+  await db.from('staff_accounts').delete().eq('id',id);
+  showToast('Account deleted');
+  closeMdl('acc-modal');
+  renderAccountsTab();
+}
+
+// ══════════════════════ PERMISSIONS EDITOR ═══════════════════════
+var ALL_SECTIONS=['dashboard','patients','procedures','appointments','billing','finance','labs','stocks','files','settings'];
+var SECTION_LABELS={dashboard:'Dashboard',patients:'Patients',procedures:'Procedures Admin',appointments:'Appointments',billing:'Billing',finance:'Staff & Finance',labs:'Labs',stocks:'Stocks',files:'X-rays & Files',settings:'Settings'};
+var CAPABILITY_LABELS={
+  canSeeAllFinance:'See full Finance (all wallets)',
+  canManageAccounts:'Manage accounts & settings',
+  canSeeProcedureAdmin:'Edit procedure definitions',
+  canRecordProcedures:'Record procedures',
+  canSeeAllPatients:'See all patients (not just own)',
+  canUseStock:'Use stock items (deduct)',
+  canAddStock:'Add stock (purchase/restock)'
+};
+var EDITABLE_ROLES=['partner','dentist','assistant','receptionist']; // admin always full
+
+function renderPermissionsTab(){
+  var roleColors={partner:'#6D28D9',dentist:'#059669',assistant:'#B45309',receptionist:'#0E7490'};
+  var html=
+    '<div style="background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--a700);">'+
+    '&#9888; Admin role always has full access and cannot be changed. Changes here apply to all accounts with that role immediately.</div>'+
+    '<div style="overflow-x:auto;">'+
+    '<table style="width:100%;border-collapse:collapse;background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:hidden;">'+
+    '<thead><tr style="background:var(--s50);">'+
+    '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--s600);border-bottom:1px solid var(--s200);">Permission</th>'+
+    EDITABLE_ROLES.map(function(role){
+      var c=roleColors[role]||'#6B7280';
+      return '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;border-bottom:1px solid var(--s200);color:'+c+';">'+role.charAt(0).toUpperCase()+role.slice(1)+'</th>';
+    }).join('')+
+    '</tr></thead><tbody>'+
+    // Section access rows
+    '<tr><td colspan="5" style="padding:8px 14px;font-size:10px;font-weight:700;color:var(--s400);text-transform:uppercase;letter-spacing:0.5px;background:var(--s50);border-bottom:1px solid var(--s100);">Section Access</td></tr>'+
+    ALL_SECTIONS.filter(function(s){return s!=='settings';}).map(function(sec){
+      return '<tr style="border-bottom:1px solid var(--s100);">'+
+        '<td style="padding:10px 14px;font-size:12px;font-weight:600;color:var(--s700);">'+SECTION_LABELS[sec]+'</td>'+
+        EDITABLE_ROLES.map(function(role){
+          var checked=ROLE_PERMS[role].sections.indexOf(sec)>=0;
+          return '<td style="text-align:center;padding:8px;">'+
+            '<label style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">'+
+            '<input type="checkbox" data-role="'+role+'" data-type="section" data-key="'+sec+'" '+(checked?'checked':'')+
+            ' style="width:16px;height:16px;cursor:pointer;" onchange="onPermChange(this)">'+
+            '</label></td>';
+        }).join('')+'</tr>';
+    }).join('')+
+    // Capabilities rows
+    '<tr><td colspan="5" style="padding:8px 14px;font-size:10px;font-weight:700;color:var(--s400);text-transform:uppercase;letter-spacing:0.5px;background:var(--s50);border-bottom:1px solid var(--s100);">Capabilities</td></tr>'+
+    Object.keys(CAPABILITY_LABELS).map(function(cap){
+      return '<tr style="border-bottom:1px solid var(--s100);">'+
+        '<td style="padding:10px 14px;font-size:12px;font-weight:600;color:var(--s700);">'+CAPABILITY_LABELS[cap]+'</td>'+
+        EDITABLE_ROLES.map(function(role){
+          var checked=!!(ROLE_PERMS[role][cap]);
+          return '<td style="text-align:center;padding:8px;">'+
+            '<label style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">'+
+            '<input type="checkbox" data-role="'+role+'" data-type="capability" data-key="'+cap+'" '+(checked?'checked':'')+
+            ' style="width:16px;height:16px;cursor:pointer;" onchange="onPermChange(this)">'+
+            '</label></td>';
+        }).join('')+'</tr>';
+    }).join('')+
+    '</tbody></table></div>'+
+    '<div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">'+
+    '<button class="btn" onclick="resetPermissions()">Reset to defaults</button>'+
+    '<button class="btn btnp" onclick="savePermissions()">&#10003; Save permissions</button>'+
+    '</div>';
+  document.getElementById('settings-body').innerHTML=html;
+}
+
+function onPermChange(cb){
+  var role=cb.dataset.role,type=cb.dataset.type,key=cb.dataset.key,val=cb.checked;
+  if(type==='section'){
+    var idx=ROLE_PERMS[role].sections.indexOf(key);
+    if(val&&idx<0)ROLE_PERMS[role].sections.push(key);
+    else if(!val&&idx>=0)ROLE_PERMS[role].sections.splice(idx,1);
+  } else {
+    ROLE_PERMS[role][key]=val;
+  }
+}
+function savePermissions(){
+  // Save only editable roles
+  var toSave={};
+  EDITABLE_ROLES.forEach(function(role){toSave[role]=ROLE_PERMS[role];});
+  localStorage.setItem('vdc-role-perms',JSON.stringify(toSave));
+  showToast('Permissions saved ✅ — changes take effect on next login');
+  // Rebuild sidebar for current user immediately
+  buildSidebarForRole();
+}
+function resetPermissions(){
+  if(!confirm('Reset all permissions to default? This cannot be undone.'))return;
+  localStorage.removeItem('vdc-role-perms');
+  location.reload();
+}
 // ══════════════════════ LABS ══════════════════════════════════════
 var LAB_PROCS=['Crown (PFM)','Crown (zirconia)','Crown (metal)','Implant crown','Bridge (PFM)','Bridge (zirconia)','Veneer','Denture (full)','Denture (partial)'];
 function getLabProcs(){
