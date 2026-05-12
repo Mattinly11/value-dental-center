@@ -1126,7 +1126,18 @@ function canAccessSection(s){ return getPerms().sections.indexOf(s)>=0; }
 // Load admin-customized permissions from localStorage
 function loadCustomPerms(){
   var saved=localStorage.getItem('vdc-role-perms');
-  if(saved){try{var p=JSON.parse(saved);Object.keys(p).forEach(function(role){if(ROLE_PERMS[role])ROLE_PERMS[role]=p[role];});}catch(e){}}
+  if(saved){
+    try{
+      var p=JSON.parse(saved);
+      Object.keys(p).forEach(function(role){
+        if(ROLE_PERMS[role])ROLE_PERMS[role]=p[role];
+      });
+    }catch(e){}
+  }
+  // Always ensure dentist has Finance access (their personal wallet) regardless of saved perms
+  if(ROLE_PERMS.dentist.sections.indexOf('finance')<0){
+    ROLE_PERMS.dentist.sections.push('finance');
+  }
 }
 loadCustomPerms();
 
@@ -2084,6 +2095,10 @@ async function renderBilling(){
   var ir=await db.from('invoices').select('*').order('created_at',{ascending:false});
   var pr=await db.from('payments').select('*');
   allInvs=ir.data||[];allPays=pr.data||[];
+  // Dentist role: auto-filter to only their patients
+  if(currentUser&&currentUser.role==='dentist'&&currentUser.linked_dentist){
+    billFilterDr=currentUser.linked_dentist;
+  }
   buildBillingUI();
 }
 function buildBillingUI(){
@@ -2120,9 +2135,11 @@ function buildBillingUI(){
   var filterBar=
     '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">'+
     '<input class="finp" id="bill-srch" placeholder="&#128269; Search patient..." style="flex:1;min-width:160px;padding:6px 10px;" oninput="billSearch(this.value)">'+
-    '<select class="finp" id="bill-dr-filter" style="flex:1;min-width:150px;padding:6px 10px;" onchange="billFilterChange()">'+
-    '<option value="">All dentists</option>'+ALL_DRS_OPT.map(function(d){return'<option value="'+d+'"'+(billFilterDr===d?' selected':'')+'>'+d+'</option>';}).join('')+
-    '</select>'+
+    (currentUser&&currentUser.role==='dentist'?
+      '<span style="font-size:12px;color:var(--b700);font-weight:600;padding:6px 10px;background:var(--b50);border-radius:var(--radsm);">&#9673; '+currentUser.linked_dentist+'\'s patients</span>':
+      '<select class="finp" id="bill-dr-filter" style="flex:1;min-width:150px;padding:6px 10px;" onchange="billFilterChange()">'+
+      '<option value="">All dentists</option>'+ALL_DRS_OPT.map(function(d){return'<option value="'+d+'"'+(billFilterDr===d?' selected':'')+'>'+d+'</option>';}).join('')+
+      '</select>')+
     '</div>';
   // payment status chips
   var chips=
