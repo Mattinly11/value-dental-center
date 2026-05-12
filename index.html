@@ -935,8 +935,35 @@ var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6I
 var db=supabase.createClient(SUPA,SKEY);
 var USERS={admin:'vdc2026admin',reception:'vdc2026desk'};
 var IQD=parseInt(localStorage.getItem("vdc-iqd-rate")||"1310");
-var PARTNERS=['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen'];
-var REG=['Dr. Mateen','Dr. Ibrahim','Dr. Mahmoud','Dr. Niwar','Dr. Dilveen'];
+var PARTNERS=['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen']; // will be overwritten from DB
+var REG=['Dr. Mateen','Dr. Ibrahim','Dr. Mahmoud','Dr. Niwar','Dr. Dilveen']; // will be overwritten from DB
+var ALL_DENTISTS=[]; // full list, loaded from DB
+
+async function loadDentistsList(){
+  var r=await db.from('clinic_dentists').select('*').eq('is_active',true).order('type').order('name');
+  if(r.error||!r.data||!r.data.length){
+    // Table may not exist yet — keep hardcoded defaults
+    ALL_DENTISTS=PARTNERS.concat(REG).map(function(n,i){
+      return {name:n,type:i<3?'partner':'regular',is_active:true};
+    });
+    return;
+  }
+  ALL_DENTISTS=r.data;
+  PARTNERS=r.data.filter(function(d){return d.type==='partner';}).map(function(d){return d.name;});
+  REG=r.data.filter(function(d){return d.type==='regular';}).map(function(d){return d.name;});
+}
+
+// Build a <select> options string from the loaded dentists list
+function drOptions(includeBlank, blankLabel){
+  var opts=includeBlank?'<option value="">'+(blankLabel||'Select...')+'</option>':'';
+  ALL_DENTISTS.forEach(function(d){opts+='<option>'+d.name+'</option>';});
+  return opts;
+}
+function partnerOptions(includeBlank){
+  var opts=includeBlank?'<option value="">No referral</option>':'';
+  PARTNERS.forEach(function(d){opts+='<option>'+d+'</option>';});
+  return opts;
+}
 var ROOMS=['Room 1','Room 2','Room 3','Room 4','Room 5'];
 var clinicOpen=localStorage.getItem('vdc-open')||'14:00';
 var clinicClose=localStorage.getItem('vdc-close')||'22:00';
@@ -1061,7 +1088,7 @@ var ROLE_PERMS = {
     canAddStock: true
   },
   dentist: {
-    sections: ['dashboard','patients','appointments','labs','stocks'],
+    sections: ['dashboard','patients','appointments','billing','finance','labs','stocks'],
     canSeeAllFinance: false,
     canManageAccounts: false,
     canSeeProcedureAdmin: false,
@@ -1156,6 +1183,8 @@ async function doLogin(){
 
   // Build sidebar based on role
   buildSidebarForRole();
+  await loadDentistsList();
+  populateDrDropdowns();
   goTo('dashboard');
   setTimeout(function(){initStockNotifications();},1500);
 }
@@ -1166,6 +1195,20 @@ function doLogout(){
   location.reload();
 }
 
+function populateDrDropdowns(){
+  // Update all dentist select dropdowns in the HTML
+  var allDrOpts='<option value="">Select...</option>'+ALL_DENTISTS.map(function(d){return'<option>'+d.name+'</option>';}).join('');
+  var partnerOpts='<option value="">No referral</option>'+PARTNERS.map(function(d){return'<option>'+d+'</option>';}).join('');
+  var selIds=['pt-dr','am-dr','proc-dr','nvm-dentist-sel'];
+  selIds.forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=allDrOpts;});
+  var refIds=['proc-ref'];
+  refIds.forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=partnerOpts;});
+  // Update account modal linked dentist select
+  var accLinked=document.getElementById('acc-linked');
+  if(accLinked){
+    accLinked.innerHTML='<option value="">Select...</option>'+ALL_DENTISTS.map(function(d){return'<option>'+d.name+'</option>';}).join('');
+  }
+}
 function buildSidebarForRole(){
   if(!currentUser)return;
   var perms=getPerms();
@@ -1201,7 +1244,7 @@ function clearBackBtn(){
   var el=document.getElementById('pg-back');
   if(el){el.style.display='none';el.innerHTML='';}
 }
-window.onload=function(){_attachChipDelegation();
+window.onload=async function(){_attachChipDelegation();
   var sess=sessionStorage.getItem('vdc-session');
   if(sess){
     try{currentUser=JSON.parse(sess);}catch(e){currentUser=null;}
@@ -1214,6 +1257,8 @@ window.onload=function(){_attachChipDelegation();
     var roleEl=document.getElementById('sf-role');
     if(roleEl)roleEl.textContent=(currentUser.role||'').charAt(0).toUpperCase()+(currentUser.role||'').slice(1);
     buildSidebarForRole();
+    await loadDentistsList();
+    populateDrDropdowns();
     goTo('dashboard');
     setTimeout(function(){initStockNotifications();},1500);
   }
@@ -1291,7 +1336,7 @@ function buildPtList(){
   var sCounts={};
   ['active','new','inprogress','followup','completed','inactive'].forEach(function(s){sCounts[s]=allPts.filter(function(p){return p.status===s;}).length;});
   // filter bar
-  var ALL_DRS_OPT=['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen','Dr. Mateen','Dr. Ibrahim','Dr. Mahmoud','Dr. Niwar','Dr. Dilveen'];
+  var ALL_DRS_OPT=ALL_DENTISTS.map(function(d){return d.name;});
   var filterBar=
     '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">'+
     '<input class="finp" id="pt-srch" placeholder="&#128269; Search name, phone..." style="flex:1;min-width:160px;padding:6px 10px;" value="'+ptQ+'" oninput="ptSearch(this.value)">'+
@@ -2071,7 +2116,7 @@ function buildBillingUI(){
   var unpaidCount=Object.values(byPt).filter(function(pt){return(pt.billed-pt.paid)>0&&pt.paid===0;}).length;
   var partialCount=Object.values(byPt).filter(function(pt){return(pt.billed-pt.paid)>0&&pt.paid>0;}).length;
   var paidCount=Object.values(byPt).filter(function(pt){return(pt.billed-pt.paid)<=0;}).length;
-  var ALL_DRS_OPT=['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen','Dr. Mateen','Dr. Ibrahim','Dr. Mahmoud','Dr. Niwar','Dr. Dilveen'];
+  var ALL_DRS_OPT=ALL_DENTISTS.map(function(d){return d.name;});
   var filterBar=
     '<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">'+
     '<input class="finp" id="bill-srch" placeholder="&#128269; Search patient..." style="flex:1;min-width:160px;padding:6px 10px;" oninput="billSearch(this.value)">'+
@@ -2148,6 +2193,11 @@ async function openPtBilling(pid,pname){
 var finPays=[],finInvs=[];
 async function renderFinance(){
   if(!canAccessSection('finance')){accessDenied('finance');return;}
+  // Dentist role — show their personal earnings view
+  if(currentUser&&currentUser.role==='dentist'&&currentUser.linked_dentist){
+    await renderDentistWallet();
+    return;
+  }
   document.getElementById('pg-actions').innerHTML='';
   document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading finance...</div>';
   var results=await Promise.all([
@@ -2161,6 +2211,94 @@ async function renderFinance(){
   finPays=results[3].data||[];finInvs=results[4].data||[];
   buildFinUI();
 }
+// ══════════════ DENTIST PERSONAL WALLET VIEW ═════════════════════
+async function renderDentistWallet(){
+  var drName=currentUser.linked_dentist;
+  document.getElementById('pg-title').textContent='My Earnings';
+  document.getElementById('pg-sub').textContent=drName;
+  document.getElementById('pg-actions').innerHTML=
+    '<button class="btn btnsm" onclick="openFinDateModal()">&#128197; Change period</button>'+
+    '<button class="btn btnsm" onclick="setFinM(new Date().getMonth(),new Date().getFullYear())">This month</button>';
+  // Load data for this period
+  var allPaysR=await db.from('payments').select('*');
+  var allPays=allPaysR.data||[];
+  var allInvsR=await db.from('invoices').select('*').eq('treating_dentist',drName);
+  var myInvs=allInvsR.data||[];
+  // Filter payments to this period and this dentist's invoices
+  var myInvIds=myInvs.map(function(i){return i.id;});
+  var periodPays=allPays.filter(function(p){
+    return myInvIds.indexOf(p.invoice_id)>=0&&_dateInPeriod(p.date);
+  });
+  var rates=getDR(drName);
+  var earnIQD=0,earnUSD=0,refIQD=0,refUSD=0;
+  periodPays.forEach(function(p){
+    var inv=myInvs.find(function(i){return i.id===p.invoice_id;});
+    if(!inv)return;
+    var d=getPayDistDual(p,inv);
+    earnIQD+=d.treaterIQD||0;
+    earnUSD+=d.treaterUSD||0;
+  });
+  // Also check referral earnings (where this dentist is referrer)
+  var refPaysR=await db.from('payments').select('*');
+  var refPays=refPaysR.data||[];
+  var refInvsR=await db.from('invoices').select('*').eq('referrer',drName);
+  var refInvs=refInvsR.data||[];
+  var refInvIds=refInvs.map(function(i){return i.id;});
+  refPays.filter(function(p){return refInvIds.indexOf(p.invoice_id)>=0&&_dateInPeriod(p.date);}).forEach(function(p){
+    var inv=refInvs.find(function(i){return i.id===p.invoice_id;});
+    if(!inv)return;
+    var d=getPayDistDual(p,inv);
+    refIQD+=d.refIQD||0;
+    refUSD+=d.refUSD||0;
+  });
+  // Period label
+  var label='';
+  if(finMode==='range'&&finRangeStart&&finRangeEnd)label=finRangeStart+' → '+finRangeEnd;
+  else if(finMode==='year')label='Year '+finRangeYear;
+  else label=new Date(finY,finM,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  var html=
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">'+
+    '<div style="font-size:16px;font-weight:700;color:var(--s800);">'+label+'</div>'+
+    (finMode==='month'&&finM===new Date().getMonth()&&finY===new Date().getFullYear()?
+    '<span style="background:var(--b600);color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">Current</span>':'')+
+    '</div>'+
+    '<div class="stats-row" style="margin-bottom:18px;">'+
+    statC('var(--g50)','&#128176;','Own earnings (IQD)',fu(Math.round(earnIQD)))+
+    (earnUSD>0?statC('#FFF7ED','&#128176;','Own earnings (USD)',fusd(earnUSD)):'')+
+    (refIQD>0||refUSD>0?statC('var(--p50)','&#127974;','Referral earnings',fu(Math.round(refIQD))+(refUSD>0?' + '+fusd(refUSD):'')):'')+
+    statC('var(--b50)','&#128200;','Payments recorded',periodPays.length)+
+    '</div>'+
+    // Rate card
+    '<div class="vdc-card" style="margin-bottom:16px;">'+
+    '<div class="vdc-card-hdr"><div class="vdc-card-title">&#128200; My rates</div>'+
+    '<button class="btn btnsm" onclick="openDRR(\''+drName.replace(/'/g,'&#39;')+'\')">Edit rates</button></div>'+
+    '<div class="vdc-card-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'+
+    '<div style="background:var(--b50);border-radius:var(--radsm);padding:12px;text-align:center;">'+
+    '<div style="font-size:10px;color:var(--s400);margin-bottom:4px;">Own patient rate</div>'+
+    '<div style="font-size:24px;font-weight:800;color:var(--b700);">'+rates.ownPct+'%</div></div>'+
+    '<div style="background:var(--a50);border-radius:var(--radsm);padding:12px;text-align:center;">'+
+    '<div style="font-size:10px;color:var(--s400);margin-bottom:4px;">Referred patient rate</div>'+
+    '<div style="font-size:24px;font-weight:800;color:var(--a700);">'+rates.refPct+'%</div></div>'+
+    '</div></div></div>'+
+    // Payment breakdown
+    (periodPays.length?'<div class="vdc-card"><div class="vdc-card-hdr"><div class="vdc-card-title">Payment breakdown</div></div>'+
+    '<div class="vdc-card-body" style="padding:0;overflow-x:auto;"><table class="tbl"><thead><tr>'+
+    '<th>Date</th><th>Patient</th><th>Procedure</th><th>Payment</th><th>My earnings</th>'+
+    '</tr></thead><tbody>'+
+    periodPays.map(function(p){
+      var inv=myInvs.find(function(i){return i.id===p.invoice_id;});
+      var d=getPayDistDual(p,inv);
+      return '<tr>'+
+        '<td style="font-size:10px;color:var(--s400);">'+(p.date||'—')+'</td>'+
+        '<td style="font-weight:600;">'+(inv?inv.patient_name||'—':'—')+'</td>'+
+        '<td style="font-size:11px;">'+(inv?inv.procedure_name||'—':'—')+'</td>'+
+        '<td style="font-weight:700;color:var(--b700);">'+(Number(p.amount_iqd||0)>0?fu(Number(p.amount_iqd)):'')+(Number(p.amount_usd||0)>0?(Number(p.amount_iqd||0)>0?' + ':'')+fusd(Number(p.amount_usd)):'')+'</td>'+
+        '<td style="font-weight:700;color:var(--g700);">'+fu(Math.round(d.treaterIQD||0))+(d.treaterUSD>0?' + '+fusd(d.treaterUSD):'')+'</td>'+
+        '</tr>';
+    }).join('')+'</tbody></table></div></div>':'<div style="text-align:center;padding:30px;color:var(--s400);font-size:13px;">No payments recorded this period</div>');
+  document.getElementById('pg-content').innerHTML=html;
+}
+
 function buildFinUI(){
   var label,isCurrentMonth=false;
   if(finMode==='range'&&finRangeStart&&finRangeEnd){
@@ -2564,12 +2702,15 @@ function renderSettings(){
   document.getElementById('pg-content').innerHTML=
     '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:18px;" id="settings-tabs">'+
     '<button class="fin-tab'+(settingsTab==='general'?' act':'')+'" onclick="settingsTab=\'general\';renderSettings()">&#9881; General</button>'+
-    (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='accounts'?' act':'')+'" onclick="settingsTab=\'accounts\';renderSettings()">&#128100; Accounts</button>':'')  +
+    (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='accounts'?' act':'')+'" onclick="settingsTab=\'accounts\';renderSettings()">&#128100; Accounts</button>':'')+
+    (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='dentists'?' act':'')+'" onclick="settingsTab=\'dentists\';renderSettings()">&#9673; Dentists</button>':'')+
     (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='permissions'?' act':'')+'" onclick="settingsTab=\'permissions\';renderSettings()">&#128274; Permissions</button>':'')+
     '</div>'+
     '<div id="settings-body"></div>';
   if(settingsTab==='accounts'&&can('canManageAccounts')){
     renderAccountsTab();
+  } else if(settingsTab==='dentists'&&can('canManageAccounts')){
+    renderDentistsTab();
   } else if(settingsTab==='permissions'&&can('canManageAccounts')){
     renderPermissionsTab();
   } else {
@@ -2601,6 +2742,103 @@ function renderGeneralTab(){
     '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:8px;">&#128272; Your session</div>'+
     '<div class="set-row"><div style="font-size:12px;font-weight:600;">Logged in as</div><div style="font-size:12px;color:var(--s600);">'+(currentUser?currentUser.name+' ('+currentUser.role+')':'—')+'</div></div>'+
     '</div>';
+}
+
+// ══════════════════════ DENTISTS MANAGEMENT ══════════════════════
+async function renderDentistsTab(){
+  var el=document.getElementById('settings-body');
+  el.innerHTML='<div class="loader"><div class="spinner"></div>Loading...</div>';
+  var r=await db.from('clinic_dentists').select('*').order('type').order('name');
+  var dentists=r.data||[];
+  var html=
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;">'+
+    '<button class="btn btnp" onclick="openAddDentist()">+ Add dentist</button></div>'+
+    '<div class="vdc-card"><div class="vdc-card-body" style="padding:0;overflow-x:auto;">'+
+    '<table class="tbl"><thead><tr>'+
+    '<th>Name</th><th>Type</th><th>Status</th><th></th>'+
+    '</tr></thead><tbody>'+
+    (dentists.length?dentists.map(function(d){
+      var typeColor=d.type==='partner'?'#6D28D9':'#059669';
+      return '<tr>'+
+        '<td style="font-weight:700;">'+d.name+'</td>'+
+        '<td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+typeColor+'22;color:'+typeColor+';">'+
+        (d.type==='partner'?'Partner':'Regular dentist')+'</span></td>'+
+        '<td><span class="badge '+(d.is_active?'bg':'br')+'">'+(d.is_active?'Active':'Inactive')+'</span></td>'+
+        '<td><button class="btn btnxs" onclick="openEditDentist(\''+d.id+'\',\''+d.name.replace(/'/g,'&#39;')+'\',\''+d.type+'\','+d.is_active+')">Edit</button></td>'+
+        '</tr>';
+    }).join(''):'<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--s400);">No dentists yet — add your first</td></tr>')+
+    '</tbody></table></div></div>';
+  el.innerHTML=html;
+}
+
+function openAddDentist(){
+  var html='<div class="mbg open" id="dentist-quick-modal" onclick="if(event.target===this)this.remove()" style="z-index:600;">'+
+    '<div class="modal" style="max-width:380px;">'+
+    '<div class="mtit">Add dentist</div>'+
+    '<input type="hidden" id="dqm-id">'+
+    '<div class="fgrp"><label class="flbl">Full name <span class="req">*</span></label>'+
+    '<input class="finp" id="dqm-name" placeholder="e.g. Dr. Karzan"></div>'+
+    '<div class="fgrp"><label class="flbl">Type</label>'+
+    '<select class="finp" id="dqm-type">'+
+    '<option value="regular">Regular dentist</option>'+
+    '<option value="partner">Partner</option>'+
+    '</select></div>'+
+    '<div class="mac">'+
+    '<button class="btn" onclick="document.getElementById(\'dentist-quick-modal\').remove()">Cancel</button>'+
+    '<button class="btn btnp" onclick="saveDentist()">Save</button>'+
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+function openEditDentist(id,name,type,isActive){
+  var html='<div class="mbg open" id="dentist-quick-modal" onclick="if(event.target===this)this.remove()" style="z-index:600;">'+
+    '<div class="modal" style="max-width:380px;">'+
+    '<div class="mtit">Edit dentist</div>'+
+    '<input type="hidden" id="dqm-id" value="'+id+'">'+
+    '<div class="fgrp"><label class="flbl">Full name <span class="req">*</span></label>'+
+    '<input class="finp" id="dqm-name" value="'+name+'"></div>'+
+    '<div class="fgrp"><label class="flbl">Type</label>'+
+    '<select class="finp" id="dqm-type">'+
+    '<option value="regular"'+(type==='regular'?' selected':'')+'>Regular dentist</option>'+
+    '<option value="partner"'+(type==='partner'?' selected':'')+'>Partner</option>'+
+    '</select></div>'+
+    '<div class="fgrp"><label class="flbl">Status</label>'+
+    '<select class="finp" id="dqm-active">'+
+    '<option value="true"'+(isActive?' selected':'')+'>Active</option>'+
+    '<option value="false"'+(!isActive?' selected':'')+'>Inactive</option>'+
+    '</select></div>'+
+    '<div class="mac">'+
+    '<button class="btn btnr" style="margin-right:auto;" onclick="deleteDentist(\''+id+'\')">Delete</button>'+
+    '<button class="btn" onclick="document.getElementById(\'dentist-quick-modal\').remove()">Cancel</button>'+
+    '<button class="btn btnp" onclick="saveDentist()">Save</button>'+
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+async function saveDentist(){
+  var id=document.getElementById('dqm-id').value;
+  var name=document.getElementById('dqm-name').value.trim();
+  var type=document.getElementById('dqm-type').value;
+  var isActive=document.getElementById('dqm-active')?document.getElementById('dqm-active').value==='true':true;
+  if(!name){showToast('Enter dentist name','error');return;}
+  var payload={name:name,type:type,is_active:isActive};
+  var r=id?await db.from('clinic_dentists').update(payload).eq('id',id):await db.from('clinic_dentists').insert([payload]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast(id?'Dentist updated':'Dentist added ✅');
+  document.getElementById('dentist-quick-modal').remove();
+  // Reload dentists list
+  await loadDentistsList();
+  populateDrDropdowns();
+  renderDentistsTab();
+}
+async function deleteDentist(id){
+  if(!confirm('Remove this dentist from the list? This will not delete their patient records.'))return;
+  await db.from('clinic_dentists').delete().eq('id',id);
+  showToast('Dentist removed');
+  document.getElementById('dentist-quick-modal').remove();
+  await loadDentistsList();
+  populateDrDropdowns();
+  renderDentistsTab();
 }
 
 // ══════════════════════ ACCOUNTS MANAGEMENT ══════════════════════
@@ -4394,11 +4632,11 @@ function addAnotherProc(){
     '<div class="fg">'+
     '<div class="fgrp"><label class="flbl">Treating dentist</label>'+
     '<select class="finp" id="ep-dr-'+idx+'"><option value="">Select...</option>'+
-    ['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen','Dr. Mateen','Dr. Ibrahim','Dr. Mahmoud','Dr. Niwar','Dr. Dilveen'].map(function(d){return'<option>'+d+'</option>';}).join('')+
+    ALL_DENTISTS.map(function(d){return'<option>'+d.name+'</option>';}).join('')+
     '</select></div>'+
     '<div class="fgrp"><label class="flbl">Referred by (partner)</label>'+
     '<select class="finp" id="ep-ref-'+idx+'"><option value="">No referral</option>'+
-    ['Dr. Sarmad','Dr. Akheenk','Dr. Shaveen'].map(function(d){return'<option>'+d+'</option>';}).join('')+
+    PARTNERS.map(function(d){return'<option>'+d+'</option>';}).join('')+
     '</select></div></div>'+
     // Fee + status
     '<div class="fg">'+
