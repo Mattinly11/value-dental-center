@@ -302,7 +302,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       <div class="sfooter">
         <div class="sfooter-inner">
           <div class="sfav" id="sf-av">AD</div>
-          <div><div class="sfname" id="sf-name">Admin</div><div class="sfrole">Value Dental Center</div></div>
+          <div><div class="sfname" id="sf-name">Admin</div><div class="sfrole" id="sf-role">Value Dental Center</div></div>
           <button class="logout-btn" onclick="doLogout()">&#9211;</button>
         </div>
       </div>
@@ -809,6 +809,61 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
   </div>
 </div>
 
+<!-- STAFF ACCOUNT MODAL -->
+<div class="mbg" id="acc-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="mtit" id="acc-modal-title">Add account</div>
+    <div class="msub">Create a login account for a staff member</div>
+    <input type="hidden" id="acc-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Full name <span class="req">*</span></label>
+        <input class="finp" id="acc-name" placeholder="e.g. Dr. Sarmad"></div>
+      <div class="fgrp"><label class="flbl">Username <span class="req">*</span></label>
+        <input class="finp" id="acc-username" placeholder="e.g. sarmad" autocomplete="off"></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl" id="acc-pass-label">Password <span class="req">*</span></label>
+        <input class="finp" type="password" id="acc-password" placeholder="Set a strong password" autocomplete="new-password">
+        <div style="font-size:10px;color:var(--s400);margin-top:3px;" id="acc-pass-hint">Leave blank to keep current password (when editing)</div>
+      </div>
+      <div class="fgrp"><label class="flbl">Role <span class="req">*</span></label>
+        <select class="finp" id="acc-role" onchange="onAccRoleChange()">
+          <option value="">Select role...</option>
+          <option value="admin">Admin — full access</option>
+          <option value="partner">Partner — owner access</option>
+          <option value="dentist">Dentist — own patients only</option>
+          <option value="assistant">Assistant — appointments & stock</option>
+          <option value="receptionist">Receptionist — patients & billing</option>
+        </select></div>
+    </div>
+    <!-- Linked dentist — shown for partner and dentist roles -->
+    <div class="fgrp" id="acc-linked-wrap" style="display:none;">
+      <label class="flbl">Linked to dentist name <span class="req">*</span></label>
+      <select class="finp" id="acc-linked">
+        <option value="">Select...</option>
+        <option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option>
+        <option>Dr. Mateen</option><option>Dr. Ibrahim</option><option>Dr. Mahmoud</option>
+        <option>Dr. Niwar</option><option>Dr. Dilveen</option>
+      </select>
+      <div style="font-size:10px;color:var(--s400);margin-top:3px;">This links the account to their schedule, patients, and wallet</div>
+    </div>
+    <!-- Role description card -->
+    <div id="acc-role-desc" style="display:none;background:var(--b50);border:1px solid var(--b100);border-radius:var(--radsm);padding:10px 12px;font-size:11px;color:var(--b700);margin-bottom:12px;"></div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Status</label>
+        <select class="finp" id="acc-active">
+          <option value="true">Active</option>
+          <option value="false">Inactive (cannot login)</option>
+        </select></div>
+    </div>
+    <div class="mac">
+      <button class="btn btnr" id="acc-del-btn" style="display:none;margin-right:auto;" onclick="deleteAccount()">Delete account</button>
+      <button class="btn" onclick="closeMdl('acc-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveAccount()">Save account</button>
+    </div>
+  </div>
+</div>
+
 <!-- DR RATE MODAL -->
 <div class="mbg" id="drr-modal">
   <div class="modal">
@@ -972,20 +1027,162 @@ function stBadge(s){
   return '<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;'+style+'">'+(labels[s]||s||'New')+'</span>';
 }
 
-// AUTH
-function doLogin(){
-  var u=document.getElementById('li-u').value.trim(),p=document.getElementById('li-p').value;
-  if(USERS[u]&&USERS[u]===p){
-    sessionStorage.setItem('vdc-user',u);
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app').style.display='block';
-    document.getElementById('sf-name').textContent=u.charAt(0).toUpperCase()+u.slice(1);
-    document.getElementById('sf-av').textContent=u.slice(0,2).toUpperCase();
-    goTo('dashboard');
-    setTimeout(function(){initStockNotifications();},1500);
-  }else{var e=document.getElementById('li-err');e.style.display='block';setTimeout(function(){e.style.display='none';},3000);}
+// ═══════════════════════ AUTH & PERMISSIONS ══════════════════════
+// Current session user object
+var currentUser = null; // {id, name, username, role, linked_dentist, is_active}
+
+// SHA-256 hash using Web Crypto API
+async function sha256(str){
+  var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
 }
-function doLogout(){sessionStorage.removeItem('vdc-user');location.reload();}
+
+// PERMISSIONS MAP per role
+// Each role gets a set of allowed sections and capabilities
+var ROLE_PERMS = {
+  admin: {
+    sections: ['dashboard','patients','procedures','appointments','billing','finance','labs','stocks','files','settings'],
+    canSeeAllFinance: true,
+    canManageAccounts: true,
+    canSeeProcedureAdmin: true,
+    canRecordProcedures: true,
+    canSeeAllPatients: true,
+    canUseStock: true,
+    canAddStock: true
+  },
+  partner: {
+    sections: ['dashboard','patients','procedures','appointments','billing','finance','labs','stocks','files'],
+    canSeeAllFinance: false,  // only own wallet + value wallet
+    canManageAccounts: false,
+    canSeeProcedureAdmin: false,
+    canRecordProcedures: true,
+    canSeeAllPatients: true,
+    canUseStock: true,
+    canAddStock: true
+  },
+  dentist: {
+    sections: ['dashboard','patients','appointments','labs','stocks'],
+    canSeeAllFinance: false,
+    canManageAccounts: false,
+    canSeeProcedureAdmin: false,
+    canRecordProcedures: true,
+    canSeeAllPatients: false,  // own patients only
+    canUseStock: true,
+    canAddStock: false
+  },
+  assistant: {
+    sections: ['dashboard','appointments','stocks'],
+    canSeeAllFinance: false,
+    canManageAccounts: false,
+    canSeeProcedureAdmin: false,
+    canRecordProcedures: false,
+    canSeeAllPatients: false,
+    canUseStock: true,
+    canAddStock: false
+  },
+  receptionist: {
+    sections: ['dashboard','patients','appointments','billing','stocks'],
+    canSeeAllFinance: false,
+    canManageAccounts: false,
+    canSeeProcedureAdmin: false,
+    canRecordProcedures: false,
+    canSeeAllPatients: true,
+    canUseStock: true,
+    canAddStock: false
+  }
+};
+
+function getPerms(){ return ROLE_PERMS[currentUser?currentUser.role:'admin']||ROLE_PERMS.admin; }
+function can(action){ return !!(getPerms()[action]); }
+function canAccessSection(s){ return getPerms().sections.indexOf(s)>=0; }
+
+async function doLogin(){
+  var u=document.getElementById('li-u').value.trim();
+  var p=document.getElementById('li-p').value;
+  if(!u||!p){var e=document.getElementById('li-err');e.textContent='Enter username and password';e.style.display='block';setTimeout(function(){e.style.display='none';},3000);return;}
+
+  // Hash the entered password
+  var hash = await sha256(p);
+
+  // Look up in DB — try hash first, then plain text (for migration compatibility)
+  var r = await db.from('staff_accounts').select('*').eq('username',u).eq('is_active',true).limit(1);
+  var acc = null;
+  if(r.data&&r.data.length){
+    var candidate = r.data[0];
+    // Accept if hash matches OR plain text matches (covers both old and new accounts)
+    if(candidate.password_hash === hash || candidate.password_hash === p){
+      acc = candidate;
+      // Silently upgrade plain text to hash if needed
+      if(candidate.password_hash === p){
+        db.from('staff_accounts').update({password_hash:hash}).eq('id',candidate.id).then(function(){});
+      }
+    }
+  }
+
+  if(!acc){
+    var e2=document.getElementById('li-err');
+    e2.textContent='Incorrect username or password';
+    e2.style.display='block';
+    setTimeout(function(){e2.style.display='none';},3000);
+    return;
+  }
+
+  // Successful login
+  currentUser = {
+    id: acc.id,
+    name: acc.name,
+    username: acc.username,
+    role: acc.role,
+    linked_dentist: acc.linked_dentist||null,
+    is_active: acc.is_active
+  };
+  sessionStorage.setItem('vdc-session', JSON.stringify(currentUser));
+
+  // Update last login timestamp
+  db.from('staff_accounts').update({last_login:new Date().toISOString()}).eq('id',acc.id).then(function(){});
+
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('sf-name').textContent=acc.name;
+  document.getElementById('sf-av').textContent=ini(acc.name)||u.slice(0,2).toUpperCase();
+  document.getElementById('sf-role').textContent=acc.role.charAt(0).toUpperCase()+acc.role.slice(1);
+
+  // Build sidebar based on role
+  buildSidebarForRole();
+  goTo('dashboard');
+  setTimeout(function(){initStockNotifications();},1500);
+}
+
+function doLogout(){
+  currentUser=null;
+  sessionStorage.removeItem('vdc-session');
+  location.reload();
+}
+
+function buildSidebarForRole(){
+  if(!currentUser)return;
+  var perms=getPerms();
+  // Show/hide nav items based on role
+  var navMap={
+    dashboard:'nav-dashboard',patients:'nav-patients',procedures:'nav-procedures',
+    appointments:'nav-appointments',billing:'nav-billing',finance:'nav-finance',
+    labs:'nav-labs',stocks:'nav-stocks',files:'nav-files',settings:'nav-settings'
+  };
+  Object.keys(navMap).forEach(function(section){
+    var el=document.getElementById(navMap[section]);
+    if(el){el.style.display=perms.sections.indexOf(section)>=0?'':'none';}
+  });
+}
+
+function accessDenied(section){
+  document.getElementById('pg-content').innerHTML=
+    '<div style="text-align:center;padding:80px 20px;">'+
+    '<div style="font-size:48px;margin-bottom:16px;">&#128274;</div>'+
+    '<div style="font-size:16px;font-weight:700;color:var(--r600);margin-bottom:8px;">Access denied</div>'+
+    '<div style="font-size:12px;color:var(--s400);">Your account does not have permission to view this section.</div>'+
+    '<div style="font-size:12px;color:var(--s400);margin-top:4px;">Please contact your admin.</div></div>';
+}
+// goTo with permission check
 
 function setBackBtn(label, fn){
   var el=document.getElementById('pg-back');
@@ -998,18 +1195,28 @@ function clearBackBtn(){
   if(el){el.style.display='none';el.innerHTML='';}
 }
 window.onload=function(){_attachChipDelegation();
-  var u=sessionStorage.getItem('vdc-user');
-  if(u){document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';
-    document.getElementById('sf-name').textContent=u.charAt(0).toUpperCase()+u.slice(1);
-    document.getElementById('sf-av').textContent=u.slice(0,2).toUpperCase();
+  var sess=sessionStorage.getItem('vdc-session');
+  if(sess){
+    try{currentUser=JSON.parse(sess);}catch(e){currentUser=null;}
+  }
+  if(currentUser&&currentUser.role){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    document.getElementById('sf-name').textContent=currentUser.name||currentUser.username||'User';
+    document.getElementById('sf-av').textContent=ini(currentUser.name||currentUser.username||'U');
+    var roleEl=document.getElementById('sf-role');
+    if(roleEl)roleEl.textContent=(currentUser.role||'').charAt(0).toUpperCase()+(currentUser.role||'').slice(1);
+    buildSidebarForRole();
     goTo('dashboard');
-    // Initialize stock notifications silently
     setTimeout(function(){initStockNotifications();},1500);
   }
 };
 
-// NAVIGATION
+// goTo with permission check
 function goTo(s){
+  // Permission check — skip for dashboard (always allowed)
+  if(s!=='dashboard'&&!canAccessSection(s)){accessDenied(s);return;}
+
   document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('act');});
   var nav=document.getElementById('nav-'+s);if(nav)nav.classList.add('act');
   if(waitInt){clearInterval(waitInt);waitInt=null;}
@@ -1053,7 +1260,12 @@ var ptFilterDr='',ptFilterStatus='',ptSort='name';
 async function renderPatients(){
   document.getElementById('pg-actions').innerHTML='<button class="btn btnp" onclick="openAddPt()">+ Add patient</button>';
   document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading...</div>';
-  var r=await db.from('patients').select('*').order('name');
+  var q=db.from('patients').select('*').order('name');
+  // Dentist role: only show their own patients
+  if(currentUser&&currentUser.role==='dentist'&&currentUser.linked_dentist){
+    q=q.eq('primary_dentist',currentUser.linked_dentist);
+  }
+  var r=await q;
   if(r.error){showToast('Failed to load','error');return;}
   allPts=r.data||[];buildPtList();
 }
@@ -1928,6 +2140,7 @@ async function openPtBilling(pid,pname){
 // ══════════════════════ STAFF & FINANCE ══════════════════════════
 var finPays=[],finInvs=[];
 async function renderFinance(){
+  if(!canAccessSection('finance')){accessDenied('finance');return;}
   document.getElementById('pg-actions').innerHTML='';
   document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading finance...</div>';
   var results=await Promise.all([
@@ -2104,6 +2317,8 @@ function buildFO(){
   var pC=[{bg:'#DBEAFE',border:'#2563EB',c:'#1D4ED8'},{bg:'#CCFBF1',border:'#0D9488',c:'#0F766E'},{bg:'#EDE9FE',border:'#7C3AED',c:'#6D28D9'}];
   html+='<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px;">';
   PARTNERS.forEach(function(p,i){
+    // Partner role: only show own wallet, hide other partners
+    if(currentUser&&currentUser.role==='partner'&&currentUser.linked_dentist&&currentUser.linked_dentist!==p) return;
     var c=pC[i],gIQD=walletsIQD[p]||0,gUSD=walletsUSD[p]||0;
     var wdIQD=(vWithdrawals[p]||{}).iqd||0,wdUSD=(vWithdrawals[p]||{}).usd||0;
     html+='<div class="wallet-card" style="background:'+c.bg+';border-color:'+c.border+';">'+
@@ -2334,33 +2549,6 @@ async function saveExp(){
 }
 
 // ══════════════════════ SETTINGS ═════════════════════════════════
-function renderSettings(){
-  document.getElementById('pg-content').innerHTML=
-    '<div class="set-sec">'+
-    '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:4px;">&#128336; Working hours</div>'+
-    '<div style="font-size:11px;color:var(--s400);margin-bottom:14px;">Set your clinic opening and closing times</div>'+
-    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Opening time</div></div>'+
-    '<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:14px;font-weight:700;color:var(--b600);">'+clinicOpen+'</span><button class="btn btnsm" onclick="loadHours();openMdl(\'hrs-modal\')">Change</button></div></div>'+
-    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Closing time</div></div>'+
-    '<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:14px;font-weight:700;color:var(--b600);">'+clinicClose+'</span><button class="btn btnsm" onclick="loadHours();openMdl(\'hrs-modal\')">Change</button></div></div>'+
-    '</div>'+
-    '<div class="set-sec">'+
-    '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:14px;">&#127973; Clinic info</div>'+
-    '<div class="set-row"><div style="font-size:12px;font-weight:600;">Clinic name</div><div style="font-size:13px;color:var(--s600);">Value Dental Center</div></div>'+
-    '<div class="set-row"><div style="font-size:12px;font-weight:600;">Location</div><div style="font-size:13px;color:var(--s600);">Duhok, Iraq</div></div>'+
-    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">IQD exchange rate</div><div style="font-size:10px;color:var(--s400);margin-top:2px;">Updated daily — for USD conversion</div></div>'+
-    '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:13px;">1 USD =</span>'+
-    '<input type="number" id="settings-iqd-rate" value="'+IQD+'" style="width:90px;padding:5px 8px;border-radius:var(--radsm);border:1.5px solid var(--s200);font-size:13px;font-weight:700;font-family:inherit;text-align:center;">'+
-    '<span style="font-size:13px;">IQD</span>'+
-    '<button class="btn btnsm btnp" onclick="saveIQDRate()">Save</button></div></div>'+
-    '</div>'+
-    '<div class="set-sec">'+
-    '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:14px;">&#128100; Login accounts</div>'+
-    '<div class="set-row"><div style="font-size:12px;font-weight:600;">Admin</div><div style="font-size:12px;color:var(--s500);">admin / vdc2026admin</div></div>'+
-    '<div class="set-row"><div style="font-size:12px;font-weight:600;">Receptionist</div><div style="font-size:12px;color:var(--s500);">reception / vdc2026desk</div></div>'+
-    '</div>';
-}
-
 // ══════════════════════ LABS ══════════════════════════════════════
 var LAB_PROCS=['Crown (PFM)','Crown (zirconia)','Crown (metal)','Implant crown','Bridge (PFM)','Bridge (zirconia)','Veneer','Denture (full)','Denture (partial)'];
 function getLabProcs(){
@@ -3303,7 +3491,7 @@ function openStockUse(itemId){
   document.getElementById('su-stock').textContent='In stock: '+(item.quantity||0)+' '+(item.unit||'piece');
   document.getElementById('su-qty').value=1;
   document.getElementById('su-qty').max=item.quantity||0;
-  var user=sessionStorage.getItem('vdc-user')||'Admin';
+  var user=(currentUser&&currentUser.name)||'Admin';
   document.getElementById('su-user').textContent=user.charAt(0).toUpperCase()+user.slice(1);
   openMdl('stock-use-modal');
 }
@@ -3315,7 +3503,7 @@ async function confirmStockUse(){
   if(qty>max){showToast('Not enough stock (only '+max+' available)','error');return;}
   var item=stockItems.find(function(i){return i.id===id;});if(!item)return;
   var newQty=Number(item.quantity||0)-qty;
-  var user=sessionStorage.getItem('vdc-user')||'Admin';
+  var user=(currentUser&&currentUser.name)||'Admin';
   var userName=user.charAt(0).toUpperCase()+user.slice(1);
   // Update stock
   var r=await db.from('stock_items').update({quantity:newQty}).eq('id',id);
@@ -3357,7 +3545,7 @@ async function confirmStockAdd(){
   var unitCost=parseFloat(document.getElementById('sa-cost').value)||Number(item.unit_cost||0);
   var curr=document.getElementById('sa-cost-curr').value||item.cost_currency||'IQD';
   var totalCost=unitCost*qty;
-  var user=sessionStorage.getItem('vdc-user')||'Admin';
+  var user=(currentUser&&currentUser.name)||'Admin';
   var userName=user.charAt(0).toUpperCase()+user.slice(1);
   // Update stock quantity and unit cost
   var r=await db.from('stock_items').update({quantity:newQty,unit_cost:unitCost,cost_currency:curr}).eq('id',id);
