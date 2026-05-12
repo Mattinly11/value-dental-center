@@ -224,7 +224,36 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .case-summary-card{background:var(--b50);border:1.5px solid var(--b100);border-radius:var(--radsm);padding:14px;margin-bottom:14px;}
 .case-new-card{background:var(--g50);border:1.5px solid var(--g100);border-radius:var(--radsm);padding:14px;margin-bottom:14px;}
 
-@keyframes glow-green{0%,100%{box-shadow:0 0 6px 2px #22c55e80;}50%{box-shadow:0 0 14px 5px #22c55eb0;}}
+/* STOCKS */
+.stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+.stock-card{background:white;border-radius:var(--rad);border:1.5px solid var(--s200);overflow:hidden;transition:box-shadow 0.15s;}
+.stock-card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.10);}
+.stock-card-img{width:100%;height:110px;object-fit:cover;background:var(--s50);display:flex;align-items:center;justify-content:center;font-size:36px;}
+.stock-card-body{padding:10px 12px;}
+.stock-qty{font-size:20px;font-weight:800;}
+.stock-qty.ok{color:var(--g700);}
+.stock-qty.low{color:var(--a600);}
+.stock-qty.out{color:var(--r600);}
+.stock-use-btn{width:100%;padding:6px;border-radius:var(--radsm);border:none;background:var(--r50);color:var(--r600);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid var(--r100);margin-top:6px;}
+.stock-use-btn:hover{background:var(--r100);}
+.stock-add-btn{width:100%;padding:6px;border-radius:var(--radsm);border:none;background:var(--g50);color:var(--g700);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid var(--g100);}
+.stock-add-btn:hover{background:var(--g100);}
+/* NOTIFICATION BELL */
+.notif-bell{position:relative;background:none;border:1px solid var(--s200);border-radius:var(--radsm);width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--s600);}
+.notif-bell:hover{background:var(--s50);}
+.notif-badge{position:absolute;top:-4px;right:-4px;background:var(--r600);color:white;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;display:none;}
+.notif-badge.show{display:flex;}
+.notif-panel{position:absolute;top:42px;right:0;width:320px;background:white;border-radius:var(--rad);border:1px solid var(--s200);box-shadow:0 8px 32px rgba(0,0,0,0.15);z-index:200;display:none;max-height:400px;overflow-y:auto;}
+.notif-panel.open{display:block;}
+.notif-item{padding:10px 14px;border-bottom:1px solid var(--s100);font-size:12px;}
+.notif-item:last-child{border-bottom:none;}
+.notif-item.red{border-left:3px solid var(--r500);}
+.notif-item.amber{border-left:3px solid var(--a500);}
+/* EXPIRY */
+.expiry-ok{color:var(--g700);font-size:10px;}
+.expiry-warn{color:var(--a600);font-size:10px;font-weight:700;}
+.expiry-urgent{color:var(--r600);font-size:10px;font-weight:700;}
+0%,100%{box-shadow:0 0 6px 2px #22c55e80;}50%{box-shadow:0 0 14px 5px #22c55eb0;}}
 @keyframes glow-dollar{0%,100%{box-shadow:0 0 6px 2px #f59e0b80;}50%{box-shadow:0 0 14px 5px #f59e0bb0;}}
 .record-proc-btn{position:absolute;bottom:22px;right:3px;background:#16a34a;color:white;border:none;border-radius:5px;font-size:9px;font-weight:800;padding:2px 5px;cursor:pointer;z-index:20;animation:glow-green 1.5s infinite;white-space:nowrap;}
 .dollar-btn{position:absolute;bottom:4px;right:3px;width:18px;height:18px;border-radius:50%;background:#f59e0b;color:white;border:none;font-size:10px;font-weight:800;cursor:pointer;z-index:20;display:flex;align-items:center;justify-content:center;animation:glow-dollar 1.5s infinite;}
@@ -266,6 +295,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         <a class="ni" id="nav-billing" onclick="goTo('billing')"><div class="ni-ic">&#128180;</div>Billing</a>
         <a class="ni" id="nav-finance" onclick="goTo('finance')"><div class="ni-ic">&#128188;</div>Staff &amp; Finance</a>
         <a class="ni" id="nav-labs" onclick="goTo('labs')"><div class="ni-ic">&#128300;</div>Labs</a>
+        <a class="ni" id="nav-stocks" onclick="goTo('stocks')"><div class="ni-ic">&#128230;</div>Stocks</a>
         <a class="ni" id="nav-files" onclick="goTo('files')"><div class="ni-ic">&#9638;</div>X-rays &amp; Files</a>
         <a class="ni" id="nav-settings" onclick="goTo('settings')"><div class="ni-ic">&#9881;</div>Settings</a>
       </div>
@@ -284,6 +314,20 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
           <div><div class="ttitle" id="pg-title">Patients</div><div class="tsub" id="pg-sub"></div></div>
         </div>
         <div id="pg-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"></div>
+        <!-- NOTIFICATION BELL -->
+        <div style="position:relative;" id="notif-wrap">
+          <button class="notif-bell" onclick="toggleNotifPanel()" title="Notifications" id="notif-bell-btn">
+            &#128276;
+            <span class="notif-badge" id="notif-badge">0</span>
+          </button>
+          <div class="notif-panel" id="notif-panel">
+            <div style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--s600);border-bottom:1px solid var(--s200);display:flex;justify-content:space-between;align-items:center;">
+              <span>&#128276; Alerts</span>
+              <button onclick="toggleNotifPanel()" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--s400);">&#10005;</button>
+            </div>
+            <div id="notif-list"><div style="padding:20px;text-align:center;color:var(--s400);font-size:12px;">All clear ✓</div></div>
+          </div>
+        </div>
       </div>
       <div class="content" id="pg-content"><div class="loader"><div class="spinner"></div>Loading...</div></div>
     </div>
@@ -609,6 +653,133 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
   </div>
 </div>
 
+<!-- STOCK ITEM MODAL -->
+<div class="mbg" id="stock-item-modal">
+  <div class="modal mw">
+    <div class="mtit" id="si-title">Add stock item</div>
+    <div class="msub">Add an item to your stock catalog</div>
+    <input type="hidden" id="si-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Item name <span class="req">*</span></label>
+        <input class="finp" id="si-name" placeholder="e.g. Composite A2 — 3M Filtek"></div>
+      <div class="fgrp"><label class="flbl">Category <span class="req">*</span></label>
+        <select class="finp" id="si-cat"></select></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Brand</label>
+        <input class="finp" id="si-brand" placeholder="e.g. 3M, GC, Dentsply"></div>
+      <div class="fgrp"><label class="flbl">Unit</label>
+        <select class="finp" id="si-unit">
+          <option>piece</option><option>box</option><option>pack</option>
+          <option>syringe</option><option>tube</option><option>vial</option>
+          <option>cartridge</option><option>bottle</option><option>kit</option><option>roll</option>
+        </select></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Current quantity</label>
+        <input class="finp" type="number" id="si-qty" placeholder="0" min="0"></div>
+      <div class="fgrp"><label class="flbl">Minimum quantity (alert threshold)</label>
+        <input class="finp" type="number" id="si-min" placeholder="e.g. 5" min="0"></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Unit cost</label>
+        <input class="finp" type="number" id="si-cost" placeholder="0" min="0"></div>
+      <div class="fgrp"><label class="flbl">Currency</label>
+        <select class="finp" id="si-curr"><option value="IQD">IQD</option><option value="USD">USD</option></select></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Expiry date (optional)</label>
+        <input class="finp" type="date" id="si-expiry" max="2099-12-31"></div>
+      <div class="fgrp"><label class="flbl">Warn before expiry (days)</label>
+        <input class="finp" type="number" id="si-expiry-warn" placeholder="30" min="1" max="365" value="30"></div>
+    </div>
+    <!-- IMAGE UPLOAD -->
+    <div class="fgrp">
+      <label class="flbl">Item photo</label>
+      <div id="si-img-preview" style="width:80px;height:80px;border-radius:var(--radsm);border:1.5px dashed var(--s300);display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:8px;overflow:hidden;cursor:pointer;" onclick="document.getElementById('si-img-input').click()">&#128247;</div>
+      <input type="file" id="si-img-input" accept="image/*" style="display:none;" onchange="previewStockImg(this)">
+      <button type="button" class="btn btnsm" onclick="document.getElementById('si-img-input').click()">&#128247; Upload photo</button>
+      <input type="hidden" id="si-img-url">
+    </div>
+    <div class="fgrp"><label class="flbl">Notes</label>
+      <textarea class="finp" id="si-notes" rows="2" placeholder="Any additional notes..."></textarea></div>
+    <div class="mac">
+      <button class="btn btnr" id="si-del-btn" style="display:none;margin-right:auto;" onclick="deleteStockItem()">Delete item</button>
+      <button class="btn" onclick="closeMdl('stock-item-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveStockItem()">Save item</button>
+    </div>
+  </div>
+</div>
+
+<!-- STOCK CATEGORY MODAL -->
+<div class="mbg" id="stock-cat-modal">
+  <div class="modal" style="max-width:380px;">
+    <div class="mtit" id="sc-title">Add category</div>
+    <input type="hidden" id="sc-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Category name <span class="req">*</span></label>
+        <input class="finp" id="sc-name" placeholder="e.g. Composites, Gloves, Cements"></div>
+      <div class="fgrp"><label class="flbl">Color</label>
+        <input type="color" id="sc-color" value="#6366F1" style="width:48px;height:36px;border:none;border-radius:var(--radsm);cursor:pointer;padding:2px;"></div>
+    </div>
+    <div class="mac">
+      <button class="btn btnr" id="sc-del-btn" style="display:none;margin-right:auto;" onclick="deleteStockCat()">Delete</button>
+      <button class="btn" onclick="closeMdl('stock-cat-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveStockCat()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- STOCK USE MODAL (fast deduct) -->
+<div class="mbg" id="stock-use-modal">
+  <div class="modal" style="max-width:340px;">
+    <div style="text-align:center;font-size:32px;margin-bottom:8px;" id="su-emoji">📦</div>
+    <div class="mtit" style="text-align:center;" id="su-name">Item name</div>
+    <div style="text-align:center;font-size:11px;color:var(--s400);margin-bottom:4px;" id="su-stock">In stock: —</div>
+    <input type="hidden" id="su-id">
+    <input type="hidden" id="su-max">
+    <div class="fgrp" style="margin-top:14px;">
+      <label class="flbl" style="text-align:center;display:block;margin-bottom:8px;">How many used?</label>
+      <input class="finp" type="number" id="su-qty" value="1" min="1" style="text-align:center;font-size:24px;font-weight:700;height:56px;">
+    </div>
+    <div style="font-size:11px;color:var(--s400);text-align:center;margin-top:6px;" id="su-by">Used by: <strong id="su-user">—</strong></div>
+    <div class="mac" style="justify-content:center;margin-top:14px;">
+      <button class="btn" onclick="closeMdl('stock-use-modal')">Cancel</button>
+      <button class="btn btnr" style="padding:10px 28px;font-size:13px;" onclick="confirmStockUse()">Confirm use</button>
+    </div>
+  </div>
+</div>
+
+<!-- STOCK ADD (purchase/restock) MODAL -->
+<div class="mbg" id="stock-add-modal">
+  <div class="modal" style="max-width:380px;">
+    <div style="text-align:center;font-size:32px;margin-bottom:8px;">📥</div>
+    <div class="mtit" style="text-align:center;" id="sa-name">Add stock</div>
+    <div style="text-align:center;font-size:11px;color:var(--s400);margin-bottom:4px;" id="sa-stock">Current stock: —</div>
+    <input type="hidden" id="sa-id">
+    <input type="hidden" id="sa-unit-cost">
+    <input type="hidden" id="sa-curr">
+    <div class="fgrp" style="margin-top:14px;">
+      <label class="flbl" style="text-align:center;display:block;margin-bottom:8px;">Quantity received</label>
+      <input class="finp" type="number" id="sa-qty" value="1" min="1" style="text-align:center;font-size:24px;font-weight:700;height:56px;">
+    </div>
+    <div class="fgrp">
+      <label class="flbl">Unit cost (optional — updates item cost)</label>
+      <div style="display:flex;gap:8px;">
+        <input class="finp" type="number" id="sa-cost" placeholder="0" min="0" style="flex:1;">
+        <select class="finp" id="sa-cost-curr" style="width:80px;"><option value="IQD">IQD</option><option value="USD">USD</option></select>
+      </div>
+    </div>
+    <div style="background:var(--g50);border:1px solid var(--g100);border-radius:var(--radsm);padding:10px 12px;font-size:11px;color:var(--g700);margin-bottom:12px;">
+      &#10003; A Finance expense will be created automatically for this purchase
+    </div>
+    <div class="mac" style="justify-content:center;">
+      <button class="btn" onclick="closeMdl('stock-add-modal')">Cancel</button>
+      <button class="btn btnp" style="padding:10px 28px;" onclick="confirmStockAdd()">&#128229; Add to stock</button>
+    </div>
+  </div>
+</div>
+
 <!-- IMPLANT FIXTURE MODAL -->
 <div class="mbg" id="fixture-modal">
   <div class="modal">
@@ -811,6 +982,7 @@ function doLogin(){
     document.getElementById('sf-name').textContent=u.charAt(0).toUpperCase()+u.slice(1);
     document.getElementById('sf-av').textContent=u.slice(0,2).toUpperCase();
     goTo('dashboard');
+    setTimeout(function(){initStockNotifications();},1500);
   }else{var e=document.getElementById('li-err');e.style.display='block';setTimeout(function(){e.style.display='none';},3000);}
 }
 function doLogout(){sessionStorage.removeItem('vdc-user');location.reload();}
@@ -829,7 +1001,11 @@ window.onload=function(){_attachChipDelegation();
   var u=sessionStorage.getItem('vdc-user');
   if(u){document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';
     document.getElementById('sf-name').textContent=u.charAt(0).toUpperCase()+u.slice(1);
-    document.getElementById('sf-av').textContent=u.slice(0,2).toUpperCase();goTo('dashboard');}
+    document.getElementById('sf-av').textContent=u.slice(0,2).toUpperCase();
+    goTo('dashboard');
+    // Initialize stock notifications silently
+    setTimeout(function(){initStockNotifications();},1500);
+  }
 };
 
 // NAVIGATION
@@ -838,8 +1014,8 @@ function goTo(s){
   var nav=document.getElementById('nav-'+s);if(nav)nav.classList.add('act');
   if(waitInt){clearInterval(waitInt);waitInt=null;}
   if(nowInt){clearInterval(nowInt);nowInt=null;}
-  var T={dashboard:'Dashboard',patients:'Patients',procedures:'Procedures',appointments:'Appointments',billing:'Billing',finance:'Staff & Finance',labs:'Labs',files:'X-rays & Files',settings:'Settings'};
-  var S={patients:'Manage patients & clinical records',appointments:'Daily schedule & room management',billing:'Financial overview — all patients',finance:'Payroll & partner wallets',settings:'Clinic preferences'};
+  var T={dashboard:'Dashboard',patients:'Patients',procedures:'Procedures',appointments:'Appointments',billing:'Billing',finance:'Staff & Finance',labs:'Labs',stocks:'Stocks',files:'X-rays & Files',settings:'Settings'};
+  var S={patients:'Manage patients & clinical records',appointments:'Daily schedule & room management',billing:'Financial overview — all patients',finance:'Payroll & partner wallets',stocks:'Inventory management & stock tracking',settings:'Clinic preferences'};
   document.getElementById('pg-title').textContent=T[s]||s;
   document.getElementById('pg-sub').textContent=S[s]||'';
   document.getElementById('pg-actions').innerHTML='';
@@ -861,6 +1037,7 @@ function goTo(s){
   else if(s==='finance')renderFinance();
   else if(s==='proccatalog')renderProcCatalog();
   else if(s==='labs')renderLabs();
+  else if(s==='stocks')renderStocks();
   else if(s==='dashboard')renderDashboard();
   else if(s==='files')renderFiles();
   else if(s==='settings')renderSettings();
@@ -2714,7 +2891,538 @@ function removeFixtureLine(btn){
   updateProcNet();
 }
 
-// ══════════════════════ DASHBOARD ════════════════════════════════
+// ══════════════════════ STOCKS SYSTEM ════════════════════════════
+var stockItems=[], stockCats=[], stockHistory=[];
+var stockTab='items'; // 'items' | 'history' | 'alerts'
+var stockCatFilter='all';
+
+// ── SUPABASE URL helper ──
+function getSupabaseImgUrl(path){
+  if(!path)return null;
+  if(path.startsWith('http'))return path;
+  return SUPA+'/storage/v1/object/public/stock-images/'+path;
+}
+
+// ── MAIN RENDER ──
+async function renderStocks(){
+  document.getElementById('pg-actions').innerHTML=
+    '<button class="btn btnsm" onclick="openStockCatMgr()">&#9881; Categories</button>'+
+    '<button class="btn btnp" onclick="openAddStockItem()">+ Add item</button>';
+  document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading stocks...</div>';
+  await loadStockData();
+  buildStocksUI();
+}
+
+async function loadStockData(){
+  var [catR, itemR] = await Promise.all([
+    db.from('stock_categories').select('*').order('name'),
+    db.from('stock_items').select('*').order('name')
+  ]);
+  stockCats = catR.data||[];
+  stockItems = itemR.data||[];
+  // Update notification bell
+  updateStockNotifications();
+}
+
+async function buildStocksUI(){
+  var today = fd(new Date());
+  var lowItems = stockItems.filter(function(i){ return Number(i.quantity||0) <= Number(i.min_quantity||0); });
+  var expiryItems = stockItems.filter(function(i){
+    if(!i.expiry_date)return false;
+    var warn = Number(i.expiry_warning_days||30);
+    var daysLeft = Math.ceil((new Date(i.expiry_date) - new Date())/(1000*60*60*24));
+    return daysLeft <= warn;
+  });
+  var alertCount = new Set(lowItems.map(function(i){return i.id;}).concat(expiryItems.map(function(i){return i.id;}))).size;
+
+  // Tab bar
+  var html = '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:14px;flex-wrap:wrap;">'+
+    '<button class="fin-tab'+(stockTab==='items'?' act':'')+'" onclick="setStockTab(\'items\')">&#128230; All items</button>'+
+    '<button class="fin-tab'+(stockTab==='history'?' act':'')+'" onclick="setStockTab(\'history\')">&#128203; History</button>'+
+    '<button class="fin-tab'+(stockTab==='alerts'?' act':'')+'" onclick="setStockTab(\'alerts\')">'+
+    (alertCount>0?'<span style="display:inline-flex;align-items:center;justify-content:center;background:var(--r600);color:white;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:800;margin-right:4px;">'+alertCount+'</span>':'')+
+    '&#9888; Alerts</button></div>';
+
+  if(stockTab==='items'){
+    html += buildStockItemsTab(today);
+    document.getElementById('pg-content').innerHTML = html;
+  } else if(stockTab==='history'){
+    document.getElementById('pg-content').innerHTML = html + '<div class="loader"><div class="spinner"></div>Loading history...</div>';
+    var histHtml = await buildStockHistoryTab();
+    document.getElementById('pg-content').innerHTML = html + histHtml;
+  } else {
+    html += buildStockAlertsTab(today);
+    document.getElementById('pg-content').innerHTML = html;
+  }
+}
+
+function setStockTab(tab){ stockTab=tab; buildStocksUI(); }
+
+// ── ITEMS TAB ──
+function buildStockItemsTab(today){
+  // Category filter bar
+  var html = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">'+
+    '<button class="btn btnsm'+(stockCatFilter==='all'?' btnp':'')+'" onclick="stockCatFilter=\'all\';buildStocksUI()">All</button>'+
+    stockCats.map(function(cat){
+      return '<button class="btn btnsm'+(stockCatFilter===cat.id?' btnp':'')+'" onclick="stockCatFilter=\''+cat.id+'\';buildStocksUI()" style="border-color:'+cat.color+';'+(stockCatFilter===cat.id?'background:'+cat.color+';color:white;':'color:'+cat.color+';')+'">'+(cat.name)+'</button>';
+    }).join('')+'</div>';
+
+  var filtered = stockCatFilter==='all' ? stockItems : stockItems.filter(function(i){ return i.category_id===stockCatFilter; });
+
+  if(!filtered.length){
+    return html+'<div style="text-align:center;padding:60px 20px;"><div style="font-size:48px;margin-bottom:12px;">&#128230;</div>'+
+      '<div style="font-size:14px;font-weight:700;color:var(--s600);margin-bottom:6px;">No items yet</div>'+
+      '<div style="font-size:12px;color:var(--s400);">Click &quot;+ Add item&quot; to start your stock catalog</div></div>';
+  }
+
+  html += '<div class="stock-grid">';
+  filtered.forEach(function(item){
+    var qty = Number(item.quantity||0);
+    var minQty = Number(item.min_quantity||0);
+    var qtyClass = qty===0?'out':qty<=minQty?'low':'ok';
+    var qtyLabel = qty===0?'Out of stock':qty<=minQty?'Low stock':'In stock';
+    var cat = stockCats.find(function(c){ return c.id===item.category_id; });
+    var catColor = cat?cat.color:'#6366F1';
+    // Expiry
+    var expiryHtml='';
+    if(item.expiry_date){
+      var daysLeft=Math.ceil((new Date(item.expiry_date)-new Date())/(1000*60*60*24));
+      var expClass=daysLeft<=0?'expiry-urgent':daysLeft<=(item.expiry_warning_days||30)?'expiry-warn':'expiry-ok';
+      var expLabel=daysLeft<=0?'Expired!':daysLeft===1?'Expires tomorrow':'Expires in '+daysLeft+' days';
+      expiryHtml='<div class="'+expClass+'">&#128197; '+expLabel+'</div>';
+    }
+    var imgHtml='';
+    var imgUrl=getSupabaseImgUrl(item.image_url);
+    if(imgUrl){
+      imgHtml='<img src="'+imgUrl+'" style="width:100%;height:110px;object-fit:cover;" onerror="this.parentNode.innerHTML=\'<div style=\\\'width:100%;height:110px;background:var(--s50);display:flex;align-items:center;justify-content:center;font-size:36px;\\\'>&#128230;</div>\'">';
+    } else {
+      imgHtml='<div style="width:100%;height:110px;background:var(--s50);display:flex;align-items:center;justify-content:center;font-size:36px;">&#128230;</div>';
+    }
+    html+=
+      '<div class="stock-card">'+
+      imgHtml+
+      '<div class="stock-card-body">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">'+
+      '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;background:'+catColor+'22;color:'+catColor+';">'+( cat?cat.name:'—')+'</span>'+
+      '<button onclick="openEditStockItem(\''+item.id+'\')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--s400);">&#9998;</button>'+
+      '</div>'+
+      '<div style="font-size:12px;font-weight:700;color:var(--s800);margin-bottom:2px;line-height:1.3;">'+(item.name)+'</div>'+
+      (item.brand?'<div style="font-size:10px;color:var(--s400);">'+(item.brand)+'</div>':'')+
+      '<div style="display:flex;align-items:baseline;gap:4px;margin:6px 0 2px;">'+
+      '<span class="stock-qty '+qtyClass+'">'+(qty)+'</span>'+
+      '<span style="font-size:11px;color:var(--s400);">'+(item.unit||'piece')+'</span>'+
+      '</div>'+
+      '<div style="font-size:10px;font-weight:600;color:'+(qtyClass==='ok'?'var(--g700)':qtyClass==='low'?'var(--a600)':'var(--r600)')+';">'+qtyLabel+'</div>'+
+      (minQty>0?'<div style="font-size:9px;color:var(--s400);">Min: '+minQty+' '+( item.unit||'')+'</div>':'')+
+      expiryHtml+
+      '<div style="font-size:10px;color:var(--s500);margin-top:4px;">'+fmtAmt(item.unit_cost,item.cost_currency||'IQD')+' / '+(item.unit||'piece')+'</div>'+
+      '<div style="display:flex;gap:5px;margin-top:8px;">'+
+      '<button class="stock-add-btn" onclick="openStockAdd(\''+item.id+'\')">&#128229; Add</button>'+
+      '<button class="stock-use-btn" onclick="openStockUse(\''+item.id+'\')">&#8722; Use</button>'+
+      '</div></div></div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+// ── HISTORY TAB ──
+async function buildStockHistoryTab(){
+  var r = await db.from('stock_history').select('*').order('created_at',{ascending:false}).limit(100);
+  var hist = r.data||[];
+  if(!hist.length) return '<div style="text-align:center;padding:60px;color:var(--s400);">No history yet</div>';
+  return '<div class="vdc-card"><div class="vdc-card-body" style="overflow-x:auto;padding:0;">'+
+    '<table class="tbl"><thead><tr>'+
+    '<th>Date/Time</th><th>Item</th><th>Action</th><th>Change</th><th>After</th><th>Cost</th><th>By</th><th>Notes</th>'+
+    '</tr></thead><tbody>'+
+    hist.map(function(h){
+      var isAdd=h.action==='added'||h.action==='purchase';
+      var isUse=h.action==='used';
+      return '<tr>'+
+        '<td style="font-size:10px;color:var(--s400);white-space:nowrap;">'+(h.created_at?h.created_at.slice(0,16).replace('T',' '):'—')+'</td>'+
+        '<td style="font-weight:600;">'+(h.item_name||'—')+'</td>'+
+        '<td><span class="badge '+(isAdd?'bg':isUse?'br':'bs')+'">'+( isAdd?'&#128229; Added':isUse?'&#8722; Used':'&#9998; Adjusted')+'</span></td>'+
+        '<td style="font-weight:700;color:'+(isAdd?'var(--g700)':'var(--r600)')+';">'+(isAdd?'+':'-')+Math.abs(h.quantity_change||0)+' '+(h.unit||'')+'</td>'+
+        '<td style="color:var(--s500);">'+(h.quantity_after||0)+'</td>'+
+        '<td style="color:var(--b700);">'+(h.total_cost?fmtAmt(h.total_cost,h.cost_currency||'IQD'):'—')+'</td>'+
+        '<td><span class="badge bs">'+(h.user_name||'Admin')+'</span></td>'+
+        '<td style="font-size:10px;color:var(--s400);">'+(h.notes||'—')+'</td>'+
+        '</tr>';
+    }).join('')+'</tbody></table></div></div>';
+}
+
+// ── ALERTS TAB ──
+function buildStockAlertsTab(today){
+  var lowItems = stockItems.filter(function(i){ return Number(i.quantity||0) <= Number(i.min_quantity||0); });
+  var expiryItems = stockItems.filter(function(i){
+    if(!i.expiry_date)return false;
+    var warn = Number(i.expiry_warning_days||30);
+    var daysLeft = Math.ceil((new Date(i.expiry_date) - new Date())/(1000*60*60*24));
+    return daysLeft <= warn;
+  });
+  if(!lowItems.length&&!expiryItems.length){
+    return '<div style="text-align:center;padding:60px;"><div style="font-size:48px;margin-bottom:12px;">&#10003;</div>'+
+      '<div style="font-size:14px;font-weight:700;color:var(--g700);">All stock levels are good</div></div>';
+  }
+  var html='';
+  if(lowItems.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--r600);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">&#9888; Low / Out of stock ('+lowItems.length+')</div>';
+    html+='<div class="vdc-card" style="margin-bottom:14px;"><div class="vdc-card-body" style="padding:0;overflow-x:auto;">';
+    html+='<table class="tbl"><thead><tr><th>Item</th><th>Category</th><th>Current qty</th><th>Minimum</th><th>Action</th></tr></thead><tbody>';
+    lowItems.forEach(function(item){
+      var cat=stockCats.find(function(c){return c.id===item.category_id;});
+      var qty=Number(item.quantity||0);
+      html+='<tr>'+
+        '<td style="font-weight:700;">'+(item.name)+'</td>'+
+        '<td>'+(cat?'<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:'+cat.color+'22;color:'+cat.color+';">'+cat.name+'</span>':'—')+'</td>'+
+        '<td><span style="font-weight:800;color:'+(qty===0?'var(--r600)':'var(--a600)')+';">'+(qty)+'</span> '+(item.unit||'')+'</td>'+
+        '<td>'+(item.min_quantity||0)+' '+(item.unit||'')+'</td>'+
+        '<td><button class="btn btnp btnxs" onclick="openStockAdd(\''+item.id+'\')">&#128229; Restock</button></td>'+
+        '</tr>';
+    });
+    html+='</tbody></table></div></div>';
+  }
+  if(expiryItems.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--a600);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">&#128197; Expiring soon ('+expiryItems.length+')</div>';
+    html+='<div class="vdc-card"><div class="vdc-card-body" style="padding:0;overflow-x:auto;">';
+    html+='<table class="tbl"><thead><tr><th>Item</th><th>Expiry date</th><th>Days left</th><th>Quantity</th></tr></thead><tbody>';
+    expiryItems.forEach(function(item){
+      var daysLeft=Math.ceil((new Date(item.expiry_date)-new Date())/(1000*60*60*24));
+      var cls=daysLeft<=0?'var(--r600)':daysLeft<=7?'var(--r600)':'var(--a600)';
+      html+='<tr>'+
+        '<td style="font-weight:700;">'+(item.name)+'</td>'+
+        '<td>'+(item.expiry_date)+'</td>'+
+        '<td style="font-weight:800;color:'+cls+';">'+(daysLeft<=0?'Expired!':daysLeft+' days')+'</td>'+
+        '<td>'+(item.quantity||0)+' '+(item.unit||'')+'</td>'+
+        '</tr>';
+    });
+    html+='</tbody></table></div></div>';
+  }
+  return html;
+}
+
+// ── NOTIFICATION BELL ──
+function updateStockNotifications(){
+  var alerts=[];
+  stockItems.forEach(function(item){
+    var qty=Number(item.quantity||0);
+    var minQty=Number(item.min_quantity||0);
+    if(qty===0) alerts.push({type:'red',msg:'&#128230; <strong>'+(item.name)+'</strong> — out of stock'});
+    else if(qty<=minQty) alerts.push({type:'amber',msg:'&#9888; <strong>'+(item.name)+'</strong> — low stock ('+qty+' '+( item.unit||'')+')'});
+    if(item.expiry_date){
+      var daysLeft=Math.ceil((new Date(item.expiry_date)-new Date())/(1000*60*60*24));
+      if(daysLeft<=(item.expiry_warning_days||30)){
+        alerts.push({type:daysLeft<=7?'red':'amber',msg:'&#128197; <strong>'+(item.name)+'</strong> — '+(daysLeft<=0?'expired':daysLeft+' days to expiry')});
+      }
+    }
+  });
+  var badge=document.getElementById('notif-badge');
+  var list=document.getElementById('notif-list');
+  if(badge){if(alerts.length){badge.textContent=alerts.length;badge.classList.add('show');}else{badge.classList.remove('show');}}
+  if(list){
+    list.innerHTML=alerts.length?
+      alerts.map(function(a){return '<div class="notif-item '+a.type+'">'+a.msg+'</div>';}).join(''):
+      '<div style="padding:20px;text-align:center;color:var(--s400);font-size:12px;">All clear &#10003;</div>';
+  }
+}
+function toggleNotifPanel(){
+  var p=document.getElementById('notif-panel');if(p)p.classList.toggle('open');
+}
+document.addEventListener('click',function(e){
+  var wrap=document.getElementById('notif-wrap');
+  if(wrap&&!wrap.contains(e.target)){var p=document.getElementById('notif-panel');if(p)p.classList.remove('open');}
+});
+
+// ── CATEGORY MANAGEMENT ──
+async function openStockCatMgr(){
+  var r=await db.from('stock_categories').select('*').order('name');
+  stockCats=r.data||[];
+  var html='<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);margin-bottom:10px;overflow:hidden;">'+
+    (stockCats.length?stockCats.map(function(cat){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--s100);">'+
+        '<div style="width:16px;height:16px;border-radius:50%;background:'+cat.color+';flex-shrink:0;"></div>'+
+        '<span style="flex:1;font-weight:600;font-size:12px;">'+(cat.name)+'</span>'+
+        '<button class="btn btnxs" onclick="openEditStockCat(\''+cat.id+'\')">Edit</button>'+
+        '</div>';
+    }).join(''):'<div style="padding:16px;text-align:center;color:var(--s400);font-size:12px;">No categories yet</div>')+
+    '</div>';
+  // Quick add
+  document.getElementById('pg-content').innerHTML=
+    '<div style="max-width:500px;">'+
+    '<div style="font-size:14px;font-weight:700;color:var(--s800);margin-bottom:10px;">&#9881; Manage categories</div>'+
+    html+
+    '<button class="btn btnp" onclick="openAddStockCat()">+ New category</button>'+
+    '<button class="btn" onclick="renderStocks()" style="margin-left:8px;">&#8592; Back to stocks</button>'+
+    '</div>';
+}
+function openAddStockCat(){
+  document.getElementById('sc-title').textContent='Add category';
+  document.getElementById('sc-id').value='';
+  document.getElementById('sc-name').value='';
+  document.getElementById('sc-color').value='#6366F1';
+  document.getElementById('sc-del-btn').style.display='none';
+  openMdl('stock-cat-modal');
+}
+function openEditStockCat(id){
+  var cat=stockCats.find(function(c){return c.id===id;});if(!cat)return;
+  document.getElementById('sc-title').textContent='Edit category';
+  document.getElementById('sc-id').value=cat.id;
+  document.getElementById('sc-name').value=cat.name||'';
+  document.getElementById('sc-color').value=cat.color||'#6366F1';
+  document.getElementById('sc-del-btn').style.display='inline-flex';
+  openMdl('stock-cat-modal');
+}
+async function saveStockCat(){
+  var name=document.getElementById('sc-name').value.trim();
+  if(!name){showToast('Enter category name','error');return;}
+  var id=document.getElementById('sc-id').value;
+  var payload={name:name,color:document.getElementById('sc-color').value||'#6366F1'};
+  var r=id?await db.from('stock_categories').update(payload).eq('id',id):await db.from('stock_categories').insert([payload]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast(id?'Category updated':'Category added');
+  closeMdl('stock-cat-modal');
+  await openStockCatMgr();
+}
+async function deleteStockCat(){
+  var id=document.getElementById('sc-id').value;
+  if(!id||!confirm('Delete this category? Items in this category will become uncategorized.'))return;
+  await db.from('stock_categories').delete().eq('id',id);
+  showToast('Category deleted');
+  closeMdl('stock-cat-modal');
+  await openStockCatMgr();
+}
+
+// ── STOCK ITEM CRUD ──
+async function openAddStockItem(){
+  document.getElementById('si-title').textContent='Add stock item';
+  document.getElementById('si-id').value='';
+  ['si-name','si-brand','si-notes','si-img-url'].forEach(function(i){document.getElementById(i).value='';});
+  document.getElementById('si-qty').value='0';
+  document.getElementById('si-min').value='5';
+  document.getElementById('si-cost').value='0';
+  document.getElementById('si-curr').value='IQD';
+  document.getElementById('si-unit').value='piece';
+  document.getElementById('si-expiry').value='';
+  document.getElementById('si-expiry-warn').value='30';
+  document.getElementById('si-del-btn').style.display='none';
+  document.getElementById('si-img-preview').innerHTML='&#128247;';
+  document.getElementById('si-img-input').value='';
+  // populate categories
+  var sel=document.getElementById('si-cat');
+  sel.innerHTML='<option value="">Select category...</option>'+stockCats.map(function(c){return '<option value="'+c.id+'">'+c.name+'</option>';}).join('');
+  openMdl('stock-item-modal');
+}
+async function openEditStockItem(id){
+  var item=stockItems.find(function(i){return i.id===id;});if(!item)return;
+  document.getElementById('si-title').textContent='Edit stock item';
+  document.getElementById('si-id').value=item.id;
+  document.getElementById('si-name').value=item.name||'';
+  document.getElementById('si-brand').value=item.brand||'';
+  document.getElementById('si-notes').value=item.notes||'';
+  document.getElementById('si-img-url').value=item.image_url||'';
+  document.getElementById('si-qty').value=item.quantity||0;
+  document.getElementById('si-min').value=item.min_quantity||0;
+  document.getElementById('si-cost').value=item.unit_cost||0;
+  document.getElementById('si-curr').value=item.cost_currency||'IQD';
+  document.getElementById('si-unit').value=item.unit||'piece';
+  document.getElementById('si-expiry').value=item.expiry_date||'';
+  document.getElementById('si-expiry-warn').value=item.expiry_warning_days||30;
+  document.getElementById('si-del-btn').style.display='inline-flex';
+  var imgUrl=getSupabaseImgUrl(item.image_url);
+  if(imgUrl){
+    document.getElementById('si-img-preview').innerHTML='<img src="'+imgUrl+'" style="width:100%;height:100%;object-fit:cover;">';
+  } else {
+    document.getElementById('si-img-preview').innerHTML='&#128247;';
+  }
+  document.getElementById('si-img-input').value='';
+  var sel=document.getElementById('si-cat');
+  sel.innerHTML='<option value="">Select category...</option>'+stockCats.map(function(c){return '<option value="'+c.id+'"'+(c.id===item.category_id?' selected':'')+'>'+c.name+'</option>';}).join('');
+  openMdl('stock-item-modal');
+}
+async function previewStockImg(input){
+  if(!input.files||!input.files[0])return;
+  var file=input.files[0];
+  var reader=new FileReader();
+  reader.onload=function(e){
+    document.getElementById('si-img-preview').innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover;">';
+  };
+  reader.readAsDataURL(file);
+}
+async function saveStockItem(){
+  var name=document.getElementById('si-name').value.trim();
+  if(!name){showToast('Enter item name','error');return;}
+  var id=document.getElementById('si-id').value;
+  // Upload image if a new file was selected
+  var imgUrl=document.getElementById('si-img-url').value||null;
+  var imgInput=document.getElementById('si-img-input');
+  if(imgInput.files&&imgInput.files[0]){
+    var file=imgInput.files[0];
+    var ext=file.name.split('.').pop();
+    var path='items/'+(Date.now())+'.'+ext;
+    var upR=await db.storage.from('stock-images').upload(path,file,{upsert:true,contentType:file.type});
+    if(upR.error){showToast('Image upload failed: '+upR.error.message,'error');}
+    else{imgUrl=path;}
+  }
+  var payload={
+    name:name,
+    category_id:document.getElementById('si-cat').value||null,
+    brand:document.getElementById('si-brand').value.trim()||null,
+    unit:document.getElementById('si-unit').value||'piece',
+    quantity:parseFloat(document.getElementById('si-qty').value)||0,
+    min_quantity:parseFloat(document.getElementById('si-min').value)||0,
+    unit_cost:parseFloat(document.getElementById('si-cost').value)||0,
+    cost_currency:document.getElementById('si-curr').value||'IQD',
+    image_url:imgUrl,
+    expiry_date:document.getElementById('si-expiry').value||null,
+    expiry_warning_days:parseInt(document.getElementById('si-expiry-warn').value)||30,
+    notes:document.getElementById('si-notes').value.trim()||null
+  };
+  var r=id?await db.from('stock_items').update(payload).eq('id',id):await db.from('stock_items').insert([payload]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast(id?'Item updated':'Item added');
+  closeMdl('stock-item-modal');
+  await renderStocks();
+}
+async function deleteStockItem(){
+  var id=document.getElementById('si-id').value;
+  if(!id||!confirm('Delete this stock item and all its history?'))return;
+  await db.from('stock_history').delete().eq('item_id',id);
+  await db.from('stock_items').delete().eq('id',id);
+  showToast('Item deleted');
+  closeMdl('stock-item-modal');
+  await renderStocks();
+}
+
+// ── STOCK USE (fast deduct) ──
+function openStockUse(itemId){
+  var item=stockItems.find(function(i){return i.id===itemId;});if(!item)return;
+  document.getElementById('su-id').value=itemId;
+  document.getElementById('su-max').value=item.quantity||0;
+  document.getElementById('su-name').textContent=item.name;
+  var imgUrl=getSupabaseImgUrl(item.image_url);
+  document.getElementById('su-emoji').innerHTML=imgUrl?'<img src="'+imgUrl+'" style="width:56px;height:56px;border-radius:var(--radsm);object-fit:cover;">':'&#128230;';
+  document.getElementById('su-stock').textContent='In stock: '+(item.quantity||0)+' '+(item.unit||'piece');
+  document.getElementById('su-qty').value=1;
+  document.getElementById('su-qty').max=item.quantity||0;
+  var user=sessionStorage.getItem('vdc-user')||'Admin';
+  document.getElementById('su-user').textContent=user.charAt(0).toUpperCase()+user.slice(1);
+  openMdl('stock-use-modal');
+}
+async function confirmStockUse(){
+  var id=document.getElementById('su-id').value;
+  var qty=parseFloat(document.getElementById('su-qty').value)||0;
+  var max=parseFloat(document.getElementById('su-max').value)||0;
+  if(qty<=0){showToast('Enter quantity','error');return;}
+  if(qty>max){showToast('Not enough stock (only '+max+' available)','error');return;}
+  var item=stockItems.find(function(i){return i.id===id;});if(!item)return;
+  var newQty=Number(item.quantity||0)-qty;
+  var user=sessionStorage.getItem('vdc-user')||'Admin';
+  var userName=user.charAt(0).toUpperCase()+user.slice(1);
+  // Update stock
+  var r=await db.from('stock_items').update({quantity:newQty}).eq('id',id);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  // Log history
+  await db.from('stock_history').insert([{
+    item_id:id, item_name:item.name, action:'used',
+    quantity_change:-qty, quantity_after:newQty,
+    unit_cost:item.unit_cost||0, cost_currency:item.cost_currency||'IQD',
+    total_cost:(item.unit_cost||0)*qty,
+    user_name:userName, unit:item.unit||'piece',
+    reference_type:'manual', notes:'Manual deduction'
+  }]);
+  showToast(qty+' '+( item.unit||'piece')+' used from stock');
+  closeMdl('stock-use-modal');
+  await loadStockData();
+  buildStocksUI();
+}
+
+// ── STOCK ADD (purchase / restock) ──
+function openStockAdd(itemId){
+  var item=stockItems.find(function(i){return i.id===itemId;});if(!item)return;
+  document.getElementById('sa-id').value=itemId;
+  document.getElementById('sa-unit-cost').value=item.unit_cost||0;
+  document.getElementById('sa-curr').value=item.cost_currency||'IQD';
+  document.getElementById('sa-name').textContent=item.name;
+  document.getElementById('sa-stock').textContent='Current stock: '+(item.quantity||0)+' '+(item.unit||'piece');
+  document.getElementById('sa-qty').value=1;
+  document.getElementById('sa-cost').value=item.unit_cost||0;
+  document.getElementById('sa-cost-curr').value=item.cost_currency||'IQD';
+  openMdl('stock-add-modal');
+}
+async function confirmStockAdd(){
+  var id=document.getElementById('sa-id').value;
+  var qty=parseFloat(document.getElementById('sa-qty').value)||0;
+  if(qty<=0){showToast('Enter quantity','error');return;}
+  var item=stockItems.find(function(i){return i.id===id;});if(!item)return;
+  var newQty=Number(item.quantity||0)+qty;
+  var unitCost=parseFloat(document.getElementById('sa-cost').value)||Number(item.unit_cost||0);
+  var curr=document.getElementById('sa-cost-curr').value||item.cost_currency||'IQD';
+  var totalCost=unitCost*qty;
+  var user=sessionStorage.getItem('vdc-user')||'Admin';
+  var userName=user.charAt(0).toUpperCase()+user.slice(1);
+  // Update stock quantity and unit cost
+  var r=await db.from('stock_items').update({quantity:newQty,unit_cost:unitCost,cost_currency:curr}).eq('id',id);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  // Log history
+  await db.from('stock_history').insert([{
+    item_id:id, item_name:item.name, action:'added',
+    quantity_change:qty, quantity_after:newQty,
+    unit_cost:unitCost, cost_currency:curr,
+    total_cost:totalCost,
+    user_name:userName, unit:item.unit||'piece',
+    reference_type:'purchase', notes:'Stock purchase'
+  }]);
+  // Auto-create Finance expense
+  if(totalCost>0){
+    var today=fd(new Date());
+    await db.from('expenses').insert([{
+      category:'Stock & Materials',
+      description:'Stock purchase: '+(item.name)+' × '+qty+' '+(item.unit||'piece'),
+      amount:totalCost,
+      date:today,
+      type:'one-time'
+    }]).then(function(r){if(r.error)console.warn('Expense log warn:',r.error.message);});
+    showToast(qty+' '+(item.unit||'piece')+' added — expense of '+fmtAmt(totalCost,curr)+' recorded ✅');
+  } else {
+    showToast(qty+' '+(item.unit||'piece')+' added to stock ✅');
+  }
+  closeMdl('stock-add-modal');
+  await loadStockData();
+  buildStocksUI();
+}
+
+// ── STOCK DEDUCTION FROM PROCEDURES (fixture auto-deduct) ──
+async function deductStockFromFixtures(fixtureLinesSummary, userName){
+  if(!fixtureLinesSummary||!fixtureLinesSummary.length)return;
+  for(var i=0;i<fixtureLinesSummary.length;i++){
+    var line=fixtureLinesSummary[i];
+    if(!line.stockItemId||!line.qty)continue;
+    var item=stockItems.find(function(x){return x.id===line.stockItemId;});
+    if(!item)continue;
+    var newQty=Math.max(0,Number(item.quantity||0)-Number(line.qty));
+    await db.from('stock_items').update({quantity:newQty}).eq('id',line.stockItemId);
+    await db.from('stock_history').insert([{
+      item_id:line.stockItemId, item_name:item.name, action:'used',
+      quantity_change:-Number(line.qty), quantity_after:newQty,
+      unit_cost:item.unit_cost||0, cost_currency:item.cost_currency||'IQD',
+      total_cost:(item.unit_cost||0)*Number(line.qty),
+      user_name:userName||'Admin', unit:item.unit||'piece',
+      reference_type:'procedure', notes:'Used in procedure'
+    }]);
+  }
+  // Reload stock data silently
+  var r=await db.from('stock_items').select('*').order('name');
+  stockItems=r.data||[];
+  updateStockNotifications();
+}
+
+// ── INITIALIZE NOTIFICATIONS ON LOGIN ──
+async function initStockNotifications(){
+  var r=await db.from('stock_items').select('*').order('name');
+  stockItems=r.data||[];
+  var cR=await db.from('stock_categories').select('*').order('name');
+  stockCats=cR.data||[];
+  updateStockNotifications();
+}
 async function renderDashboard(){
   document.getElementById('pg-actions').innerHTML='';
   document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading dashboard...</div>';
