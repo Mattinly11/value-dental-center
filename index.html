@@ -258,6 +258,61 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .record-proc-btn{position:absolute;bottom:22px;right:3px;background:#16a34a;color:white;border:none;border-radius:5px;font-size:9px;font-weight:800;padding:2px 5px;cursor:pointer;z-index:20;animation:glow-green 1.5s infinite;white-space:nowrap;}
 .dollar-btn{position:absolute;bottom:4px;right:3px;width:18px;height:18px;border-radius:50%;background:#f59e0b;color:white;border:none;font-size:10px;font-weight:800;cursor:pointer;z-index:20;display:flex;align-items:center;justify-content:center;animation:glow-dollar 1.5s infinite;}
 .dollar-btn.paid{background:#16a34a;animation:none;}
+
+/* ═══════════════════════ MOBILE RESPONSIVE ═══════════════════════ */
+.drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:98;}
+.drawer-overlay.open{display:block;}
+.hamburger-btn{display:none;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:var(--radsm);color:var(--s700);font-size:22px;line-height:1;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
+/* FULL-SCREEN MODALS — all devices */
+.mbg{align-items:flex-start;padding:0;}
+.modal{border-radius:0;width:100%;max-width:100%;height:100svh;max-height:100svh;display:flex;flex-direction:column;box-shadow:none;padding:0;}
+.modal-hdr{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--s200);background:white;position:sticky;top:0;z-index:10;flex-shrink:0;}
+.modal-hdr-title{font-size:15px;font-weight:700;color:var(--s800);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.modal-back{background:none;border:none;cursor:pointer;padding:6px 4px;border-radius:var(--radsm);color:var(--s600);font-size:20px;line-height:1;display:flex;align-items:center;font-family:inherit;}
+.modal-bdy{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 20px 40px;}
+.modal-ftr{padding:12px 16px;border-top:1px solid var(--s200);background:white;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;}
+.modal .mtit{font-size:13px;font-weight:700;color:var(--s500);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.3px;}
+.modal .mac{margin-top:20px;}
+/* MOBILE ≤768px */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);z-index:99;width:240px;}
+  .sidebar.open{transform:translateX(0);}
+  .main{margin-left:0 !important;}
+  .hamburger-btn{display:flex;align-items:center;justify-content:center;}
+  .topbar{padding:10px 12px;gap:6px;}
+  .ttitle{font-size:14px;}
+  .tsub{display:none;}
+  .content{padding:12px 12px;}
+  .stats-row{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;}
+  .stat-val{font-size:17px;}
+  .fg{flex-direction:column;gap:0;}
+  .mac{flex-wrap:wrap;}
+  .mac .btn{flex:1;min-width:120px;padding:11px 8px;font-size:13px;text-align:center;}
+  .modal-ftr .btn{flex:1;padding:12px;font-size:13px;text-align:center;}
+  .vdc-card-body{overflow-x:auto;}
+  .tbl{min-width:500px;}
+  .stock-grid{grid-template-columns:repeat(2,1fr) !important;gap:10px;}
+  .notif-panel{right:-50px;width:280px;}
+  #pg-actions .btn{padding:6px 10px;font-size:11px;}
+  #pg-actions .btnsm{padding:5px 8px;}
+  .cal-room-filters{display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:white;border-bottom:1px solid var(--s200);-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .cal-room-filters::-webkit-scrollbar{display:none;}
+  .cal-room-btn{flex-shrink:0;padding:7px 16px;border-radius:20px;border:1.5px solid var(--s200);background:white;font-size:11px;font-weight:600;cursor:pointer;color:var(--s600);font-family:inherit;white-space:nowrap;}
+  .cal-room-btn.act{background:var(--b600);color:white;border-color:var(--b600);}
+  .appt-block{min-height:52px !important;}
+  .open-case-banner{padding:10px 12px;}
+  .case-summary-card{padding:12px;}
+  .sched-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .pt-timeline-body .pt-visit-date{width:60px;}
+}
+/* TABLET 769–1024px */
+@media(min-width:769px) and (max-width:1024px){
+  .sidebar{width:180px;}
+  .main{margin-left:180px;}
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+  .stock-grid{grid-template-columns:repeat(3,1fr) !important;}
+}
+/* ══════════════════════════════════════════════════════════════════ */
 </style>
 </head>
 <body>
@@ -280,24 +335,29 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 
 <!-- APP SHELL -->
 <div id="app" style="display:none;">
+  <!-- DRAWER OVERLAY (mobile) -->
+  <div class="drawer-overlay" id="drawer-overlay" onclick="closeSidebar()"></div>
   <div style="display:flex;min-height:100vh;">
-    <div class="sidebar">
+    <div class="sidebar" id="app-sidebar">
       <div class="slogo">
-        <div class="smark">VDC</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div><div class="smark">VDC</div></div>
+          <button onclick="closeSidebar()" style="display:none;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.5);font-size:20px;padding:4px;" id="sidebar-close-btn">&#10005;</button>
+        </div>
         <div class="sname">Value Dental Center</div>
         <div class="ssub">Clinic management</div>
       </div>
       <div class="snav">
-        <a class="ni" id="nav-dashboard" onclick="goTo('dashboard')"><div class="ni-ic">&#8962;</div>Dashboard</a>
-        <a class="ni" id="nav-patients" onclick="goTo('patients')"><div class="ni-ic">&#9673;</div>Patients</a>
-        <a class="ni" id="nav-procedures" onclick="goTo('procedures')"><div class="ni-ic">&#10010;</div>Procedures</a>
-        <a class="ni" id="nav-appointments" onclick="goTo('appointments')"><div class="ni-ic">&#9719;</div>Appointments</a>
-        <a class="ni" id="nav-billing" onclick="goTo('billing')"><div class="ni-ic">&#128180;</div>Billing</a>
-        <a class="ni" id="nav-finance" onclick="goTo('finance')"><div class="ni-ic">&#128188;</div>Staff &amp; Finance</a>
-        <a class="ni" id="nav-labs" onclick="goTo('labs')"><div class="ni-ic">&#128300;</div>Labs</a>
-        <a class="ni" id="nav-stocks" onclick="goTo('stocks')"><div class="ni-ic">&#128230;</div>Stocks</a>
-        <a class="ni" id="nav-files" onclick="goTo('files')"><div class="ni-ic">&#9638;</div>X-rays &amp; Files</a>
-        <a class="ni" id="nav-settings" onclick="goTo('settings')"><div class="ni-ic">&#9881;</div>Settings</a>
+        <a class="ni" id="nav-dashboard" onclick="goTo('dashboard');closeSidebar()"><div class="ni-ic">&#8962;</div>Dashboard</a>
+        <a class="ni" id="nav-patients" onclick="goTo('patients');closeSidebar()"><div class="ni-ic">&#9673;</div>Patients</a>
+        <a class="ni" id="nav-procedures" onclick="goTo('procedures');closeSidebar()"><div class="ni-ic">&#10010;</div>Procedures</a>
+        <a class="ni" id="nav-appointments" onclick="goTo('appointments');closeSidebar()"><div class="ni-ic">&#9719;</div>Appointments</a>
+        <a class="ni" id="nav-billing" onclick="goTo('billing');closeSidebar()"><div class="ni-ic">&#128180;</div>Billing</a>
+        <a class="ni" id="nav-finance" onclick="goTo('finance');closeSidebar()"><div class="ni-ic">&#128188;</div>Staff &amp; Finance</a>
+        <a class="ni" id="nav-labs" onclick="goTo('labs');closeSidebar()"><div class="ni-ic">&#128300;</div>Labs</a>
+        <a class="ni" id="nav-stocks" onclick="goTo('stocks');closeSidebar()"><div class="ni-ic">&#128230;</div>Stocks</a>
+        <a class="ni" id="nav-files" onclick="goTo('files');closeSidebar()"><div class="ni-ic">&#9638;</div>X-rays &amp; Files</a>
+        <a class="ni" id="nav-settings" onclick="goTo('settings');closeSidebar()"><div class="ni-ic">&#9881;</div>Settings</a>
       </div>
       <div class="sfooter">
         <div class="sfooter-inner">
@@ -309,13 +369,15 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     </div>
     <div class="main">
       <div class="topbar">
-        <div style="display:flex;align-items:center;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+          <!-- Hamburger — mobile only -->
+          <button class="hamburger-btn" id="hamburger-btn" onclick="openSidebar()" aria-label="Open menu">&#9776;</button>
           <div id="pg-back" style="display:none;"></div>
-          <div><div class="ttitle" id="pg-title">Patients</div><div class="tsub" id="pg-sub"></div></div>
+          <div style="min-width:0;"><div class="ttitle" id="pg-title">Patients</div><div class="tsub" id="pg-sub"></div></div>
         </div>
-        <div id="pg-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"></div>
+        <div id="pg-actions" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"></div>
         <!-- NOTIFICATION BELL -->
-        <div style="position:relative;" id="notif-wrap">
+        <div style="position:relative;flex-shrink:0;" id="notif-wrap">
           <button class="notif-bell" onclick="toggleNotifPanel()" title="Notifications" id="notif-bell-btn">
             &#128276;
             <span class="notif-badge" id="notif-badge">0</span>
@@ -1314,9 +1376,88 @@ function goTo(s){
   else document.getElementById('pg-content').innerHTML='<div style="text-align:center;padding:80px 20px;"><div style="font-size:48px;margin-bottom:16px;">🚧</div><h2 style="font-size:18px;font-weight:700;color:var(--s700);margin-bottom:8px;">'+(T[s]||s)+' — Coming soon</h2><p style="font-size:13px;color:var(--s400);">This section is being built.</p></div>';
 }
 function showToast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className='toast '+(type||'success')+' show';setTimeout(function(){t.classList.remove('show');},3000);}
-function openMdl(id){var m=document.getElementById(id);if(m)m.classList.add('open');}
-function closeMdl(id){var m=document.getElementById(id);if(m)m.classList.remove('open');}
-document.addEventListener('click',function(e){if(e.target.classList.contains('mbg'))e.target.classList.remove('open');});
+
+// ══════════ MOBILE SIDEBAR ═══════════════════════════════════════
+function openSidebar(){
+  var s=document.getElementById('app-sidebar');
+  var o=document.getElementById('drawer-overlay');
+  var cb=document.getElementById('sidebar-close-btn');
+  if(s)s.classList.add('open');
+  if(o)o.classList.add('open');
+  if(cb)cb.style.display='block';
+  document.body.style.overflow='hidden';
+}
+function closeSidebar(){
+  var s=document.getElementById('app-sidebar');
+  var o=document.getElementById('drawer-overlay');
+  var cb=document.getElementById('sidebar-close-btn');
+  if(s)s.classList.remove('open');
+  if(o)o.classList.remove('open');
+  if(cb)cb.style.display='none';
+  document.body.style.overflow='';
+}
+
+// ══════════ FULL-SCREEN MODAL ENGINE ════════════════════════════
+function openMdl(id){
+  var m=document.getElementById(id);
+  if(!m)return;
+  if(!m.dataset.transformed){transformModalFullscreen(m);m.dataset.transformed='1';}
+  m.classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeMdl(id){
+  var m=document.getElementById(id);
+  if(m)m.classList.remove('open');
+  document.body.style.overflow='';
+}
+document.addEventListener('click',function(e){
+  if(e.target.classList.contains('mbg')&&e.target.classList.contains('open')){
+    e.target.classList.remove('open');
+    document.body.style.overflow='';
+  }
+});
+
+function transformModalFullscreen(mbg){
+  var inner=mbg.querySelector('.modal');
+  if(!inner||inner.querySelector('.modal-hdr'))return; // already done
+  var titEl=inner.querySelector('.mtit');
+  var title=titEl?titEl.innerHTML:'';
+  var titId=titEl?titEl.id||'':'';
+  var macEl=inner.querySelector('.mac');
+  var modalId=mbg.id;
+  // Build sticky header
+  var hdr=document.createElement('div');
+  hdr.className='modal-hdr';
+  hdr.innerHTML=
+    '<button class="modal-back" onclick="closeMdl(\''+modalId+'\')" aria-label="Close">&#8592;</button>'+
+    '<div class="modal-hdr-title"'+(titId?' id="'+titId+'"':'')+'>'+title+'</div>';
+  if(titId&&titEl)titEl.removeAttribute('id');
+  // Scrollable body wraps everything except mac
+  var bdy=document.createElement('div');
+  bdy.className='modal-bdy';
+  var kids=Array.from(inner.children);
+  kids.forEach(function(c){if(c!==macEl)bdy.appendChild(c);});
+  // Sticky footer from mac
+  var ftr=document.createElement('div');
+  ftr.className='modal-ftr';
+  if(macEl){Array.from(macEl.children).forEach(function(b){ftr.appendChild(b);});}
+  inner.innerHTML='';
+  inner.appendChild(hdr);
+  inner.appendChild(bdy);
+  if(ftr.children.length)inner.appendChild(ftr);
+}
+
+// ══════════ CALENDAR MOBILE ROOM FILTER ═════════════════════════
+var mobileCalRoom='all';
+function buildMobileRoomFilters(){
+  if(window.innerWidth>768)return '';
+  var rooms=['all'].concat(ROOMS);
+  return '<div class="cal-room-filters" id="cal-room-filters">'+
+    rooms.map(function(r){
+      return '<button class="cal-room-btn'+(mobileCalRoom===r?' act':'')+'" onclick="setMobileRoom(\''+r+'\')">'+( r==='all'?'All rooms':r)+'</button>';
+    }).join('')+'</div>';
+}
+function setMobileRoom(room){mobileCalRoom=room;buildSched();}
 // ══════════════════════ PATIENTS LIST ════════════════════════════
 var ptView=localStorage.getItem('vdc-view')||'grid',ptQ='';
 var ptFilterDr='',ptFilterStatus='',ptSort='name';
@@ -1768,8 +1909,15 @@ function buildSched(){
   if(isToday)timeH+='<div id="now-tdot" style="position:absolute;right:4px;width:8px;height:8px;border-radius:50%;background:#EF4444;z-index:16;top:0;"></div>';
   timeH+='</div>';
 
-  // room columns
-  var roomsH=ROOMS.map(function(room){
+  // On mobile: filter rooms based on mobileCalRoom selection
+  var isMobile=window.innerWidth<=768;
+  var visibleRooms=ROOMS;
+  if(isMobile&&mobileCalRoom!=='all'){
+    visibleRooms=ROOMS.filter(function(r){return r===mobileCalRoom;});
+  }
+
+  // room columns — only render visible rooms
+  var roomsH=visibleRooms.map(function(room){
     var appts=allAppts.filter(function(a){return a.room===room;});
     var h='<div class="sch-room-col" data-room="'+room+'" style="position:relative;height:'+gridH+'px;">';
     for(var m2=0;m2<totalM;m2+=SLOT_MIN){
@@ -1833,6 +1981,7 @@ function buildSched(){
   }).join('');
 
   var html=
+    buildMobileRoomFilters()+
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'+
     '<button style="width:32px;height:32px;border-radius:var(--radsm);border:1px solid var(--s200);background:white;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;" onclick="chgDate(-1)">&#8249;</button>'+
     '<span style="font-size:13px;font-weight:700;color:var(--s800);cursor:pointer;padding:6px 14px;border-radius:var(--radsm);border:1px solid var(--s200);background:white;" onclick="pickDate()">'+dd(currentDate)+(isToday?' (Today)':'')+'</span>'+
@@ -1842,9 +1991,9 @@ function buildSched(){
     '</div>'+
     '<div class="stats-row">'+statC('#F0F9FF','&#128197;','Total today',total)+statC('#FFFBEB','&#8987;','Checked in',cin)+statC('#EDE9FE','&#128260;','In progress',inp)+statC('#F0FDF4','&#10004;','Completed',comp)+'</div>'+
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">'+legend+'</div>'+
-    '<div class="schedule-wrap">'+
+    '<div class="schedule-wrap sched-wrap">'+
     '<div class="sch-header"><div style="padding:12px 8px;font-size:10px;font-weight:700;color:var(--s400);text-transform:uppercase;border-right:1px solid var(--s200);">Time</div>'+
-    ROOMS.map(function(r){return '<div style="padding:10px 8px;text-align:center;font-size:12px;font-weight:700;color:var(--s700);border-right:1px solid var(--s100);">'+r+'<br><span style="font-size:10px;color:var(--s400);font-weight:400;">'+counts[r]+' appt'+(counts[r]!==1?'s':'')+'</span></div>';}).join('')+
+    visibleRooms.map(function(r){return '<div style="padding:10px 8px;text-align:center;font-size:12px;font-weight:700;color:var(--s700);border-right:1px solid var(--s100);">'+r+'<br><span style="font-size:10px;color:var(--s400);font-weight:400;">'+counts[r]+' appt'+(counts[r]!==1?'s':'')+'</span></div>';}).join('')+
     '</div>'+
     '<div class="sch-body" id="sch-body"><div style="position:relative;height:'+gridH+'px;">'+timeH+'</div>'+roomsH+'</div></div>';
 
