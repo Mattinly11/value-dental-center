@@ -259,6 +259,26 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .dollar-btn{position:absolute;bottom:4px;right:3px;width:18px;height:18px;border-radius:50%;background:#f59e0b;color:white;border:none;font-size:10px;font-weight:800;cursor:pointer;z-index:20;display:flex;align-items:center;justify-content:center;animation:glow-dollar 1.5s infinite;}
 .dollar-btn.paid{background:#16a34a;animation:none;}
 
+/* DIAGNOSIS & TREATMENT PLAN */
+.diag-item-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--s100);background:white;}
+.diag-item-row:last-child{border-bottom:none;}
+.diag-item-row:hover{background:var(--b50);}
+.diag-tooth-badge{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:22px;padding:0 6px;border-radius:11px;background:var(--a50);color:var(--a700);font-size:10px;font-weight:800;border:1.5px solid var(--a200);flex-shrink:0;}
+.diag-status-planned{background:var(--a50);color:var(--a700);border:1px solid var(--a200);}
+.diag-status-inprogress{background:var(--p50);color:var(--p700);border:1px solid var(--p100);}
+.diag-status-completed{background:var(--g50);color:var(--g700);border:1px solid var(--g100);}
+/* SALARY / WALLET */
+.wallet-from-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:var(--p50);color:var(--p700);border:1px solid var(--p100);}
+/* REWARDS & PENALTIES */
+.adj-reward{border-left:3px solid var(--g600);}
+.adj-penalty{border-left:3px solid var(--r500);}
+/* PRINT STYLES */
+@media print{
+  body>*{visibility:hidden;}
+  #print-report,#print-report *{visibility:visible;}
+  #print-report{position:fixed;inset:0;background:white;padding:32px;font-size:12px;z-index:9999;}
+  .no-print{display:none !important;}
+}
 /* ═══════════════════════ MOBILE RESPONSIVE ═══════════════════════ */
 .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:98;}
 .drawer-overlay.open{display:block;}
@@ -926,6 +946,129 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
   </div>
 </div>
 
+<!-- PRINT REPORT CONTAINER (hidden, used for print/PDF) -->
+<div id="print-report" style="display:none;"></div>
+
+<!-- DIAGNOSIS ITEM MODAL -->
+<div class="mbg" id="diag-item-modal">
+  <div class="modal" style="max-width:480px;">
+    <div class="mtit" id="dim-title">Add diagnosis item</div>
+    <div class="msub">Record a finding and recommended treatment</div>
+    <input type="hidden" id="dim-id">
+    <input type="hidden" id="dim-plan-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Teeth (select one or more) <span class="req">*</span></label>
+        <input class="finp" id="dim-teeth" placeholder="e.g. 16, 17 or leave blank for general"></div>
+      <div class="fgrp"><label class="flbl">Treatment needed <span class="req">*</span></label>
+        <select class="finp" id="dim-treatment">
+          <option value="">Select treatment...</option>
+          <option>Composite Filling</option><option>Amalgam Filling</option>
+          <option>Crown</option><option>Bridge</option>
+          <option>Implant</option><option>Extraction</option>
+          <option>Root Canal Treatment</option><option>Scaling & Polishing</option>
+          <option>Veneer</option><option>Whitening</option>
+          <option>Orthodontic Treatment</option><option>Denture</option>
+          <option>Other</option>
+        </select></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Estimated cost (optional)</label>
+        <input class="finp" type="number" id="dim-cost" placeholder="0" min="0"></div>
+      <div class="fgrp"><label class="flbl">Currency</label>
+        <select class="finp" id="dim-curr"><option value="IQD">IQD</option><option value="USD">USD</option></select></div>
+    </div>
+    <div class="fgrp"><label class="flbl">Notes</label>
+      <textarea class="finp" id="dim-notes" rows="2" placeholder="Clinical notes for this finding..."></textarea></div>
+    <div class="mac">
+      <button class="btn btnr" id="dim-del-btn" style="display:none;margin-right:auto;" onclick="deleteDiagItem()">Delete</button>
+      <button class="btn" onclick="closeMdl('diag-item-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveDiagItem()">Save finding</button>
+    </div>
+  </div>
+</div>
+
+<!-- DIAGNOSIS PLAN MODAL (create/edit plan header) -->
+<div class="mbg" id="diag-plan-modal">
+  <div class="modal" style="max-width:480px;">
+    <div class="mtit" id="dpm-title">New treatment plan</div>
+    <div class="msub">Examination and diagnosis for this patient</div>
+    <input type="hidden" id="dpm-id">
+    <input type="hidden" id="dpm-pid">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Examination date</label>
+        <input class="finp" type="date" id="dpm-date" max="2099-12-31"></div>
+      <div class="fgrp"><label class="flbl">Examining dentist</label>
+        <select class="finp" id="dpm-dr"></select></div>
+    </div>
+    <div class="fgrp"><label class="flbl">Chief complaint</label>
+      <input class="finp" id="dpm-complaint" placeholder="Patient's main concern..."></div>
+    <div class="fgrp"><label class="flbl">General notes & recommendations</label>
+      <textarea class="finp" id="dpm-notes" rows="3" placeholder="Oral hygiene advice, warnings, future recommendations..."></textarea></div>
+    <div class="mac">
+      <button class="btn" onclick="closeMdl('diag-plan-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveDiagPlan()">Create plan</button>
+    </div>
+  </div>
+</div>
+
+<!-- SALARY PAYMENT MODAL -->
+<div class="mbg" id="salary-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="mtit" id="sal-title">Record salary payment</div>
+    <div class="msub" id="sal-sub">Monthly salary payment</div>
+    <input type="hidden" id="sal-staff-id">
+    <input type="hidden" id="sal-staff-name">
+    <div class="fgrp"><label class="flbl">Amount (IQD) <span class="req">*</span></label>
+      <input class="finp" type="number" id="sal-amount" placeholder="0" min="0"></div>
+    <div class="fgrp"><label class="flbl">Paid from wallet <span class="req">*</span></label>
+      <select class="finp" id="sal-wallet">
+        <option value="value">&#128176; Value Wallet (clinic)</option>
+        <option value="Dr. Sarmad">Dr. Sarmad's wallet</option>
+        <option value="Dr. Akheenk">Dr. Akheenk's wallet</option>
+        <option value="Dr. Shaveen">Dr. Shaveen's wallet</option>
+      </select></div>
+    <div class="fgrp"><label class="flbl">Date</label>
+      <input class="finp" type="date" id="sal-date" max="2099-12-31"></div>
+    <div class="fgrp"><label class="flbl">Notes (optional)</label>
+      <input class="finp" id="sal-notes" placeholder="e.g. Monthly salary — May 2026"></div>
+    <div class="mac">
+      <button class="btn" onclick="closeMdl('salary-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveSalaryPayment()">Record payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- REWARD / PENALTY MODAL -->
+<div class="mbg" id="adj-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="mtit">Add reward / penalty</div>
+    <div class="msub">Record a bonus or deduction for a staff member</div>
+    <input type="hidden" id="adj-id">
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Staff member <span class="req">*</span></label>
+        <input class="finp" id="adj-staff" placeholder="Name..."></div>
+      <div class="fgrp"><label class="flbl">Type</label>
+        <select class="finp" id="adj-type" onchange="updateAdjLabel()">
+          <option value="reward">&#127881; Reward / Bonus</option>
+          <option value="penalty">&#128683; Penalty / Deduction</option>
+        </select></div>
+    </div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl" id="adj-amt-lbl">Bonus amount (IQD)</label>
+        <input class="finp" type="number" id="adj-amount" placeholder="0" min="0"></div>
+      <div class="fgrp"><label class="flbl">Date</label>
+        <input class="finp" type="date" id="adj-date" max="2099-12-31"></div>
+    </div>
+    <div class="fgrp"><label class="flbl">Reason <span class="req">*</span></label>
+      <textarea class="finp" id="adj-reason" rows="2" placeholder="Describe the reason..."></textarea></div>
+    <div class="mac">
+      <button class="btn btnr" id="adj-del-btn" style="display:none;margin-right:auto;" onclick="deleteAdj()">Delete</button>
+      <button class="btn" onclick="closeMdl('adj-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveAdj()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- DR RATE MODAL -->
 <div class="mbg" id="drr-modal">
   <div class="modal">
@@ -955,17 +1098,30 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 <div class="mbg" id="exp-modal">
   <div class="modal">
     <div class="mtit">Add expense</div>
-    <div class="msub">Split equally between the 3 partners</div>
+    <div class="msub">Record a clinic or personal expense</div>
     <div class="fg">
       <div class="fgrp"><label class="flbl">Category</label>
-        <select class="finp" id="exp-cat"><option>Staff salaries</option><option>Materials</option><option>Utilities</option><option>Rent</option><option>Lab fees</option><option>Equipment</option><option>Other</option></select></div>
-      <div class="fgrp"><label class="flbl">Date</label><input class="finp" type="date" id="exp-date"></div>
+        <select class="finp" id="exp-cat"><option>Staff salaries</option><option>Materials</option><option>Utilities</option><option>Rent</option><option>Lab fees</option><option>Equipment</option><option>Stock & Materials</option><option>Other</option></select></div>
+      <div class="fgrp"><label class="flbl">Date</label><input class="finp" type="date" id="exp-date" max="2099-12-31"></div>
     </div>
     <div class="fgrp"><label class="flbl">Description</label><input class="finp" id="exp-desc" placeholder="e.g. March rent"></div>
-    <div class="fgrp"><label class="flbl">Amount (USD) <span class="req">*</span></label><input class="finp" type="number" id="exp-amt" placeholder="0" min="0"></div>
+    <div class="fg">
+      <div class="fgrp"><label class="flbl">Amount <span class="req">*</span></label><input class="finp" type="number" id="exp-amt" placeholder="0" min="0"></div>
+      <div class="fgrp"><label class="flbl">Currency</label>
+        <select class="finp" id="exp-curr"><option value="IQD">IQD</option><option value="USD">USD</option></select></div>
+    </div>
+    <div class="fgrp"><label class="flbl">&#128176; Charged to wallet</label>
+      <select class="finp" id="exp-wallet">
+        <option value="value">Value Wallet (clinic — split between partners)</option>
+        <option value="Dr. Sarmad">Dr. Sarmad's personal wallet</option>
+        <option value="Dr. Akheenk">Dr. Akheenk's personal wallet</option>
+        <option value="Dr. Shaveen">Dr. Shaveen's personal wallet</option>
+      </select>
+      <div style="font-size:10px;color:var(--s400);margin-top:3px;">Value Wallet expenses are split equally. Personal expenses reduce that partner's balance directly.</div>
+    </div>
     <div class="mac">
       <button class="btn" onclick="closeMdl('exp-modal')">Cancel</button>
-      <button class="btn btnp" onclick="saveExp()">Save</button>
+      <button class="btn btnp" onclick="saveExp()">Save expense</button>
     </div>
   </div>
 </div>
@@ -2553,8 +2709,8 @@ function buildFinUI(){
     '<button class="btn btnsm" onclick="setFinM(new Date().getMonth(),new Date().getFullYear())">This month</button>'+
     '</div>'+
     '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:14px;flex-wrap:wrap;">'+
-    ['overview','payments','dentists','substaff','expenses'].map(function(t){
-      var L={overview:'Finance overview',payments:'Payment log',dentists:'Dentist payroll',substaff:'Substaff',expenses:'Expenses'};
+    ['overview','payments','dentists','substaff','expenses','adjustments'].map(function(t){
+      var L={overview:'Finance overview',payments:'Payment log',dentists:'Dentist payroll',substaff:'Substaff',expenses:'Expenses',adjustments:'Rewards & Penalties'};
       return '<button class="fin-tab'+(finTab===t?' act':'')+'" onclick="setFinT(\''+t+'\')">'+L[t]+'</button>';
     }).join('')+'</div>'+
     '<div id="fin-content"></div>';
@@ -2653,6 +2809,7 @@ function buildFinTab(){
   else if(finTab==='dentists')el.innerHTML=buildFD();
   else if(finTab==='substaff')el.innerHTML=buildFS();
   else if(finTab==='expenses')el.innerHTML=buildFE();
+  else if(finTab==='adjustments'){buildFAdj();}
 }
 function buildFO(){
   var pays=getMPays(),exps=getME();
@@ -2678,7 +2835,12 @@ function buildFO(){
       else{vWiqd+=d.vIQD;vWusd+=d.vUSD;}
     } else {vWiqd+=d.vIQD;vWusd+=d.vUSD;}
   });
-  var totalExp=exps.reduce(function(s,e){return s+Number(e.amount||0);},0),expPP=totalExp/3;
+  var totalExp=exps.filter(function(e){return !e.wallet||e.wallet==='value';}).reduce(function(s,e){return s+Number(e.amount||0);},0),expPP=totalExp/3;
+  // Partner-specific expenses (deducted from their personal wallet)
+  var partnerExps={};
+  exps.forEach(function(e){
+    if(e.wallet&&e.wallet!=='value'){partnerExps[e.wallet]=(partnerExps[e.wallet]||0)+Number(e.amount||0);}
+  });
   var vPPiqd=vWiqd/3,vPPusd=vWusd/3;
   // load any manual withdrawals from localStorage
   var vWithdrawKey='vdc-vw-withdraw';
@@ -2700,15 +2862,17 @@ function buildFO(){
     if(currentUser&&currentUser.role==='partner'&&currentUser.linked_dentist&&currentUser.linked_dentist!==p) return;
     var c=pC[i],gIQD=walletsIQD[p]||0,gUSD=walletsUSD[p]||0;
     var wdIQD=(vWithdrawals[p]||{}).iqd||0,wdUSD=(vWithdrawals[p]||{}).usd||0;
+    var personalExp=partnerExps[p]||0;
+    var netIQD=Math.max(0,gIQD-personalExp);
     html+='<div class="wallet-card" style="background:'+c.bg+';border-color:'+c.border+';">'+
       '<div style="font-size:10px;font-weight:700;color:'+c.c+';text-transform:uppercase;margin-bottom:6px;">'+p+'</div>'+
       '<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
       '<div style="font-size:9px;color:'+c.c+';font-weight:600;">🇮🇶 IQD</div>'+
-      '<div style="font-size:15px;font-weight:700;color:'+c.c+';">'+fiqd(Math.round(gIQD))+'</div></div>'+
+      '<div style="font-size:15px;font-weight:700;color:'+c.c+';">'+fiqd(Math.round(netIQD))+'</div></div>'+
       (gUSD>0?'<div style="background:white;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
       '<div style="font-size:9px;color:'+c.c+';font-weight:600;">🇺🇸 USD</div>'+
       '<div style="font-size:15px;font-weight:700;color:'+c.c+';">'+fusd(gUSD)+'</div></div>':'')+
-      '<div style="font-size:10px;color:'+c.c+';margin-top:4px;border-top:1px solid '+c.border+';padding-top:4px;">- expenses: '+fiqd(Math.round(expPP))+'</div>'+
+      '<div style="font-size:10px;color:'+c.c+';margin-top:4px;border-top:1px solid '+c.border+';padding-top:4px;">- clinic exp: '+fiqd(Math.round(expPP))+(personalExp>0?' — personal: '+fiqd(Math.round(personalExp)):'')+'</div>'+
       '</div>';
   });
   html+='</div>';
@@ -2868,28 +3032,39 @@ function openDRR(dr){var r=getDR(dr);document.getElementById('drr-name').textCon
 function saveDrRate(){var dr=document.getElementById('drr-dr').value,o=parseInt(document.getElementById('drr-own').value)||35,r=parseInt(document.getElementById('drr-ref').value)||20;if(o<1||o>100||r<1||r>100){showToast('Rates must be 1–100','error');return;}drRates[dr]={ownPct:o,refPct:r};saveRates();closeMdl('drr-modal');showToast('Rates updated for '+dr);buildFinTab();}
 
 function buildFS(){
-  var staff=finSubs,total=staff.reduce(function(s,e){return s+Number(e.salary_usd||0);},0);
-  var pm=JSON.parse(localStorage.getItem('vdc-sub-paid-'+finY+'-'+finM)||'{}');
-  var unpaid=staff.filter(function(s){return!pm[s.id];}).reduce(function(t,s){return t+Number(s.salary_usd||0);},0);
-  var html='<div class="stats-row">'+statC('var(--b50)','&#128101;','Total staff',staff.length)+statC('var(--g50)','&#128176;','Total salaries',fu(total))+statC('var(--r50)','&#9888;','Unpaid this month',fu(unpaid))+statC('var(--a50)','&#9876;','Per partner (1/3)',fu(total/3))+'</div>'+
-    '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button class="btn btnp btnsm" onclick="openMdl(\'sub-modal\')">+ Add staff</button></div>'+
-    '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">';
+  var staff=finSubs;
+  var walletOpts=['value'].concat(PARTNERS);
+  var walletLabels={'value':'Value Wallet'};
+  PARTNERS.forEach(function(p){walletLabels[p]=p+'\'s wallet';});
+  var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--s800);">Staff salaries</div>'+
+    '<button class="btn btnp btnsm" onclick="openMdl(\'sub-modal\')">+ Add staff</button></div>';
+  if(!staff.length){
+    return html+'<div style="text-align:center;padding:40px;color:var(--s400);">No staff added yet</div>';
+  }
   var ic={Receptionist:'&#128202;',Assistant:'&#129459;',Cleaner:'&#129529;','Lab Technician':'&#128300;','Sterilization Tech':'&#129514;',Other:'&#128100;'};
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">';
   staff.forEach(function(s){
-    var isPaid=pm[s.id]||false;
-    html+='<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:13px;display:flex;align-items:center;gap:12px;">'+
+    var walletLabel=walletLabels[s.salary_wallet||'value']||'Value Wallet';
+    var walletColor=(s.salary_wallet&&s.salary_wallet!=='value')?'var(--p700)':'var(--b700)';
+    html+='<div style="background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:14px;">'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'+
       '<div style="width:38px;height:38px;border-radius:50%;background:var(--s100);color:var(--s600);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">'+(ic[s.role]||'&#128100;')+'</div>'+
-      '<div style="flex:1;"><div style="font-size:12px;font-weight:700;">'+(s.name||'')+'</div><div style="font-size:10px;color:var(--s400);">'+(s.role||'')+'</div>'+
-      '<div style="font-size:13px;font-weight:700;color:var(--g700);margin-top:3px;">'+fu(s.salary_usd||0)+'/mo</div></div>'+
-      '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">'+
-      (isPaid?'<span class="badge bg">&#10003; Paid</span>':'<span class="badge br">Unpaid</span>')+
-      '<button class="btn btnxs" onclick="togSubPaid(\''+s.id+'\')">'+( isPaid?'Undo':'Mark paid')+'</button></div></div>';
+      '<div style="flex:1;"><div style="font-size:13px;font-weight:700;">'+(s.name||'')+'</div>'+
+      '<div style="font-size:10px;color:var(--s400);">'+(s.role||'')+'</div></div>'+
+      '</div>'+
+      '<div style="background:var(--s50);border-radius:var(--radsm);padding:8px 10px;margin-bottom:8px;">'+
+      '<div style="font-size:10px;color:var(--s400);">Monthly salary</div>'+
+      '<div style="font-size:16px;font-weight:800;color:var(--g700);">'+fu(s.salary_iqd||0)+'</div>'+
+      '</div>'+
+      '<div style="font-size:10px;margin-bottom:10px;">&#128176; Paid from: <span style="font-weight:700;color:'+walletColor+';">'+walletLabel+'</span></div>'+
+      '<div style="display:flex;gap:6px;">'+
+      '<button class="btn btnsm btnp" style="flex:1;" onclick="openSalaryPayment(\''+s.id+'\',\''+s.name.replace(/'/g,'&#39;')+'\',\''+( s.salary_iqd||0)+'\',\''+(s.salary_wallet||'value')+'\')">&#128176; Pay salary</button>'+
+      '<button class="btn btnsm" onclick="openEditSub(\''+s.id+'\')">Edit</button>'+
+      '</div></div>';
   });
   return html+'</div>';
 }
-function togSubPaid(id){var k='vdc-sub-paid-'+finY+'-'+finM,m=JSON.parse(localStorage.getItem(k)||'{}');m[id]=!m[id];localStorage.setItem(k,JSON.stringify(m));buildFinTab();}
-function subSyncUSD(){var v=parseFloat(document.getElementById('sub-usd').value)||0;var el=document.getElementById('sub-iqd');if(el)el.value=v?Math.round(v*IQD):'';}
-function subSyncIQD(){var v=parseFloat(document.getElementById('sub-iqd').value)||0;var el=document.getElementById('sub-usd');if(el)el.value=v?+(v/IQD).toFixed(2):'';}
 async function saveSub(){
   var name=document.getElementById('sub-name').value.trim();if(!name){showToast('Enter name','error');return;}
   var usd=parseFloat(document.getElementById('sub-usd').value)||0;
@@ -2918,13 +3093,165 @@ function buildFE(){
     '</tbody></table></div></div>':'');
   return html;
 }
-function openExpMdl(){document.getElementById('exp-date').value=fd(new Date());document.getElementById('exp-amt').value='';document.getElementById('exp-desc').value='';openMdl('exp-modal');}
+function openExpMdl(){
+  document.getElementById('exp-date').value=fd(new Date());
+  document.getElementById('exp-amt').value='';
+  document.getElementById('exp-desc').value='';
+  document.getElementById('exp-wallet').value='value';
+  document.getElementById('exp-curr').value='IQD';
+  openMdl('exp-modal');
+}
 async function saveExp(){
-  var amt=parseFloat(document.getElementById('exp-amt').value)||0;if(!amt){showToast('Enter amount','error');return;}
-  var r=await db.from('expenses').insert([{category:document.getElementById('exp-cat').value,description:document.getElementById('exp-desc').value||null,amount:amt,date:document.getElementById('exp-date').value||fd(new Date()),type:'one-time'}]);
-  if(r.error){showToast('Failed','error');return;}
-  showToast('Expense added');closeMdl('exp-modal');
+  var amt=parseFloat(document.getElementById('exp-amt').value)||0;
+  if(!amt){showToast('Enter amount','error');return;}
+  var wallet=document.getElementById('exp-wallet').value||'value';
+  var curr=document.getElementById('exp-curr').value||'IQD';
+  var r=await db.from('expenses').insert([{
+    category:document.getElementById('exp-cat').value,
+    description:document.getElementById('exp-desc').value||null,
+    amount:amt,
+    currency:curr,
+    wallet:wallet,
+    date:document.getElementById('exp-date').value||fd(new Date()),
+    type:'one-time'
+  }]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast('Expense added ✅');closeMdl('exp-modal');
   var r2=await db.from('expenses').select('*');finExps=r2.data||[];buildFinTab();
+}
+async function deleteExpense(id){
+  if(!confirm('Delete this expense?'))return;
+  await db.from('expenses').delete().eq('id',id);
+  var r=await db.from('expenses').select('*');finExps=r.data||[];buildFinTab();
+}
+
+// ══════════ SALARY PAYMENTS ════════════════════════════════════
+function openSalaryPayment(staffId,staffName,defaultAmount,defaultWallet){
+  document.getElementById('sal-title').textContent='Pay salary — '+staffName;
+  document.getElementById('sal-sub').textContent='Recording a salary payment for '+staffName;
+  document.getElementById('sal-staff-id').value=staffId;
+  document.getElementById('sal-staff-name').value=staffName;
+  document.getElementById('sal-amount').value=defaultAmount||'';
+  document.getElementById('sal-wallet').value=defaultWallet||'value';
+  document.getElementById('sal-date').value=fd(new Date());
+  document.getElementById('sal-notes').value='';
+  // Populate wallet options from current partners
+  var walletSel=document.getElementById('sal-wallet');
+  walletSel.innerHTML='<option value="value">&#128176; Value Wallet (clinic)</option>'+
+    PARTNERS.map(function(p){return '<option value="'+p+'">'+p+'\'s wallet</option>';}).join('');
+  walletSel.value=defaultWallet||'value';
+  openMdl('salary-modal');
+}
+async function saveSalaryPayment(){
+  var staffId=document.getElementById('sal-staff-id').value;
+  var staffName=document.getElementById('sal-staff-name').value;
+  var amount=parseFloat(document.getElementById('sal-amount').value)||0;
+  var wallet=document.getElementById('sal-wallet').value||'value';
+  var date=document.getElementById('sal-date').value||fd(new Date());
+  var notes=document.getElementById('sal-notes').value.trim()||null;
+  if(!amount){showToast('Enter salary amount','error');return;}
+  var r=await db.from('salary_payments').insert([{
+    staff_id:staffId,staff_name:staffName,amount:amount,
+    currency:'IQD',wallet:wallet,date:date,notes:notes
+  }]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  // Also record as expense so it affects the wallet
+  await db.from('expenses').insert([{
+    category:'Staff salaries',
+    description:'Salary: '+staffName+(notes?' — '+notes:''),
+    amount:amount,currency:'IQD',wallet:wallet,
+    date:date,type:'salary'
+  }]).then(function(r){if(r.error)console.warn('Expense log warn:',r.error.message);});
+  showToast('Salary payment recorded ✅');
+  closeMdl('salary-modal');
+  var r2=await db.from('expenses').select('*');finExps=r2.data||[];buildFinTab();
+}
+
+// ══════════ REWARDS & PENALTIES ════════════════════════════════
+function updateAdjLabel(){
+  var type=document.getElementById('adj-type').value;
+  var lbl=document.getElementById('adj-amt-lbl');
+  if(lbl)lbl.textContent=type==='reward'?'Bonus amount (IQD)':'Deduction amount (IQD)';
+}
+function openNewAdj(){
+  document.getElementById('adj-id').value='';
+  document.getElementById('adj-staff').value='';
+  document.getElementById('adj-type').value='reward';
+  document.getElementById('adj-amount').value='';
+  document.getElementById('adj-date').value=fd(new Date());
+  document.getElementById('adj-reason').value='';
+  document.getElementById('adj-del-btn').style.display='none';
+  updateAdjLabel();
+  openMdl('adj-modal');
+}
+async function saveAdj(){
+  var staff=document.getElementById('adj-staff').value.trim();
+  var type=document.getElementById('adj-type').value;
+  var amount=parseFloat(document.getElementById('adj-amount').value)||0;
+  var reason=document.getElementById('adj-reason').value.trim();
+  var date=document.getElementById('adj-date').value||fd(new Date());
+  if(!staff){showToast('Enter staff name','error');return;}
+  if(!amount){showToast('Enter amount','error');return;}
+  if(!reason){showToast('Enter a reason','error');return;}
+  var id=document.getElementById('adj-id').value;
+  var payload={staff_name:staff,type:type,amount:amount,reason:reason,date:date};
+  var r=id?await db.from('staff_adjustments').update(payload).eq('id',id):await db.from('staff_adjustments').insert([payload]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast(id?'Updated':'Adjustment saved ✅');
+  closeMdl('adj-modal');buildFAdj();
+}
+async function deleteAdj(){
+  var id=document.getElementById('adj-id').value;
+  if(!id||!confirm('Delete this adjustment?'))return;
+  await db.from('staff_adjustments').delete().eq('id',id);
+  showToast('Deleted');closeMdl('adj-modal');buildFAdj();
+}
+async function buildFAdj(){
+  var el=document.getElementById('fin-content');if(!el)return;
+  var r=await db.from('staff_adjustments').select('*').order('date',{ascending:false});
+  var adjs=(r.data||[]).filter(function(a){return _dateInPeriod(a.date);});
+  var totalRewards=adjs.filter(function(a){return a.type==='reward';}).reduce(function(s,a){return s+Number(a.amount||0);},0);
+  var totalPenalties=adjs.filter(function(a){return a.type==='penalty';}).reduce(function(s,a){return s+Number(a.amount||0);},0);
+  var html='<div class="stats-row">'+
+    statC('var(--g50)','&#127881;','Total rewards',fu(totalRewards))+
+    statC('var(--r50)','&#128683;','Total penalties',fu(totalPenalties))+
+    statC('var(--b50)','&#128203;','Total entries',adjs.length)+
+    '</div>'+
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">'+
+    '<button class="btn btnp btnsm" onclick="openNewAdj()">+ Add reward / penalty</button></div>';
+  if(!adjs.length){
+    el.innerHTML=html+'<div style="text-align:center;padding:30px;color:var(--s400);font-size:13px;">No adjustments this period</div>';
+    return;
+  }
+  html+='<div class="vdc-card"><div class="vdc-card-body" style="padding:0;">'+
+    adjs.map(function(a){
+      var isReward=a.type==='reward';
+      return '<div class="reward-row '+(isReward?'adj-reward':'adj-penalty')+'">'+
+        '<div style="width:32px;height:32px;border-radius:50%;background:'+(isReward?'var(--g50)':'var(--r50)')+';display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">'+(isReward?'&#127881;':'&#128683;')+'</div>'+
+        '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:12px;font-weight:700;color:var(--s800);">'+(a.staff_name||'—')+'</div>'+
+        '<div style="font-size:11px;color:var(--s500);">'+(a.reason||'—')+'</div>'+
+        '<div style="font-size:10px;color:var(--s400);">'+(a.date||'—')+'</div>'+
+        '</div>'+
+        '<div style="font-size:14px;font-weight:800;color:'+(isReward?'var(--g700)':'var(--r600)')+';">'+(isReward?'+':'-')+fu(a.amount||0)+'</div>'+
+        '<button class="btn btnxs" onclick="openEditAdj(\''+a.id+'\')">Edit</button>'+
+        '</div>';
+    }).join('')+'</div></div>';
+  el.innerHTML=html;
+}
+async function openEditAdj(id){
+  var r=await db.from('staff_adjustments').select('*').eq('id',id).single();
+  if(r.error||!r.data){showToast('Not found','error');return;}
+  var a=r.data;
+  document.getElementById('adj-id').value=a.id;
+  document.getElementById('adj-staff').value=a.staff_name||'';
+  document.getElementById('adj-type').value=a.type||'reward';
+  document.getElementById('adj-amount').value=a.amount||'';
+  document.getElementById('adj-date').value=a.date||fd(new Date());
+  document.getElementById('adj-reason').value=a.reason||'';
+  document.getElementById('adj-del-btn').style.display='inline-flex';
+  updateAdjLabel();
+  openMdl('adj-modal');
 }
 
 // ══════════════════════ SETTINGS ═════════════════════════════════
@@ -4331,6 +4658,161 @@ async function initStockNotifications(){
   var cR=await db.from('stock_categories').select('*').order('name');
   stockCats=cR.data||[];
   updateStockNotifications();
+}
+// ══════════════════════ DIAGNOSIS & TREATMENT PLAN ═══════════════
+function toggleDiagPlan(id){
+  var el=document.getElementById(id);if(!el)return;
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+function openNewDiagPlan(pid,pname){
+  document.getElementById('dpm-id').value='';
+  document.getElementById('dpm-pid').value=pid;
+  document.getElementById('dpm-date').value=fd(new Date());
+  document.getElementById('dpm-complaint').value='';
+  document.getElementById('dpm-notes').value='';
+  var drSel=document.getElementById('dpm-dr');
+  drSel.innerHTML='<option value="">Select...</option>'+ALL_DENTISTS.map(function(d){return'<option>'+d.name+'</option>';}).join('');
+  if(currentUser&&currentUser.linked_dentist)drSel.value=currentUser.linked_dentist;
+  openMdl('diag-plan-modal');
+}
+async function saveDiagPlan(){
+  var pid=document.getElementById('dpm-pid').value;
+  if(!pid){showToast('No patient selected','error');return;}
+  var payload={
+    patient_id:pid,
+    examination_date:document.getElementById('dpm-date').value||fd(new Date()),
+    dentist:document.getElementById('dpm-dr').value||null,
+    chief_complaint:document.getElementById('dpm-complaint').value.trim()||null,
+    notes:document.getElementById('dpm-notes').value.trim()||null,
+    status:'active'
+  };
+  var r=await db.from('diagnosis_plans').insert([payload]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast('Treatment plan created ✅');
+  closeMdl('diag-plan-modal');
+  if(profState.pid)renderProf(profState.pid,profState.pname);
+}
+function openNewDiagItem(planId){
+  document.getElementById('dim-id').value='';
+  document.getElementById('dim-plan-id').value=planId;
+  document.getElementById('dim-teeth').value='';
+  document.getElementById('dim-treatment').value='';
+  document.getElementById('dim-cost').value='';
+  document.getElementById('dim-curr').value='IQD';
+  document.getElementById('dim-notes').value='';
+  document.getElementById('dim-del-btn').style.display='none';
+  document.getElementById('dim-title').textContent='Add finding';
+  openMdl('diag-item-modal');
+}
+async function openEditDiagItem(itemId,planId){
+  var r=await db.from('diagnosis_items').select('*').eq('id',itemId).single();
+  if(r.error||!r.data){showToast('Not found','error');return;}
+  var item=r.data;
+  document.getElementById('dim-id').value=item.id;
+  document.getElementById('dim-plan-id').value=planId;
+  document.getElementById('dim-teeth').value=item.teeth||'';
+  document.getElementById('dim-treatment').value=item.treatment||'';
+  document.getElementById('dim-cost').value=item.estimated_cost||'';
+  document.getElementById('dim-curr').value=item.cost_currency||'IQD';
+  document.getElementById('dim-notes').value=item.notes||'';
+  document.getElementById('dim-del-btn').style.display='inline-flex';
+  document.getElementById('dim-title').textContent='Edit finding';
+  openMdl('diag-item-modal');
+}
+async function saveDiagItem(){
+  var treatment=document.getElementById('dim-treatment').value;
+  if(!treatment){showToast('Select a treatment','error');return;}
+  var planId=document.getElementById('dim-plan-id').value;
+  var id=document.getElementById('dim-id').value;
+  var payload={
+    plan_id:planId,teeth:document.getElementById('dim-teeth').value.trim()||null,
+    treatment:treatment,estimated_cost:parseFloat(document.getElementById('dim-cost').value)||0,
+    cost_currency:document.getElementById('dim-curr').value||'IQD',
+    notes:document.getElementById('dim-notes').value.trim()||null,status:'planned'
+  };
+  var r=id?await db.from('diagnosis_items').update(payload).eq('id',id):await db.from('diagnosis_items').insert([payload]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast(id?'Updated':'Finding added ✅');
+  closeMdl('diag-item-modal');
+  if(profState.pid)renderProf(profState.pid,profState.pname);
+}
+async function deleteDiagItem(){
+  var id=document.getElementById('dim-id').value;
+  if(!id||!confirm('Delete this finding?'))return;
+  await db.from('diagnosis_items').delete().eq('id',id);
+  showToast('Deleted');closeMdl('diag-item-modal');
+  if(profState.pid)renderProf(profState.pid,profState.pname);
+}
+async function startTreatmentFromDiag(itemId,pid,pname,treatmentName){
+  await db.from('diagnosis_items').update({status:'inprogress'}).eq('id',itemId);
+  showToast('Opening case for '+treatmentName);
+  await openAddProc(pid);
+  var sel=document.getElementById('proc-name');
+  if(sel){
+    var opt=Array.from(sel.options).find(function(o){return o.value===treatmentName||o.textContent.startsWith(treatmentName);});
+    if(opt){sel.value=opt.value;onProcNameChange(opt.value);onProcDefSelect(opt.value);await onProcNameForSessions(opt.value);}
+  }
+}
+async function exportDiagReport(planId){
+  var html=await buildDiagReportHTML(planId);if(!html)return;
+  var blob=new Blob([html],{type:'text/html'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='treatment-plan-'+planId.slice(0,8)+'.html';
+  a.click();URL.revokeObjectURL(url);showToast('Report downloaded ✅');
+}
+async function printDiagReport(planId){
+  var html=await buildDiagReportHTML(planId);if(!html)return;
+  var w=window.open('','_blank');
+  w.document.write(html);w.document.close();
+  w.focus();setTimeout(function(){w.print();},400);
+}
+async function buildDiagReportHTML(planId){
+  var planR=await db.from('diagnosis_plans').select('*').eq('id',planId).single();
+  if(planR.error||!planR.data){showToast('Plan not found','error');return null;}
+  var plan=planR.data;
+  var itemsR=await db.from('diagnosis_items').select('*').eq('plan_id',planId).order('created_at');
+  var items=itemsR.data||[];
+  var ptR=await db.from('patients').select('*').eq('id',plan.patient_id).single();
+  var pt=ptR.data||{};
+  var totalCost=items.reduce(function(s,i){return s+Number(i.estimated_cost||0);},0);
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Treatment Plan — '+pt.name+'</title>'+
+    '<style>body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;color:#1a1a1a;}'+
+    '.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2563EB;padding-bottom:16px;margin-bottom:24px;}'+
+    '.clinic-name{font-size:22px;font-weight:800;color:#2563EB;}.clinic-sub{font-size:11px;color:#64748B;margin-top:3px;}'+
+    '.report-title{font-size:16px;font-weight:700;text-align:right;}.report-date{font-size:11px;color:#64748B;text-align:right;}'+
+    '.section{background:#F8FAFC;border-radius:8px;padding:14px 16px;margin-bottom:16px;}'+
+    '.section-title{font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}'+
+    '.patient-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}'+
+    '.field label{font-size:10px;color:#94A3B8;font-weight:600;display:block;margin-bottom:2px;}.field span{font-size:13px;font-weight:600;}'+
+    'table{width:100%;border-collapse:collapse;margin-top:8px;}'+
+    'th{text-align:left;padding:8px 12px;background:#EFF6FF;color:#1D4ED8;font-size:10px;font-weight:700;text-transform:uppercase;border-bottom:2px solid #DBEAFE;}'+
+    'td{padding:9px 12px;border-bottom:1px solid #F1F5F9;font-size:12px;}'+
+    '.total-row td{font-weight:700;background:#EFF6FF;color:#1D4ED8;}'+
+    '.notes-box{background:#FFFBEB;border:1px solid #FEF3C7;border-radius:6px;padding:12px;font-size:12px;color:#78350F;margin-top:8px;}'+
+    '.signature{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;padding-top:20px;border-top:1px solid #E2E8F0;}'+
+    '.sig-line{border-bottom:1px solid #CBD5E1;margin-bottom:6px;height:40px;}.sig-label{font-size:11px;color:#94A3B8;}'+
+    '@media print{body{padding:20px;}}</style></head><body>'+
+    '<div class="header"><div><div class="clinic-name">Value Dental Center</div><div class="clinic-sub">Duhok, Iraq · Professional Dental Care</div></div>'+
+    '<div><div class="report-title">Treatment Plan & Diagnosis Report</div><div class="report-date">Date: '+(plan.examination_date||new Date().toISOString().slice(0,10))+'</div></div></div>'+
+    '<div class="section"><div class="section-title">Patient information</div><div class="patient-grid">'+
+    '<div class="field"><label>Full name</label><span>'+(pt.name||'—')+'</span></div>'+
+    '<div class="field"><label>Date of birth</label><span>'+(pt.dob||'—')+'</span></div>'+
+    '<div class="field"><label>Phone</label><span>'+(pt.phone||'—')+'</span></div>'+
+    '<div class="field"><label>Examining dentist</label><span>'+(plan.dentist||'—')+'</span></div>'+
+    (plan.chief_complaint?'<div class="field" style="grid-column:span 2"><label>Chief complaint</label><span>'+plan.chief_complaint+'</span></div>':'')+
+    '</div></div>'+
+    '<div class="section"><div class="section-title">Diagnosis & treatment plan ('+items.length+' findings)</div>'+
+    '<table><thead><tr><th>Tooth/Region</th><th>Treatment needed</th><th>Est. cost</th><th>Status</th></tr></thead><tbody>'+
+    items.map(function(item){return '<tr><td style="font-weight:600;">'+(item.teeth||'General')+'</td><td>'+(item.treatment||'—')+'</td>'+
+      '<td style="font-weight:600;color:#2563EB;">'+(item.estimated_cost>0?fmtAmt(item.estimated_cost,item.cost_currency||'IQD'):'—')+'</td>'+
+      '<td>'+(item.status||'planned')+'</td></tr>';}).join('')+
+    (totalCost>0?'<tr class="total-row"><td colspan="2" style="text-align:right;">Total estimated</td><td>'+fu(totalCost)+'</td><td></td></tr>':'')+
+    '</tbody></table></div>'+
+    (plan.notes?'<div class="section"><div class="section-title">Notes & recommendations</div><div class="notes-box">'+plan.notes+'</div></div>':'')+
+    '<div class="signature"><div><div class="sig-line"></div><div class="sig-label">Dentist signature & stamp</div></div>'+
+    '<div><div class="sig-line"></div><div class="sig-label">Patient signature</div></div></div>'+
+    '<div style="margin-top:24px;font-size:10px;color:#94A3B8;text-align:center;">This is a proposed treatment plan. Final cost may vary based on clinical findings.</div>'+
+    '</body></html>';
 }
 async function renderDashboard(){
   document.getElementById('pg-actions').innerHTML='';
@@ -6315,6 +6797,63 @@ async function renderProf(id,name,tab){
       html+='<div style="padding:10px 14px;font-size:11px;color:var(--s400);text-align:center;">'+previousAppts.length-10+' more previous appointments not shown</div>';
     }
     html+='</div>';
+  }
+
+  // ── DIAGNOSIS & TREATMENT PLANS ──────────────────────────────
+  var diagR = await db.from('diagnosis_plans').select('*').eq('patient_id',id).order('created_at',{ascending:false}).then(function(r){return r.error?{data:[]}:r;});
+  var diagPlans = diagR.data||[];
+  var diagItemsR = diagPlans.length ? await db.from('diagnosis_items').select('*').in('plan_id',diagPlans.map(function(p){return p.id;})).order('created_at') : {data:[]};
+  var allDiagItems = (diagItemsR.data||[]);
+
+  if(diagPlans.length||canDo('create','procedures')){
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:16px;">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--s500);text-transform:uppercase;letter-spacing:0.5px;">&#128203; Treatment plans / Diagnosis</div>'+
+      (canDo('create','procedures')?'<button class="btn btnsm btnp" onclick="openNewDiagPlan(\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">+ New plan</button>':'')+'</div>';
+    diagPlans.forEach(function(plan){
+      var items=allDiagItems.filter(function(i){return i.plan_id===plan.id;});
+      var totalCost=items.reduce(function(s,i){return s+Number(i.estimated_cost||0);},0);
+      var statusCounts={planned:0,inprogress:0,completed:0};
+      items.forEach(function(i){statusCounts[i.status||'planned']++;});
+      html+='<div class="vdc-card" style="margin-bottom:10px;">'+
+        '<div class="vdc-card-hdr" style="cursor:pointer;" onclick="toggleDiagPlan(\'diag-plan-'+plan.id+'\')">'+
+        '<div>'+
+        '<div style="font-size:13px;font-weight:700;color:var(--s800);">&#128203; '+( plan.examination_date||plan.created_at.slice(0,10))+' — '+(plan.dentist||'')+'</div>'+
+        (plan.chief_complaint?'<div style="font-size:11px;color:var(--s500);margin-top:2px;">'+plan.chief_complaint+'</div>':'')+
+        '<div style="display:flex;gap:6px;margin-top:4px;">'+
+        (statusCounts.planned?'<span class="badge ba">'+statusCounts.planned+' planned</span>':'')+
+        (statusCounts.inprogress?'<span class="badge bp">'+statusCounts.inprogress+' in progress</span>':'')+
+        (statusCounts.completed?'<span class="badge bg">'+statusCounts.completed+' done</span>':'')+
+        (totalCost?'<span class="badge bs">Total: '+fu(totalCost)+'</span>':'')+
+        '</div></div>'+
+        '<div style="display:flex;gap:6px;">'+
+        '<button class="btn btnxs" onclick="event.stopPropagation();exportDiagReport(\''+plan.id+'\')">&#128196; Export</button>'+
+        '<button class="btn btnxs" onclick="event.stopPropagation();printDiagReport(\''+plan.id+'\')">&#128438; Print</button>'+
+        '</div></div>'+
+        '<div id="diag-plan-'+plan.id+'" style="display:none;">'+
+        '<div class="vdc-card-body" style="padding:0;">'+
+        (items.length?items.map(function(item){
+          var statusCls=item.status==='completed'?'bg':item.status==='inprogress'?'bp':'ba';
+          var teethArr=item.teeth?item.teeth.split(',').map(function(t){return t.trim();}).filter(Boolean):[];
+          return '<div class="diag-item-row">'+
+            '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:'+(item.status==='completed'?'var(--g600)':item.status==='inprogress'?'#7C3AED':'var(--a500)')+';"></div>'+
+            (teethArr.length?'<div class="diag-tooth-badge">'+teethArr.join(', ')+'</div>':'')+
+            '<div style="flex:1;min-width:0;">'+
+            '<div style="font-size:12px;font-weight:700;color:var(--s800);">'+( item.treatment||'—')+'</div>'+
+            (item.estimated_cost>0?'<div style="font-size:10px;color:var(--b700);">'+fu(item.estimated_cost)+'</div>':'')+
+            (item.notes?'<div style="font-size:10px;color:var(--s400);margin-top:1px;">'+item.notes+'</div>':'')+
+            '</div>'+
+            '<span class="badge '+statusCls+'">'+( item.status||'planned')+'</span>'+
+            '<div style="display:flex;gap:4px;">'+
+            '<button class="btn btnxs" onclick="openEditDiagItem(\''+item.id+'\',\''+plan.id+'\')">Edit</button>'+
+            (item.status!=='completed'?'<button class="btn btnxs btng" onclick="startTreatmentFromDiag(\''+item.id+'\',\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\',\''+item.treatment+'\')">&#9654; Start</button>':'')+
+            '</div></div>';
+        }).join(''):
+        '<div style="padding:16px;text-align:center;font-size:12px;color:var(--s400);">No findings yet</div>')+
+        '</div>'+
+        '<div style="padding:10px 14px;border-top:1px solid var(--s100);display:flex;justify-content:flex-end;">'+
+        '<button class="btn btnsm btnp" onclick="openNewDiagItem(\''+plan.id+'\')">+ Add finding</button>'+
+        '</div></div></div>';
+    });
   }
 
   // Clinical chart — always show, build teeth from procedures AND case_visits
