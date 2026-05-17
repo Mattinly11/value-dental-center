@@ -417,7 +417,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     </div>
     <div class="fgrp"><label class="flbl">Medical notes</label><textarea class="finp" id="pt-notes" rows="2" placeholder="Allergies, conditions..."></textarea></div>
     <div class="mac">
-      <button class="btn btnr" id="pt-del-btn" style="display:none;margin-right:auto;" onclick="deletePatient()">Delete</button>
+      <button class="btn btnr" id="pt-del-btn" style="display:none;margin-right:auto;" onclick="canDo('delete','patients')?deletePatient():showToast('Only Admin can delete patients','error')">Delete</button>
       <button class="btn" onclick="closePtModal()">Cancel</button>
       <button class="btn btnp" onclick="savePatient()">Save patient</button>
     </div>
@@ -1128,56 +1128,86 @@ async function sha256(str){
 
 // PERMISSIONS MAP per role
 // Each role gets a set of allowed sections and capabilities
+// ══════════════════════ ROLE PERMISSIONS (CRUD) ══════════════════
+// Each role has: sections (visible), crud (create/edit/delete per section), capabilities
+// Delete is always false for non-admin — enforced in canDo()
+// 'own' = can only edit/create records linked to their own dentist name
+
 var ROLE_PERMS = {
   admin: {
-    sections: ['dashboard','patients','procedures','appointments','billing','finance','labs','stocks','files','settings'],
-    canSeeAllFinance: true,
-    canManageAccounts: true,
-    canSeeProcedureAdmin: true,
-    canRecordProcedures: true,
-    canSeeAllPatients: true,
-    canUseStock: true,
-    canAddStock: true
+    sections:['dashboard','patients','procedures','appointments','billing','finance','labs','stocks','files','settings'],
+    crud:{
+      patients:   {c:true, e:true, d:true},
+      appointments:{c:true,e:true, d:true},
+      procedures: {c:true, e:true, d:true},
+      billing:    {c:true, e:true, d:true},
+      payments:   {c:true, e:true, d:true},
+      cases:      {c:true, e:true, d:true},
+      stock:      {c:true, e:true, d:true},
+      labs:       {c:true, e:true, d:true}
+    },
+    canSeeAllFinance:true, canManageAccounts:true, canSeeProcedureAdmin:true,
+    canRecordProcedures:true, canSeeAllPatients:true, canUseStock:true, canAddStock:true
   },
   partner: {
-    sections: ['dashboard','patients','procedures','appointments','billing','finance','labs','stocks','files'],
-    canSeeAllFinance: false,  // only own wallet + value wallet
-    canManageAccounts: false,
-    canSeeProcedureAdmin: false,
-    canRecordProcedures: true,
-    canSeeAllPatients: true,
-    canUseStock: true,
-    canAddStock: true
+    sections:['dashboard','patients','procedures','appointments','billing','finance','labs','stocks','files'],
+    crud:{
+      patients:   {c:true, e:true, d:false},
+      appointments:{c:true,e:true, d:false},
+      procedures: {c:true, e:true, d:false},
+      billing:    {c:true, e:true, d:false},
+      payments:   {c:true, e:true, d:false},
+      cases:      {c:true, e:true, d:false},
+      stock:      {c:true, e:true, d:false},
+      labs:       {c:true, e:true, d:false}
+    },
+    canSeeAllFinance:false, canManageAccounts:false, canSeeProcedureAdmin:false,
+    canRecordProcedures:true, canSeeAllPatients:true, canUseStock:true, canAddStock:true
   },
   dentist: {
-    sections: ['dashboard','patients','appointments','billing','finance','labs','stocks'],
-    canSeeAllFinance: false,
-    canManageAccounts: false,
-    canSeeProcedureAdmin: false,
-    canRecordProcedures: true,
-    canSeeAllPatients: false,  // own patients only
-    canUseStock: true,
-    canAddStock: false
+    sections:['dashboard','patients','appointments','billing','finance','labs','stocks'],
+    crud:{
+      patients:   {c:false, e:'own', d:false},
+      appointments:{c:true, e:'own', d:false},
+      procedures: {c:true,  e:'own', d:false},
+      billing:    {c:false, e:'own', d:false},
+      payments:   {c:false, e:false, d:false},
+      cases:      {c:true,  e:'own', d:false},
+      stock:      {c:false, e:false, d:false},
+      labs:       {c:false, e:false, d:false}
+    },
+    canSeeAllFinance:false, canManageAccounts:false, canSeeProcedureAdmin:false,
+    canRecordProcedures:true, canSeeAllPatients:false, canUseStock:true, canAddStock:false
   },
   assistant: {
-    sections: ['dashboard','appointments','stocks'],
-    canSeeAllFinance: false,
-    canManageAccounts: false,
-    canSeeProcedureAdmin: false,
-    canRecordProcedures: false,
-    canSeeAllPatients: false,
-    canUseStock: true,
-    canAddStock: false
+    sections:['dashboard','appointments','stocks'],
+    crud:{
+      patients:   {c:false, e:false, d:false},
+      appointments:{c:true, e:true,  d:false},
+      procedures: {c:false, e:false, d:false},
+      billing:    {c:false, e:false, d:false},
+      payments:   {c:false, e:false, d:false},
+      cases:      {c:false, e:false, d:false},
+      stock:      {c:false, e:false, d:false},
+      labs:       {c:false, e:false, d:false}
+    },
+    canSeeAllFinance:false, canManageAccounts:false, canSeeProcedureAdmin:false,
+    canRecordProcedures:false, canSeeAllPatients:false, canUseStock:true, canAddStock:false
   },
   receptionist: {
-    sections: ['dashboard','patients','appointments','billing','stocks'],
-    canSeeAllFinance: false,
-    canManageAccounts: false,
-    canSeeProcedureAdmin: false,
-    canRecordProcedures: false,
-    canSeeAllPatients: true,
-    canUseStock: true,
-    canAddStock: false
+    sections:['dashboard','patients','appointments','billing','stocks'],
+    crud:{
+      patients:   {c:true, e:true,  d:false},
+      appointments:{c:true, e:true, d:false},
+      procedures: {c:false, e:false, d:false},
+      billing:    {c:true, e:true,  d:false},
+      payments:   {c:true, e:true,  d:false},
+      cases:      {c:false, e:false, d:false},
+      stock:      {c:false, e:false, d:false},
+      labs:       {c:false, e:false, d:false}
+    },
+    canSeeAllFinance:false, canManageAccounts:false, canSeeProcedureAdmin:false,
+    canRecordProcedures:false, canSeeAllPatients:true, canUseStock:true, canAddStock:false
   }
 };
 
@@ -1185,19 +1215,55 @@ function getPerms(){ return ROLE_PERMS[currentUser?currentUser.role:'admin']||RO
 function can(action){ return !!(getPerms()[action]); }
 function canAccessSection(s){ return getPerms().sections.indexOf(s)>=0; }
 
+// Main CRUD permission check
+// action: 'create'|'edit'|'delete'
+// section: 'patients'|'appointments'|'procedures'|'billing'|'payments'|'cases'|'stock'|'labs'
+// ownerName: (optional) the dentist name on the record — used for 'own' check
+function canDo(action, section, ownerName){
+  var role = currentUser ? currentUser.role : 'admin';
+  // Admin can do everything
+  if(role === 'admin') return true;
+  // Delete is always blocked for non-admin
+  if(action === 'delete') return false;
+  var perms = getPerms();
+  if(!perms.crud || !perms.crud[section]) return false;
+  var perm = perms.crud[section][action==='create'?'c':action==='edit'?'e':'d'];
+  if(perm === true) return true;
+  if(perm === false) return false;
+  // 'own' — check if the record belongs to this dentist
+  if(perm === 'own'){
+    if(!ownerName) return true; // no owner specified — allow (new record)
+    return currentUser && currentUser.linked_dentist === ownerName;
+  }
+  return false;
+}
+
+// Show a grayed-out disabled button with no-permission feedback
+function noPermBtn(label, reason){
+  return '<button class="btn" disabled style="opacity:0.4;cursor:not-allowed;" title="'+(reason||'No permission')+'" onclick="showToast(\''+(reason||'You do not have permission for this action')+'\',\'error\')">'+label+'</button>';
+}
+
+// Generate action button — automatically grayed if no permission
+function actionBtn(label, action, section, ownerName, onclickFn, extraClass){
+  if(canDo(action, section, ownerName)){
+    return '<button class="btn '+(extraClass||'')+'" onclick="'+onclickFn+'">'+label+'</button>';
+  }
+  return noPermBtn(label, 'No permission: '+action+' '+section);
+}
+
 // Load admin-customized permissions from localStorage
 function loadCustomPerms(){
-  var saved=localStorage.getItem('vdc-role-perms');
+  var saved = localStorage.getItem('vdc-role-perms-v2');
   if(saved){
     try{
-      var p=JSON.parse(saved);
+      var p = JSON.parse(saved);
       Object.keys(p).forEach(function(role){
-        if(ROLE_PERMS[role])ROLE_PERMS[role]=p[role];
+        if(ROLE_PERMS[role]) ROLE_PERMS[role] = p[role];
       });
     }catch(e){}
   }
-  // Always ensure dentist has Finance access (their personal wallet) regardless of saved perms
-  if(ROLE_PERMS.dentist.sections.indexOf('finance')<0){
+  // Always ensure dentist has Finance access
+  if(ROLE_PERMS.dentist.sections.indexOf('finance') < 0){
     ROLE_PERMS.dentist.sections.push('finance');
   }
 }
@@ -1462,7 +1528,9 @@ function setMobileRoom(room){mobileCalRoom=room;buildSched();}
 var ptView=localStorage.getItem('vdc-view')||'grid',ptQ='';
 var ptFilterDr='',ptFilterStatus='',ptSort='name';
 async function renderPatients(){
-  document.getElementById('pg-actions').innerHTML='<button class="btn btnp" onclick="openAddPt()">+ Add patient</button>';
+  document.getElementById('pg-actions').innerHTML=
+    (canDo('create','patients')?'<button class="btn btnp" onclick="openAddPt()">+ Add patient</button>':
+    '<button class="btn" disabled style="opacity:0.4;" onclick="showToast(\'No permission to add patients\',\'error\')">+ Add patient</button>');
   document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading...</div>';
   var q=db.from('patients').select('*').order('name');
   // Dentist role: only show their own patients
@@ -3123,89 +3191,82 @@ async function deleteAccount(){
 
 // ══════════════════════ PERMISSIONS EDITOR ═══════════════════════
 var ALL_SECTIONS=['dashboard','patients','procedures','appointments','billing','finance','labs','stocks','files','settings'];
-var SECTION_LABELS={dashboard:'Dashboard',patients:'Patients',procedures:'Procedures Admin',appointments:'Appointments',billing:'Billing',finance:'Staff & Finance',labs:'Labs',stocks:'Stocks',files:'X-rays & Files',settings:'Settings'};
-var CAPABILITY_LABELS={
-  canSeeAllFinance:'See full Finance (all wallets)',
-  canManageAccounts:'Manage accounts & settings',
-  canSeeProcedureAdmin:'Edit procedure definitions',
-  canRecordProcedures:'Record procedures',
-  canSeeAllPatients:'See all patients (not just own)',
-  canUseStock:'Use stock items (deduct)',
-  canAddStock:'Add stock (purchase/restock)'
-};
-var EDITABLE_ROLES=['partner','dentist','assistant','receptionist']; // admin always full
+var SECTION_LABELS={dashboard:'Dashboard',patients:'Patients',procedures:'Procedures',appointments:'Appointments',billing:'Billing',finance:'Staff & Finance',labs:'Labs',stocks:'Stocks',files:'X-rays & Files',settings:'Settings'};
+var CRUD_SECTIONS=['patients','appointments','procedures','billing','payments','cases','stock','labs'];
+var CRUD_LABELS={patients:'Patients',appointments:'Appointments',procedures:'Procedures',billing:'Invoices',payments:'Payments',cases:'Cases/Sessions',stock:'Stock',labs:'Labs'};
+var EDITABLE_ROLES=['partner','dentist','assistant','receptionist'];
+var ROLE_COLORS={partner:'#6D28D9',dentist:'#059669',assistant:'#B45309',receptionist:'#0E7490'};
 
 function renderPermissionsTab(){
-  var roleColors={partner:'#6D28D9',dentist:'#059669',assistant:'#B45309',receptionist:'#0E7490'};
   var html=
-    '<div style="background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--a700);">'+
-    '&#9888; Admin role always has full access and cannot be changed. Changes here apply to all accounts with that role immediately.</div>'+
-    '<div style="overflow-x:auto;">'+
+    '<div style="background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--a700);">'+
+    '&#9888; Admin always has full access and is the <strong>only role that can delete</strong>. Changes take effect on next login.</div>'+
+    '<div style="font-size:11px;font-weight:700;color:var(--s600);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">&#128274; Section access</div>'+
+    '<div style="overflow-x:auto;margin-bottom:20px;">'+
     '<table style="width:100%;border-collapse:collapse;background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:hidden;">'+
     '<thead><tr style="background:var(--s50);">'+
-    '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--s600);border-bottom:1px solid var(--s200);">Permission</th>'+
-    EDITABLE_ROLES.map(function(role){
-      var c=roleColors[role]||'#6B7280';
-      return '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;border-bottom:1px solid var(--s200);color:'+c+';">'+role.charAt(0).toUpperCase()+role.slice(1)+'</th>';
-    }).join('')+
+    '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--s600);border-bottom:1px solid var(--s200);min-width:140px;">Section</th>'+
+    EDITABLE_ROLES.map(function(role){var c=ROLE_COLORS[role];return '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;border-bottom:1px solid var(--s200);color:'+c+';min-width:90px;">'+role.charAt(0).toUpperCase()+role.slice(1)+'</th>';}).join('')+
     '</tr></thead><tbody>'+
-    // Section access rows
-    '<tr><td colspan="5" style="padding:8px 14px;font-size:10px;font-weight:700;color:var(--s400);text-transform:uppercase;letter-spacing:0.5px;background:var(--s50);border-bottom:1px solid var(--s100);">Section Access</td></tr>'+
-    ALL_SECTIONS.filter(function(s){return s!=='settings';}).map(function(sec){
-      return '<tr style="border-bottom:1px solid var(--s100);">'+
+    ALL_SECTIONS.filter(function(s){return s!=='settings';}).map(function(sec,idx){
+      return '<tr style="border-bottom:1px solid var(--s100);background:'+(idx%2===0?'white':'var(--s50)')+'">'+
         '<td style="padding:10px 14px;font-size:12px;font-weight:600;color:var(--s700);">'+SECTION_LABELS[sec]+'</td>'+
-        EDITABLE_ROLES.map(function(role){
-          var checked=ROLE_PERMS[role].sections.indexOf(sec)>=0;
-          return '<td style="text-align:center;padding:8px;">'+
-            '<label style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">'+
-            '<input type="checkbox" data-role="'+role+'" data-type="section" data-key="'+sec+'" '+(checked?'checked':'')+
-            ' style="width:16px;height:16px;cursor:pointer;" onchange="onPermChange(this)">'+
-            '</label></td>';
+        EDITABLE_ROLES.map(function(role){var checked=ROLE_PERMS[role].sections.indexOf(sec)>=0;
+          return '<td style="text-align:center;padding:8px;"><input type="checkbox" data-ptype="section" data-role="'+role+'" data-key="'+sec+'" '+(checked?'checked':'')+' style="width:18px;height:18px;cursor:pointer;accent-color:var(--b600);" onchange="onPermChange2(this)"></td>';
         }).join('')+'</tr>';
-    }).join('')+
-    // Capabilities rows
-    '<tr><td colspan="5" style="padding:8px 14px;font-size:10px;font-weight:700;color:var(--s400);text-transform:uppercase;letter-spacing:0.5px;background:var(--s50);border-bottom:1px solid var(--s100);">Capabilities</td></tr>'+
-    Object.keys(CAPABILITY_LABELS).map(function(cap){
-      return '<tr style="border-bottom:1px solid var(--s100);">'+
-        '<td style="padding:10px 14px;font-size:12px;font-weight:600;color:var(--s700);">'+CAPABILITY_LABELS[cap]+'</td>'+
-        EDITABLE_ROLES.map(function(role){
-          var checked=!!(ROLE_PERMS[role][cap]);
-          return '<td style="text-align:center;padding:8px;">'+
-            '<label style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">'+
-            '<input type="checkbox" data-role="'+role+'" data-type="capability" data-key="'+cap+'" '+(checked?'checked':'')+
-            ' style="width:16px;height:16px;cursor:pointer;" onchange="onPermChange(this)">'+
-            '</label></td>';
+    }).join('')+'</tbody></table></div>'+
+    '<div style="font-size:11px;font-weight:700;color:var(--s600);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">&#9998; Create / Edit / Delete permissions</div>'+
+    '<div style="font-size:11px;color:var(--s400);margin-bottom:10px;">C = Create &nbsp;·&nbsp; E = Edit &nbsp;·&nbsp; D = Delete (Admin only — always locked) &nbsp;·&nbsp; <span style="color:var(--a600);">&#9650; own = own records only</span></div>'+
+    '<div style="overflow-x:auto;margin-bottom:20px;">'+
+    '<table style="width:100%;border-collapse:collapse;background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:hidden;">'+
+    '<thead><tr style="background:var(--s50);">'+
+    '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--s600);border-bottom:1px solid var(--s200);min-width:130px;">Section</th>'+
+    EDITABLE_ROLES.map(function(role){var c=ROLE_COLORS[role];return '<th colspan="3" style="padding:8px 4px;text-align:center;font-size:11px;font-weight:700;border-bottom:1px solid var(--s200);border-left:2px solid '+c+'33;color:'+c+';">'+role.charAt(0).toUpperCase()+role.slice(1)+'</th>';}).join('')+
+    '</tr><tr style="background:var(--s50);"><th style="border-bottom:1px solid var(--s200);"></th>'+
+    EDITABLE_ROLES.map(function(role){var c=ROLE_COLORS[role];return ['C','E','D'].map(function(l,i){return '<th style="padding:4px 8px;text-align:center;font-size:10px;font-weight:700;border-bottom:1px solid var(--s200);'+(i===0?'border-left:2px solid '+c+'33;':'')+'color:'+(l==='D'?'var(--r400)':'var(--s500)')+';">'+l+'</th>';}).join('');}).join('')+'</tr></thead><tbody>'+
+    CRUD_SECTIONS.map(function(sec,idx){
+      return '<tr style="border-bottom:1px solid var(--s100);background:'+(idx%2===0?'white':'var(--s50)')+'">'+
+        '<td style="padding:10px 14px;font-size:12px;font-weight:600;color:var(--s700);">'+CRUD_LABELS[sec]+'</td>'+
+        EDITABLE_ROLES.map(function(role){var c=ROLE_COLORS[role];var crud=(ROLE_PERMS[role].crud||{})[sec]||{c:false,e:false,d:false};
+          return ['c','e','d'].map(function(k,ki){
+            if(k==='d')return '<td style="text-align:center;padding:6px;'+(ki===0?'border-left:2px solid '+c+'33;':'')+'"><span title="Admin only" style="font-size:14px;opacity:0.5;">&#128274;</span></td>';
+            var val=crud[k];var isOwn=val==="own";
+            return '<td style="text-align:center;padding:6px;'+(ki===0?'border-left:2px solid '+c+'33;':'')+'">'+
+              (isOwn?'<div style="display:inline-flex;flex-direction:column;align-items:center;gap:1px;"><input type="checkbox" checked data-ptype="crud" data-role="'+role+'" data-section="'+sec+'" data-key="'+k+'" style="width:16px;height:16px;cursor:pointer;accent-color:var(--a600);" onchange="onPermChange2(this)"><span style="font-size:8px;color:var(--a600);font-weight:700;">own</span></div>':
+              '<input type="checkbox" '+(val?'checked':'')+' data-ptype="crud" data-role="'+role+'" data-section="'+sec+'" data-key="'+k+'" style="width:16px;height:16px;cursor:pointer;accent-color:var(--b600);" onchange="onPermChange2(this)">')+
+              '</td>';
+          }).join('');
         }).join('')+'</tr>';
-    }).join('')+
-    '</tbody></table></div>'+
-    '<div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">'+
+    }).join('')+'</tbody></table></div>'+
+    '<div style="display:flex;gap:10px;justify-content:flex-end;">'+
     '<button class="btn" onclick="resetPermissions()">Reset to defaults</button>'+
-    '<button class="btn btnp" onclick="savePermissions()">&#10003; Save permissions</button>'+
+    '<button class="btn btnp" onclick="savePermissions()">&#10003; Save all permissions</button>'+
     '</div>';
   document.getElementById('settings-body').innerHTML=html;
 }
 
-function onPermChange(cb){
-  var role=cb.dataset.role,type=cb.dataset.type,key=cb.dataset.key,val=cb.checked;
-  if(type==='section'){
+function onPermChange2(cb){
+  var role=cb.dataset.role,ptype=cb.dataset.ptype,key=cb.dataset.key,val=cb.checked;
+  if(ptype==='section'){
     var idx=ROLE_PERMS[role].sections.indexOf(key);
     if(val&&idx<0)ROLE_PERMS[role].sections.push(key);
     else if(!val&&idx>=0)ROLE_PERMS[role].sections.splice(idx,1);
-  } else {
-    ROLE_PERMS[role][key]=val;
+  } else if(ptype==='crud'){
+    var sec=cb.dataset.section;
+    if(!ROLE_PERMS[role].crud)ROLE_PERMS[role].crud={};
+    if(!ROLE_PERMS[role].crud[sec])ROLE_PERMS[role].crud[sec]={c:false,e:false,d:false};
+    ROLE_PERMS[role].crud[sec][key]=val;
   }
 }
 function savePermissions(){
-  // Save only editable roles
-  var toSave={};
-  EDITABLE_ROLES.forEach(function(role){toSave[role]=ROLE_PERMS[role];});
-  localStorage.setItem('vdc-role-perms',JSON.stringify(toSave));
-  showToast('Permissions saved ✅ — changes take effect on next login');
-  // Rebuild sidebar for current user immediately
+  var toSave={};EDITABLE_ROLES.forEach(function(role){toSave[role]=ROLE_PERMS[role];});
+  localStorage.setItem('vdc-role-perms-v2',JSON.stringify(toSave));
+  showToast('Permissions saved ✅ — takes effect on next login');
   buildSidebarForRole();
 }
 function resetPermissions(){
-  if(!confirm('Reset all permissions to default? This cannot be undone.'))return;
+  if(!confirm('Reset all permissions to system defaults?'))return;
+  localStorage.removeItem('vdc-role-perms-v2');
   localStorage.removeItem('vdc-role-perms');
   location.reload();
 }
@@ -6055,7 +6116,8 @@ async function renderProf(id,name,tab){
   document.getElementById('nav-patients').classList.add('act');
   document.getElementById('pg-actions').innerHTML=
     '<button class="btn" onclick="goTo(\'patients\')">&#8592; All patients</button>'+
-    '<button class="btn btnp" onclick="openEditPt(\''+id+'\')">Edit patient</button>';
+    (canDo('edit','patients')?'<button class="btn btnp" onclick="openEditPt(\''+id+'\')">Edit patient</button>':
+      '<button class="btn" disabled style="opacity:0.4;" onclick="showToast(\'No permission to edit patients\',\'error\')">Edit patient</button>');
   document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading profile...</div>';
   var results=await Promise.all([
     db.from('patients').select('*').eq('id',id).single(),
@@ -6200,7 +6262,7 @@ async function renderProf(id,name,tab){
         '</div>'+
         '<div class="pt-visit-actions" style="flex-direction:column;gap:4px;">'+
         (bal>0?'<button class="btn btnp btnxs" onclick="openInvDetail(\''+inv.id+'\',\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">Pay</button>':'')+
-        '<button class="btn btnxs" onclick="deleteInvoice(\''+inv.id+'\',\''+id+'\')" style="color:var(--r600);">&#128465;</button>'+
+        (canDo('delete','billing')?'<button class="btn btnxs" onclick="deleteInvoice(\''+inv.id+'\',\''+id+'\')" style="color:var(--r600);">&#128465;</button>':'')+
         '</div></div>';
     });
     html+='</div>';
