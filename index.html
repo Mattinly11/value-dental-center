@@ -910,14 +910,17 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         <div style="font-size:10px;color:var(--s400);margin-top:3px;" id="acc-pass-hint">Leave blank to keep current password (when editing)</div>
       </div>
       <div class="fgrp"><label class="flbl">Role <span class="req">*</span></label>
-        <select class="finp" id="acc-role" onchange="onAccRoleChange()">
-          <option value="">Select role...</option>
-          <option value="admin">Admin — full access</option>
-          <option value="partner">Partner — owner access</option>
-          <option value="dentist">Dentist — own patients only</option>
-          <option value="assistant">Assistant — appointments & stock</option>
-          <option value="receptionist">Receptionist — patients & billing</option>
-        </select></div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <select class="finp" id="acc-role" onchange="onAccRoleChange()" style="flex:1;">
+            <option value="">Select role...</option>
+            <option value="admin">Admin — full access</option>
+            <option value="partner">Partner — owner access</option>
+            <option value="dentist">Dentist — own patients only</option>
+            <option value="assistant">Assistant — appointments & stock</option>
+            <option value="receptionist">Receptionist — patients & billing</option>
+          </select>
+          <button type="button" class="btn btnsm btnp" onclick="addInlineCustomRole()" title="Create a new custom role" style="white-space:nowrap;flex-shrink:0;">+ New role</button>
+        </div></div>
     </div>
     <div class="fgrp" id="acc-linked-wrap" style="display:none;">
       <label class="flbl">Linked to dentist name <span class="req">*</span></label>
@@ -1098,6 +1101,48 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       <button class="btn btnr" id="adj-del-btn" style="display:none;margin-right:auto;" onclick="deleteAdj()">Delete</button>
       <button class="btn" onclick="closeMdl('adj-modal')">Cancel</button>
       <button class="btn btnp" onclick="saveAdj()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- WALLET LOAN MODAL -->
+<div class="mbg" id="wallet-loan-modal">
+  <div class="modal" style="max-width:440px;">
+    <div class="mtit">&#128202; Borrow from another wallet</div>
+    <div class="msub" id="wlm-sub">Cover a shortfall from another wallet</div>
+    <input type="hidden" id="wlm-borrower">
+    <input type="hidden" id="wlm-expense-id">
+    <div style="background:var(--r50);border:1px solid var(--r100);border-radius:var(--radsm);padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--r700);" id="wlm-info"></div>
+    <div class="fgrp"><label class="flbl">Borrow amount (IQD) <span class="req">*</span></label>
+      <input class="finp" type="number" id="wlm-amount" placeholder="0" min="0"></div>
+    <div class="fgrp"><label class="flbl">Borrow from wallet <span class="req">*</span></label>
+      <select class="finp" id="wlm-lender">
+        <option value="value">&#128176; Value Wallet (clinic)</option>
+      </select></div>
+    <div class="fgrp"><label class="flbl">Notes (optional)</label>
+      <input class="finp" id="wlm-notes" placeholder="Reason for borrowing..."></div>
+    <div class="mac">
+      <button class="btn" onclick="closeMdl('wallet-loan-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveWalletLoan()">Record loan</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOAN REPAYMENT MODAL -->
+<div class="mbg" id="loan-repay-modal">
+  <div class="modal" style="max-width:400px;">
+    <div class="mtit">&#128197; Record repayment</div>
+    <input type="hidden" id="lrm-loan-id">
+    <div style="font-size:12px;color:var(--s600);margin-bottom:14px;" id="lrm-info"></div>
+    <div class="fgrp"><label class="flbl">Repayment amount (IQD) <span class="req">*</span></label>
+      <input class="finp" type="number" id="lrm-amount" placeholder="0" min="0"></div>
+    <div class="fgrp"><label class="flbl">Date</label>
+      <input class="finp" type="date" id="lrm-date" max="2099-12-31"></div>
+    <div class="fgrp"><label class="flbl">Notes (optional)</label>
+      <input class="finp" id="lrm-notes" placeholder="Repayment details..."></div>
+    <div class="mac">
+      <button class="btn" onclick="closeMdl('loan-repay-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveRepayment()">Record repayment</button>
     </div>
   </div>
 </div>
@@ -1536,6 +1581,7 @@ async function doLogin(){
   buildSidebarForRole();
   await loadDentistsList();
   populateDrDropdowns();
+  await loadOpeningBalances();
   goTo('dashboard');
   setTimeout(function(){initStockNotifications();},1500);
 }
@@ -1620,6 +1666,7 @@ window.onload=async function(){_attachChipDelegation();
     buildSidebarForRole();
     await loadDentistsList();
     populateDrDropdowns();
+    await loadOpeningBalances();
     goTo('dashboard');
     setTimeout(function(){initStockNotifications();},1500);
   }
@@ -2780,8 +2827,8 @@ function buildFinUI(){
     '<button class="btn btnsm" onclick="setFinM(new Date().getMonth(),new Date().getFullYear())">This month</button>'+
     '</div>'+
     '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:14px;flex-wrap:wrap;">'+
-    ['overview','payments','dentists','substaff','expenses','adjustments'].map(function(t){
-      var L={overview:'Finance overview',payments:'Payment log',dentists:'Dentist payroll',substaff:'Substaff',expenses:'Expenses',adjustments:'Rewards & Penalties'};
+    ['overview','payments','dentists','substaff','expenses','adjustments','debts'].map(function(t){
+      var L={overview:'Finance overview',payments:'Payment log',dentists:'Dentist payroll',substaff:'Substaff',expenses:'Expenses',adjustments:'Rewards & Penalties',debts:'Internal Debts'};
       return '<button class="fin-tab'+(finTab===t?' act':'')+'" onclick="setFinT(\''+t+'\')">'+L[t]+'</button>';
     }).join('')+'</div>'+
     '<div id="fin-content"></div>';
@@ -2881,6 +2928,7 @@ function buildFinTab(){
   else if(finTab==='substaff')el.innerHTML=buildFS();
   else if(finTab==='expenses')el.innerHTML=buildFE();
   else if(finTab==='adjustments'){buildFAdj();}
+  else if(finTab==='debts'){buildFLoans();}
 }
 function buildFO(){
   var pays=getMPays(),exps=getME();
@@ -2907,12 +2955,21 @@ function buildFO(){
     } else {vWiqd+=d.vIQD;vWusd+=d.vUSD;}
   });
   var totalExp=exps.filter(function(e){return !e.wallet||e.wallet==='value';}).reduce(function(s,e){return s+Number(e.amount||0);},0),expPP=totalExp/3;
-  // Partner-specific expenses (deducted from their personal wallet)
+  // Partner-specific expenses
   var partnerExps={};
   exps.forEach(function(e){
     if(e.wallet&&e.wallet!=='value'){partnerExps[e.wallet]=(partnerExps[e.wallet]||0)+Number(e.amount||0);}
   });
   var vPPiqd=vWiqd/3,vPPusd=vWusd/3;
+  // Add opening balances (global starting point — applies to all periods)
+  PARTNERS.forEach(function(p){
+    var ob=_openingBalances.partners[p]||{};
+    walletsIQD[p]=(walletsIQD[p]||0)+Number(ob.iqd||0);
+    walletsUSD[p]=(walletsUSD[p]||0)+Number(ob.usd||0);
+  });
+  vWiqd+=Number(_openingBalances.value.iqd||0);
+  vWusd+=Number(_openingBalances.value.usd||0);
+  vPPiqd=vWiqd/3;vPPusd=vWusd/3;
   // load any manual withdrawals from localStorage
   var vWithdrawKey='vdc-vw-withdraw';
   var vWithdrawals=JSON.parse(localStorage.getItem(vWithdrawKey)||'{}');
@@ -3435,7 +3492,36 @@ function renderSettings(){
   }
 }
 
-function renderGeneralTab(){
+async function renderGeneralTab(){
+  // Load opening balances from Supabase
+  var obR=await db.from('opening_balances').select('*').order('created_at');
+  var obRows=obR.data||[];
+  // Build opening balance map
+  var obMap={};obRows.forEach(function(r){obMap[r.wallet_key]=r;});
+  var isAdmin=currentUser&&currentUser.role==='admin';
+
+  // Build partner opening balance rows
+  var partnerOBrows=PARTNERS.map(function(p){
+    var ob=obMap[p]||{};
+    return '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">'+p+'\'s wallet</div><div style="font-size:10px;color:var(--s400);">Partner opening balance</div></div>'+
+      '<div style="display:flex;gap:6px;align-items:center;">'+
+      '<input type="number" class="finp" id="ob-'+p.replace(/\s/g,'_')+'-iqd" value="'+(ob.amount_iqd||0)+'" style="width:120px;text-align:right;" placeholder="IQD" '+(isAdmin?'':'disabled')+'>'+
+      '<span style="font-size:11px;color:var(--s400);">IQD</span>'+
+      '</div></div>';
+  }).join('');
+
+  // Extra sources rows
+  var extraSources=obRows.filter(function(r){return r.wallet_key.startsWith('extra:');});
+  var extraHtml=extraSources.map(function(r,idx){
+    return '<div class="set-row" id="ob-extra-'+idx+'">'+
+      '<input class="finp" value="'+r.label+'" id="ob-extra-lbl-'+idx+'" style="flex:1;" placeholder="Source name" '+(isAdmin?'':'disabled')+'>'+
+      '<div style="display:flex;gap:6px;align-items:center;">'+
+      '<input type="number" class="finp" value="'+(r.amount_iqd||0)+'" id="ob-extra-amt-'+idx+'" style="width:120px;text-align:right;" '+(isAdmin?'':'disabled')+'>'+
+      '<span style="font-size:11px;color:var(--s400);">IQD</span>'+
+      (isAdmin?'<button class="btn btnxs btnr" onclick="removeExtraOB(\''+r.id+'\')">&#10005;</button>':'')+
+      '</div></div>';
+  }).join('');
+
   document.getElementById('settings-body').innerHTML=
     '<div class="set-sec">'+
     '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:4px;">&#128336; Working hours</div>'+
@@ -3455,10 +3541,98 @@ function renderGeneralTab(){
     '<span style="font-size:13px;">IQD</span>'+
     '<button class="btn btnsm btnp" onclick="saveIQDRate()">Save</button></div></div>'+
     '</div>'+
+    // OPENING BALANCES SECTION
+    '<div class="set-sec">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'+
+    '<div><div style="font-size:13px;font-weight:700;color:var(--s800);">&#128176; Opening balances</div>'+
+    '<div style="font-size:11px;color:var(--s400);margin-top:2px;">Starting financial balances before using this system. Applied as a global base in all periods.</div></div>'+
+    (isAdmin?'<button class="btn btnsm btnp" onclick="saveOpeningBalances()">Save balances</button>':'')+
+    '</div>'+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Value Wallet</div><div style="font-size:10px;color:var(--s400);">Clinic shared wallet (IQD)</div></div>'+
+    '<div style="display:flex;gap:6px;align-items:center;">'+
+    '<input type="number" class="finp" id="ob-value-iqd" value="'+(obMap['value']?obMap['value'].amount_iqd||0:0)+'" style="width:140px;text-align:right;" placeholder="IQD" '+(isAdmin?'':'disabled')+'>'+
+    '<span style="font-size:11px;color:var(--s400);">IQD</span>'+
+    '<input type="number" class="finp" id="ob-value-usd" value="'+(obMap['value']?obMap['value'].amount_usd||0:0)+'" style="width:100px;text-align:right;" placeholder="USD" '+(isAdmin?'':'disabled')+'>'+
+    '<span style="font-size:11px;color:var(--s400);">USD</span>'+
+    '</div></div>'+
+    partnerOBrows+
+    '<div id="ob-extra-rows">'+extraHtml+'</div>'+
+    (isAdmin?'<div style="margin-top:8px;"><button class="btn btnsm" onclick="addExtraOBRow()">+ Add another source</button></div>':'')+
+    '</div>'+
     '<div class="set-sec">'+
     '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:8px;">&#128272; Your session</div>'+
     '<div class="set-row"><div style="font-size:12px;font-weight:600;">Logged in as</div><div style="font-size:12px;color:var(--s600);">'+(currentUser?currentUser.name+' ('+currentUser.role+')':'—')+'</div></div>'+
     '</div>';
+}
+
+// Extra source counter for new rows added in-session
+var _obExtraCount=0;
+function addExtraOBRow(){
+  var idx='new_'+(_obExtraCount++);
+  var row=document.createElement('div');
+  row.className='set-row';row.id='ob-extra-'+idx;
+  row.innerHTML=
+    '<input class="finp" id="ob-extra-lbl-'+idx+'" style="flex:1;" placeholder="Source name (e.g. Bank account, Cash drawer)">'+
+    '<div style="display:flex;gap:6px;align-items:center;">'+
+    '<input type="number" class="finp" id="ob-extra-amt-'+idx+'" style="width:120px;text-align:right;" placeholder="0">'+
+    '<span style="font-size:11px;color:var(--s400);">IQD</span>'+
+    '<button class="btn btnxs btnr" onclick="this.closest(\'.set-row\').remove()">&#10005;</button>'+
+    '</div>';
+  document.getElementById('ob-extra-rows').appendChild(row);
+}
+
+async function saveOpeningBalances(){
+  if(!currentUser||currentUser.role!=='admin'){showToast('Admin only','error');return;}
+  var saves=[];
+  // Value wallet
+  var vIQD=parseFloat(document.getElementById('ob-value-iqd').value)||0;
+  var vUSD=parseFloat(document.getElementById('ob-value-usd').value)||0;
+  saves.push(db.from('opening_balances').upsert([{wallet_key:'value',label:'Value Wallet',amount_iqd:vIQD,amount_usd:vUSD}],{onConflict:'wallet_key'}));
+  // Partner wallets
+  PARTNERS.forEach(function(p){
+    var key=p.replace(/\s/g,'_');
+    var el=document.getElementById('ob-'+key+'-iqd');
+    if(el){
+      var amt=parseFloat(el.value)||0;
+      saves.push(db.from('opening_balances').upsert([{wallet_key:p,label:p,amount_iqd:amt,amount_usd:0}],{onConflict:'wallet_key'}));
+    }
+  });
+  // Extra sources — find all new rows
+  var extraRows=document.querySelectorAll('[id^="ob-extra-"]');
+  for(var i=0;i<extraRows.length;i++){
+    var row=extraRows[i];
+    var lblEl=row.querySelector('[id^="ob-extra-lbl-"]');
+    var amtEl=row.querySelector('[id^="ob-extra-amt-"]');
+    if(lblEl&&amtEl&&lblEl.value.trim()){
+      var lbl=lblEl.value.trim();
+      var amt2=parseFloat(amtEl.value)||0;
+      saves.push(db.from('opening_balances').upsert([{wallet_key:'extra:'+lbl,label:lbl,amount_iqd:amt2,amount_usd:0}],{onConflict:'wallet_key'}));
+    }
+  }
+  var results=await Promise.all(saves);
+  var failed=results.filter(function(r){return r.error;});
+  if(failed.length){showToast('Some balances failed to save','error');return;}
+  showToast('Opening balances saved ✅');
+  renderGeneralTab();
+}
+
+async function removeExtraOB(id){
+  if(!confirm('Remove this opening balance entry?'))return;
+  await db.from('opening_balances').delete().eq('id',id);
+  renderGeneralTab();
+}
+
+// Load opening balances into a global for Finance to use
+var _openingBalances={value:{iqd:0,usd:0},partners:{},extras:[]};
+async function loadOpeningBalances(){
+  var r=await db.from('opening_balances').select('*');
+  var rows=r.data||[];
+  _openingBalances={value:{iqd:0,usd:0},partners:{},extras:[]};
+  rows.forEach(function(row){
+    if(row.wallet_key==='value'){_openingBalances.value={iqd:row.amount_iqd||0,usd:row.amount_usd||0};}
+    else if(row.wallet_key.startsWith('extra:')){_openingBalances.extras.push({label:row.label,iqd:row.amount_iqd||0});}
+    else{_openingBalances.partners[row.wallet_key]={iqd:row.amount_iqd||0,usd:row.amount_usd||0};}
+  });
 }
 
 // ══════════════════════ DENTISTS MANAGEMENT ══════════════════════
@@ -3631,7 +3805,30 @@ function buildAccPermsPanel(rolePerms){
   html+='</tbody></table></div>';
   return html;
 }
-var _accWorkingPerms=null;
+async function addInlineCustomRole(){
+  var name=prompt('Enter a name for the new role:\n(e.g. "X-ray Technician", "Lab Manager", "Finance Manager")');
+  if(!name||!name.trim())return;
+  name=name.trim();
+  // Check not duplicate
+  var builtIn=['admin','partner','dentist','assistant','receptionist'];
+  var existing=_customRoles.map(function(r){return r.name.toLowerCase();});
+  if(builtIn.indexOf(name.toLowerCase())>=0||existing.indexOf(name.toLowerCase())>=0){
+    showToast('A role with this name already exists','error');return;
+  }
+  var defaultPerms={sections:['dashboard'],crud:{patients:{c:false,e:false,d:false},appointments:{c:false,e:false,d:false},procedures:{c:false,e:false,d:false},billing:{c:false,e:false,d:false},payments:{c:false,e:false,d:false},cases:{c:false,e:false,d:false},stock:{c:false,e:false,d:false},labs:{c:false,e:false,d:false}},canSeeAllFinance:false,canManageAccounts:false,canSeeProcedureAdmin:false,canRecordProcedures:false,canSeeAllPatients:false,canUseStock:false,canAddStock:false};
+  var r=await db.from('custom_roles').insert([{name:name,permissions:defaultPerms}]).select().single();
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  // Add to _customRoles and to the dropdown immediately
+  _customRoles.push(r.data||{id:Date.now(),name:name,permissions:defaultPerms});
+  ROLE_PERMS[name]=defaultPerms;
+  var roleSelect=document.getElementById('acc-role');
+  var opt=document.createElement('option');
+  opt.value=name;opt.textContent=name+' (custom)';
+  roleSelect.appendChild(opt);
+  roleSelect.value=name;
+  onAccRoleChange();
+  showToast('Role "'+name+'" created ✅ — customize its permissions below');
+}
 function onAccRoleChange(){
   var role=document.getElementById('acc-role').value;
   var linkedWrap=document.getElementById('acc-linked-wrap');
@@ -5383,6 +5580,102 @@ async function deleteDiagItem(itemId){
   showToast('Finding deleted');
   var popup=document.getElementById('diag-edit-popup');if(popup)popup.remove();
   if(profState.pid)renderProf(profState.pid,profState.pname);
+}
+// ══════════════════ WALLET BORROWING / INTERNAL DEBTS ════════════
+function openWalletLoan(borrowerWallet,shortfallAmount,expenseId){
+  document.getElementById('wlm-borrower').value=borrowerWallet;
+  document.getElementById('wlm-expense-id').value=expenseId||'';
+  document.getElementById('wlm-amount').value=shortfallAmount||'';
+  document.getElementById('wlm-sub').textContent=borrowerWallet+' needs to borrow funds';
+  document.getElementById('wlm-info').textContent=
+    (shortfallAmount>0?borrowerWallet+' is short '+fu(shortfallAmount)+' IQD. ':'')+
+    'Record how much to borrow and which wallet will cover it.';
+  var lenderSel=document.getElementById('wlm-lender');
+  lenderSel.innerHTML='';
+  if(borrowerWallet!=='value')lenderSel.innerHTML+='<option value="value">&#128176; Value Wallet (clinic)</option>';
+  PARTNERS.forEach(function(p){
+    if(p!==borrowerWallet)lenderSel.innerHTML+='<option value="'+p+'">'+p+'\'s wallet</option>';
+  });
+  document.getElementById('wlm-notes').value='';
+  openMdl('wallet-loan-modal');
+}
+async function saveWalletLoan(){
+  var borrower=document.getElementById('wlm-borrower').value;
+  var lender=document.getElementById('wlm-lender').value;
+  var amount=parseFloat(document.getElementById('wlm-amount').value)||0;
+  var notes=document.getElementById('wlm-notes').value.trim()||null;
+  if(!amount){showToast('Enter loan amount','error');return;}
+  var r=await db.from('wallet_loans').insert([{
+    borrower_wallet:borrower,lender_wallet:lender,
+    amount:amount,currency:'IQD',notes:notes,status:'outstanding',date:fd(new Date())
+  }]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast('Loan recorded ✅ — visible in Finance → Internal Debts');
+  closeMdl('wallet-loan-modal');
+}
+function openNewLoanDialog(){
+  openWalletLoan(PARTNERS[0]||'value',0,'');
+}
+async function buildFLoans(){
+  var el=document.getElementById('fin-content');if(!el)return;
+  el.innerHTML='<div class="loader"><div class="spinner"></div></div>';
+  var r=await db.from('wallet_loans').select('*').order('date',{ascending:false});
+  var loans=r.data||[];
+  var outstanding=loans.filter(function(l){return l.status==='outstanding';});
+  var settled=loans.filter(function(l){return l.status==='settled';});
+  var totalOwed=outstanding.reduce(function(s,l){return s+Number(l.amount||0);},0);
+  var html='<div class="stats-row">'+
+    statC('var(--r50)','&#128202;','Outstanding loans',outstanding.length)+
+    statC('var(--a50)','&#128176;','Total owed (IQD)',fu(Math.round(totalOwed)))+
+    statC('var(--g50)','&#10003;','Settled',settled.length)+
+    '</div>'+
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">'+
+    '<button class="btn btnsm btnp" onclick="openNewLoanDialog()">+ Record loan</button></div>';
+  if(!outstanding.length&&!settled.length){
+    el.innerHTML=html+'<div style="text-align:center;padding:30px;color:var(--s400);">No internal loans recorded yet</div>';return;
+  }
+  if(outstanding.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--r600);text-transform:uppercase;margin-bottom:8px;">&#9888; Outstanding</div>'+
+    '<div class="vdc-card" style="margin-bottom:16px;"><div class="vdc-card-body" style="padding:0;">'+
+    outstanding.map(function(l){
+      return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--s100);">'+
+        '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--s800);">'+l.borrower_wallet+' borrowed from '+l.lender_wallet+'</div>'+
+        '<div style="font-size:10px;color:var(--s400);">'+(l.date||'—')+(l.notes?' · '+l.notes:'')+'</div></div>'+
+        '<div style="font-size:14px;font-weight:800;color:var(--r600);">'+fu(Number(l.amount||0))+'</div>'+
+        '<button class="btn btnsm btng" onclick="openRepayment(\''+l.id+'\',\''+l.borrower_wallet+'\',\''+l.lender_wallet+'\','+Number(l.amount||0)+')">&#128197; Repay</button>'+
+        '</div>';
+    }).join('')+'</div></div>';
+  }
+  if(settled.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--g600);text-transform:uppercase;margin-bottom:8px;">&#10003; Settled</div>'+
+    '<div class="vdc-card"><div class="vdc-card-body" style="padding:0;">'+
+    settled.slice(0,20).map(function(l){
+      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--s100);opacity:0.7;">'+
+        '<div style="flex:1;"><div style="font-size:11px;font-weight:600;color:var(--s700);">'+l.borrower_wallet+' → '+l.lender_wallet+'</div>'+
+        '<div style="font-size:10px;color:var(--s400);">'+(l.date||'—')+(l.notes?' · '+l.notes:'')+'</div></div>'+
+        '<div style="font-size:12px;font-weight:700;color:var(--g700);">'+fu(Number(l.amount||0))+' ✓</div></div>';
+    }).join('')+'</div></div>';
+  }
+  el.innerHTML=html;
+}
+function openRepayment(loanId,borrower,lender,amount){
+  document.getElementById('lrm-loan-id').value=loanId;
+  document.getElementById('lrm-amount').value=amount;
+  document.getElementById('lrm-date').value=fd(new Date());
+  document.getElementById('lrm-notes').value='';
+  document.getElementById('lrm-info').textContent=borrower+' repays '+fu(amount)+' IQD to '+lender;
+  openMdl('loan-repay-modal');
+}
+async function saveRepayment(){
+  var loanId=document.getElementById('lrm-loan-id').value;
+  var amount=parseFloat(document.getElementById('lrm-amount').value)||0;
+  var date=document.getElementById('lrm-date').value||fd(new Date());
+  var notes=document.getElementById('lrm-notes').value.trim()||null;
+  if(!amount){showToast('Enter repayment amount','error');return;}
+  var r=await db.from('wallet_loans').update({status:'settled',settled_amount:amount,settled_date:date,settled_notes:notes}).eq('id',loanId);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast('Repayment recorded ✅');
+  closeMdl('loan-repay-modal');buildFLoans();
 }
 async function renderDashboard(){
   document.getElementById('pg-actions').innerHTML='';
