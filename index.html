@@ -3906,51 +3906,6 @@ function resetPermissions(){
   localStorage.removeItem('vdc-role-perms');
   location.reload();
 }
-  var html=
-    '<div style="background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--a700);">'+
-    '&#9888; Admin always has full access and is the <strong>only role that can delete</strong>. Changes take effect on next login.</div>'+
-    '<div style="font-size:11px;font-weight:700;color:var(--s600);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">&#128274; Section access</div>'+
-    '<div style="overflow-x:auto;margin-bottom:20px;">'+
-    '<table style="width:100%;border-collapse:collapse;background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:hidden;">'+
-    '<thead><tr style="background:var(--s50);">'+
-    '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--s600);border-bottom:1px solid var(--s200);min-width:140px;">Section</th>'+
-    EDITABLE_ROLES.map(function(role){var c=ROLE_COLORS[role];return '<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;border-bottom:1px solid var(--s200);color:'+c+';min-width:90px;">'+role.charAt(0).toUpperCase()+role.slice(1)+'</th>';}).join('')+
-    '</tr></thead><tbody>'+
-    ALL_SECTIONS.filter(function(s){return s!=='settings';}).map(function(sec,idx){
-      return '<tr style="border-bottom:1px solid var(--s100);background:'+(idx%2===0?'white':'var(--s50)')+'">'+
-        '<td style="padding:10px 14px;font-size:12px;font-weight:600;color:var(--s700);">'+SECTION_LABELS[sec]+'</td>'+
-        EDITABLE_ROLES.map(function(role){var checked=ROLE_PERMS[role].sections.indexOf(sec)>=0;
-          return '<td style="text-align:center;padding:8px;"><input type="checkbox" data-ptype="section" data-role="'+role+'" data-key="'+sec+'" '+(checked?'checked':'')+' style="width:18px;height:18px;cursor:pointer;accent-color:var(--b600);" onchange="onPermChange2(this)"></td>';
-        }).join('')+'</tr>';
-    }).join('')+'</tbody></table></div>'+
-    '<div style="font-size:11px;font-weight:700;color:var(--s600);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">&#9998; Create / Edit / Delete permissions</div>'+
-    '<div style="font-size:11px;color:var(--s400);margin-bottom:10px;">C = Create &nbsp;·&nbsp; E = Edit &nbsp;·&nbsp; D = Delete (Admin only — always locked) &nbsp;·&nbsp; <span style="color:var(--a600);">&#9650; own = own records only</span></div>'+
-    '<div style="overflow-x:auto;margin-bottom:20px;">'+
-    '<table style="width:100%;border-collapse:collapse;background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:hidden;">'+
-    '<thead><tr style="background:var(--s50);">'+
-    '<th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--s600);border-bottom:1px solid var(--s200);min-width:130px;">Section</th>'+
-    EDITABLE_ROLES.map(function(role){var c=ROLE_COLORS[role];return '<th colspan="3" style="padding:8px 4px;text-align:center;font-size:11px;font-weight:700;border-bottom:1px solid var(--s200);border-left:2px solid '+c+'33;color:'+c+';">'+role.charAt(0).toUpperCase()+role.slice(1)+'</th>';}).join('')+
-    '</tr><tr style="background:var(--s50);"><th style="border-bottom:1px solid var(--s200);"></th>'+
-    EDITABLE_ROLES.map(function(role){var c=ROLE_COLORS[role];return ['C','E','D'].map(function(l,i){return '<th style="padding:4px 8px;text-align:center;font-size:10px;font-weight:700;border-bottom:1px solid var(--s200);'+(i===0?'border-left:2px solid '+c+'33;':'')+'color:'+(l==='D'?'var(--r400)':'var(--s500)')+';">'+l+'</th>';}).join('');}).join('')+'</tr></thead><tbody>'+
-    CRUD_SECTIONS.map(function(sec,idx){
-      return '<tr style="border-bottom:1px solid var(--s100);background:'+(idx%2===0?'white':'var(--s50)')+'">'+
-        '<td style="padding:10px 14px;font-size:12px;font-weight:600;color:var(--s700);">'+CRUD_LABELS[sec]+'</td>'+
-        EDITABLE_ROLES.map(function(role){var c=ROLE_COLORS[role];var crud=(ROLE_PERMS[role].crud||{})[sec]||{c:false,e:false,d:false};
-          return ['c','e','d'].map(function(k,ki){
-            if(k==='d')return '<td style="text-align:center;padding:6px;'+(ki===0?'border-left:2px solid '+c+'33;':'')+'"><span title="Admin only" style="font-size:14px;opacity:0.5;">&#128274;</span></td>';
-            var val=crud[k];var isOwn=val==="own";
-            return '<td style="text-align:center;padding:6px;'+(ki===0?'border-left:2px solid '+c+'33;':'')+'">'+
-              (isOwn?'<div style="display:inline-flex;flex-direction:column;align-items:center;gap:1px;"><input type="checkbox" checked data-ptype="crud" data-role="'+role+'" data-section="'+sec+'" data-key="'+k+'" style="width:16px;height:16px;cursor:pointer;accent-color:var(--a600);" onchange="onPermChange2(this)"><span style="font-size:8px;color:var(--a600);font-weight:700;">own</span></div>':
-              '<input type="checkbox" '+(val?'checked':'')+' data-ptype="crud" data-role="'+role+'" data-section="'+sec+'" data-key="'+k+'" style="width:16px;height:16px;cursor:pointer;accent-color:var(--b600);" onchange="onPermChange2(this)">')+
-              '</td>';
-          }).join('');
-        }).join('')+'</tr>';
-    }).join('')+'</tbody></table></div>'+
-    '<div style="display:flex;gap:10px;justify-content:flex-end;">'+
-    '<button class="btn" onclick="resetPermissions()">Reset to defaults</button>'+
-    '<button class="btn btnp" onclick="savePermissions()">&#10003; Save all permissions</button>'+
-    '</div>';
-  document.getElementById('settings-body').innerHTML=html;
 // ══════════════════════ LABS ══════════════════════════════════════
 var LAB_PROCS=['Crown (PFM)','Crown (zirconia)','Crown (metal)','Implant crown','Bridge (PFM)','Bridge (zirconia)','Veneer','Denture (full)','Denture (partial)'];
 function getLabProcs(){
