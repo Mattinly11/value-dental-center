@@ -5303,8 +5303,14 @@ async function openNewDiagItem(planId){
       document.getElementById('dim-save-btn').style.display='none';
     }
   }
-  renderDiagChart();
+  // Open the modal first, THEN render chart (modal DOM must exist first)
   openMdl('diag-item-modal');
+  // Use requestAnimationFrame + setTimeout to guarantee DOM is painted
+  requestAnimationFrame(function(){
+    setTimeout(function(){
+      renderDiagChart();
+    },60);
+  });
 }
 
 async function saveAllDiagItems(){
