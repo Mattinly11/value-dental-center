@@ -4994,18 +4994,33 @@ async function initStockNotifications(){
 }
 // ══════════════════════ DIAGNOSIS & TREATMENT PLAN ═══════════════
 var diagSelTeeth={}, diagIsPrim=false;
-var _diagPendingItems=[]; // holds items being built before saving
+var _diagPendingItems=[];
+var _diagExistingTeeth={}; // teeth already saved in DB for this plan — shown as yellow
 
 function renderDiagChart(){
   var el=document.getElementById('dim-chart');if(!el)return;
-  el.innerHTML=buildChart({},diagSelTeeth,diagIsPrim);
+  // Build combined states: existing=diagplanned(yellow), pending=diagplanned2(orange), selected=blue
+  var combinedStates={};
+  // 1. Existing saved teeth — yellow
+  Object.keys(_diagExistingTeeth).forEach(function(t){combinedStates[Number(t)]='diagplanned';});
+  // 2. Pending (added this session but not yet saved) — amber
+  _diagPendingItems.forEach(function(item){
+    if(!item.teeth)return;
+    item.teeth.split(',').map(function(t){return parseInt(t.trim());}).filter(function(n){return !isNaN(n);}).forEach(function(n){
+      if(!combinedStates[n])combinedStates[n]='diagplanned';
+    });
+  });
+  el.innerHTML=buildChart(combinedStates,diagSelTeeth,diagIsPrim);
   el.querySelectorAll('.tooth-btn').forEach(function(btn){
     var m=btn.getAttribute('onclick').match(/procTT\((\d+)\)/);
     if(m)btn.setAttribute('onclick','diagTT('+m[1]+')');
   });
   var c=Object.keys(diagSelTeeth).length;
   var lbl=document.getElementById('dim-sel-lbl');
-  if(lbl)lbl.textContent=c>0?c+' '+(c===1?'tooth':'teeth')+' selected':'No teeth selected (general)';
+  var existCount=Object.keys(_diagExistingTeeth).length+_diagPendingItems.filter(function(i){return i.teeth;}).reduce(function(s,i){return s+i.teeth.split(',').length;},0);
+  var selText=c>0?c+' '+(c===1?'tooth':'teeth')+' selected':'No teeth selected (general)';
+  var existText=existCount>0?' &nbsp;·&nbsp; <span style="color:var(--a700);">&#9679; '+existCount+' already diagnosed</span>':'';
+  if(lbl)lbl.innerHTML=selText+existText;
 }
 function diagTT(n){if(diagSelTeeth[n])delete diagSelTeeth[n];else diagSelTeeth[n]=true;renderDiagChart();}
 function diagQS(type){
@@ -5047,7 +5062,8 @@ function addDiagItemToList(){
   };
   _diagPendingItems.push(item);
   renderDiagPendingList();
-  // Clear form fields for next entry (keep chart open)
+  renderDiagChart(); // refresh chart to show newly added teeth
+  // Clear form for next entry
   diagSelTeeth={};renderDiagChart();
   document.getElementById('dim-treatment').value='';
   document.getElementById('dim-cost').value='';
@@ -5058,22 +5074,37 @@ function renderDiagPendingList(){
   var wrap=document.getElementById('dim-pending-wrap');
   var list=document.getElementById('dim-pending-list');
   var saveBtn=document.getElementById('dim-save-btn');
-  if(!_diagPendingItems.length){
+  if(!_diagPendingItems.length&&!Object.keys(_diagExistingTeeth).length){
     if(wrap)wrap.style.display='none';
     if(saveBtn)saveBtn.style.display='none';
     return;
   }
   if(wrap)wrap.style.display='block';
-  if(saveBtn)saveBtn.style.display='inline-flex';
-  list.innerHTML=_diagPendingItems.map(function(item,idx){
-    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-bottom:1px solid var(--g100);">'+
-      (item.teeth?'<span style="font-size:10px;font-weight:700;background:var(--a50);color:var(--a700);padding:2px 7px;border-radius:20px;border:1px solid var(--a200);">'+item.teeth+'</span>':'<span style="font-size:10px;color:var(--s400);">General</span>')+
-      '<span style="font-size:12px;font-weight:600;flex:1;">'+item.treatment+'</span>'+
-      (item.estimated_cost?'<span style="font-size:11px;color:var(--b700);">'+fmtAmt(item.estimated_cost,item.cost_currency||'IQD')+'</span>':'')+
-      (item.notes?'<span style="font-size:10px;color:var(--s400);font-style:italic;">'+item.notes+'</span>':'')+
-      '<button onclick="removeDiagPending('+idx+')" style="background:none;border:none;cursor:pointer;color:var(--r500);font-size:14px;padding:0 4px;">&#10005;</button>'+
-      '</div>';
-  }).join('');
+  if(saveBtn)saveBtn.style.display=_diagPendingItems.length?'inline-flex':'none';
+  // If we have a separate pending-new container, use it; otherwise use list
+  var pendingContainer=document.getElementById('dim-pending-new')||list;
+  if(pendingContainer===list){
+    list.innerHTML=_diagPendingItems.map(function(item,idx){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-bottom:1px solid var(--g100);">'+
+        (item.teeth?'<span style="font-size:10px;font-weight:700;background:var(--a50);color:var(--a700);padding:2px 7px;border-radius:20px;border:1px solid var(--a200);">'+item.teeth+'</span>':'<span style="font-size:10px;color:var(--s400);">General</span>')+
+        '<span style="font-size:12px;font-weight:600;flex:1;">'+item.treatment+'</span>'+
+        (item.estimated_cost?'<span style="font-size:11px;color:var(--b700);">'+fmtAmt(item.estimated_cost,item.cost_currency||'IQD')+'</span>':'')+
+        (item.notes?'<span style="font-size:10px;color:var(--s400);font-style:italic;">'+item.notes+'</span>':'')+
+        '<button onclick="removeDiagPending('+idx+')" style="background:none;border:none;cursor:pointer;color:var(--r500);font-size:14px;padding:0 4px;">&#10005;</button>'+
+        '</div>';
+    }).join('');
+  } else {
+    pendingContainer.innerHTML=(_diagPendingItems.length?
+      '<div style="font-size:10px;color:var(--g700);margin:6px 0 4px;font-weight:600;">&#10010; New findings (not saved yet):</div>'+
+      _diagPendingItems.map(function(item,idx){
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;background:var(--g50);border-radius:4px;margin-bottom:3px;">'+
+          (item.teeth?'<span style="font-size:10px;font-weight:700;background:var(--g100);color:var(--g700);padding:1px 7px;border-radius:20px;">'+item.teeth+'</span>':'<span style="font-size:10px;color:var(--s400);">General</span>')+
+          '<span style="font-size:12px;font-weight:600;flex:1;">'+item.treatment+'</span>'+
+          (item.estimated_cost?'<span style="font-size:11px;color:var(--b700);">'+fmtAmt(item.estimated_cost,item.cost_currency||'IQD')+'</span>':'')+
+          '<button onclick="removeDiagPending('+idx+')" style="background:none;border:none;cursor:pointer;color:var(--r500);font-size:14px;padding:0 4px;">&#10005;</button>'+
+          '</div>';
+      }).join(''):'');
+  }
 }
 
 function removeDiagPending(idx){
@@ -5220,6 +5251,7 @@ async function buildDiagReportHTML(planId){
 
 async function openNewDiagItem(planId){
   _diagPendingItems=[];
+  _diagExistingTeeth={};
   diagSelTeeth={};diagIsPrim=false;
   document.getElementById('dim-plan-id').value=planId;
   document.getElementById('dim-cost').value='';
@@ -5229,6 +5261,16 @@ async function openNewDiagItem(planId){
   var pb=document.getElementById('dim-perm-btn'),prb=document.getElementById('dim-prim-btn');
   if(pb)pb.style.cssText='background:var(--b600);color:white;border-color:var(--b600);';
   if(prb)prb.style.cssText='';
+  // Load existing items for this plan — show them as yellow on the chart
+  var existR=await db.from('diagnosis_items').select('*').eq('plan_id',planId);
+  var existItems=existR.data||[];
+  existItems.forEach(function(item){
+    if(!item.teeth)return;
+    item.teeth.split(',').map(function(t){return parseInt(t.trim());}).filter(function(n){return !isNaN(n);}).forEach(function(n){
+      _diagExistingTeeth[n]={treatment:item.treatment,status:item.status};
+    });
+  });
+  // Load procedures
   await loadProcDefs();
   var tSel=document.getElementById('dim-treatment');
   tSel.innerHTML='<option value="">Select from your procedures...</option>';
@@ -5238,14 +5280,30 @@ async function openNewDiagItem(planId){
     cats[cat].forEach(function(p){var o=document.createElement('option');o.value=p.name;o.textContent=p.name+(p.price?' ('+fmtAmt(p.price,p.currency)+')'  :'');og.appendChild(o);});
     tSel.appendChild(og);
   });
-  // Auto-fill cost when treatment selected
   tSel.onchange=function(){
     var def=allProcDefs.find(function(p){return p.name===tSel.value;});
     if(def&&def.price){document.getElementById('dim-cost').value=def.price;document.getElementById('dim-curr').value=def.currency||'IQD';}
     else{document.getElementById('dim-cost').value='';}
   };
+  // Show existing items summary above the chart
+  if(existItems.length){
+    var wrap=document.getElementById('dim-pending-wrap');
+    var list=document.getElementById('dim-pending-list');
+    if(wrap&&list){
+      wrap.style.display='block';
+      var existHeader='<div style="font-size:10px;color:var(--s500);margin-bottom:4px;font-weight:600;">Already in this plan (saved):</div>'+
+        existItems.map(function(item){
+          return '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;background:var(--a50);border-radius:4px;margin-bottom:3px;">'+
+            (item.teeth?'<span style="font-size:10px;font-weight:700;background:var(--a100);color:var(--a700);padding:1px 7px;border-radius:20px;">'+item.teeth+'</span>':'<span style="font-size:10px;color:var(--s400);">General</span>')+
+            '<span style="font-size:11px;font-weight:600;flex:1;">'+item.treatment+'</span>'+
+            (item.estimated_cost>0?'<span style="font-size:10px;color:var(--b700);">'+fmtAmt(item.estimated_cost,item.cost_currency||'IQD')+'</span>':'')+
+            '</div>';
+        }).join('');
+      list.innerHTML=existHeader+'<div id="dim-pending-new"></div>';
+      document.getElementById('dim-save-btn').style.display='none';
+    }
+  }
   renderDiagChart();
-  renderDiagPendingList();
   openMdl('diag-item-modal');
 }
 
