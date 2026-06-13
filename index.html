@@ -469,8 +469,13 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <div class="fg">
       <div class="fgrp"><label class="flbl">Patient <span class="req">*</span></label>
         <div style="display:flex;gap:8px;">
-          <input class="finp" id="am-patient" list="pt-dl" placeholder="Type patient name..." autocomplete="off" style="flex:1;" oninput="checkPatientBalance(this.value)">
+          <input class="finp" id="am-patient" list="pt-dl" placeholder="Type patient name..." autocomplete="off" style="flex:1;" oninput="onAmPatientInput(this.value)">
           <button type="button" class="btn btnsm btnp" onclick="openAddPtFromAppt()" title="Register new patient" style="flex-shrink:0;white-space:nowrap;">+ New patient</button>
+        </div>
+        <input type="hidden" id="am-pid">
+        <div id="am-dup-warn" style="display:none;margin-top:6px;background:var(--a50);border:1px solid var(--a200);border-radius:var(--radsm);padding:8px 10px;font-size:11px;color:var(--a700);">
+          &#9888; Multiple patients have this name — <strong>select the correct one:</strong>
+          <select class="finp" id="am-dup-select" style="margin-top:6px;font-size:12px;" onchange="onAmDupSelect(this.value)"></select>
         </div>
         <datalist id="pt-dl"></datalist></div>
       <div class="fgrp"><label class="flbl">Dentist <span class="req">*</span></label>
@@ -2452,7 +2457,8 @@ function buildSG(containerId,cur,fn){
 // APPOINTMENT MODAL
 async function openNewAppt(){
   document.getElementById('am-mtit').textContent='Book appointment';
-  ['am-id','am-patient','am-notes'].forEach(function(i){document.getElementById(i).value='';});
+  ['am-id','am-patient','am-notes','am-pid'].forEach(function(i){document.getElementById(i).value='';});
+  var dupWarn=document.getElementById('am-dup-warn');if(dupWarn)dupWarn.style.display='none';
   document.getElementById('am-dr').value='';document.getElementById('am-room').value='';
   // reset open case panel and balance warning — must be hidden until patient is chosen
   var cp=document.getElementById('am-case-panel');if(cp)cp.style.display='none';
@@ -2489,8 +2495,51 @@ async function openNewAppt(){
   var dl=document.getElementById('pt-dl');if(dl)dl.innerHTML=allPts.map(function(p){return '<option value="'+p.name+'">';}).join('');
   openMdl('am-modal');
 }
+// Resolve the typed name to a patient_id — handles duplicate names safely
+function onAmPatientInput(typedName){
+  var name=(typedName||'').trim();
+  var dupWarn=document.getElementById('am-dup-warn');
+  var pidEl=document.getElementById('am-pid');
+  if(!name){pidEl.value='';if(dupWarn)dupWarn.style.display='none';checkPatientBalance(name);return;}
+  // Find all patients with this exact name (case-insensitive)
+  var matches=allPts.filter(function(p){return (p.name||'').trim().toLowerCase()===name.toLowerCase();});
+  if(matches.length===1){
+    pidEl.value=matches[0].id;
+    if(dupWarn)dupWarn.style.display='none';
+  } else if(matches.length>1){
+    // Duplicate names — show disambiguation dropdown with phone numbers
+    pidEl.value=''; // force selection
+    if(dupWarn){
+      dupWarn.style.display='block';
+      var sel=document.getElementById('am-dup-select');
+      sel.innerHTML='<option value="">Select which patient...</option>'+
+        matches.map(function(p){
+          return '<option value="'+p.id+'">'+p.name+' — '+(p.phone||'no phone')+(p.dob?' · '+age(p.dob)+'y':'')+'</option>';
+        }).join('');
+    }
+  } else {
+    // No exact match (new patient name being typed)
+    pidEl.value='';
+    if(dupWarn)dupWarn.style.display='none';
+  }
+  checkPatientBalance(name);
+}
+function onAmDupSelect(pid){
+  document.getElementById('am-pid').value=pid;
+  if(pid){
+    var p=allPts.find(function(x){return x.id===pid;});
+    if(p)checkPatientBalance(p.name);
+  }
+}
 function openNewApptAt(room,time){openNewAppt().then(function(){document.getElementById('am-room').value=room;document.getElementById('am-start').value=time;var dur=parseInt((document.getElementById('am-dur')||{}).value||2);document.getElementById('am-end').value=m2t(t2m(time)+dur*15);});}
-function openApptForPt(pname){openNewAppt();document.getElementById('am-patient').value=pname;}
+// pid is the patient's unique ID — always pass this when booking from a patient profile
+function openApptForPt(pid,pname){
+  openNewAppt().then(function(){
+    document.getElementById('am-patient').value=pname;
+    document.getElementById('am-pid').value=pid||'';
+    var dupWarn=document.getElementById('am-dup-warn');if(dupWarn)dupWarn.style.display='none';
+  });
+}
 function selAS(k){document.getElementById('am-status').value=k;buildSG('am-status-grid',k,'selAS');}
 async function deleteAppt(){
   var id=document.getElementById('am-id').value;if(!id||!confirm('Cancel appointment?'))return;
@@ -2567,6 +2616,8 @@ function editApptDetail(){
   closeMdl('ad-modal');
   document.getElementById('am-mtit').textContent='Edit appointment';
   document.getElementById('am-id').value=a.id;document.getElementById('am-patient').value=a.patient_name||'';
+  document.getElementById('am-pid').value=a.patient_id||'';
+  var dupWarn=document.getElementById('am-dup-warn');if(dupWarn)dupWarn.style.display='none';
   document.getElementById('am-dr').value=a.dentist||'';document.getElementById('am-room').value=a.room||'';
   document.getElementById('am-date').value=a.date||'';document.getElementById('am-start').value=a.start_time||'';
   document.getElementById('am-end').value=a.end_time||'';document.getElementById('am-proc').value=a.procedure_type||'';
@@ -6351,8 +6402,9 @@ async function savePatient(){
     status:document.getElementById('pt-status').value,
     primary_dentist:document.getElementById('pt-dr').value||null,
     medical_notes:document.getElementById('pt-notes').value.trim()||null};
-  var r=id?await db.from('patients').update(payload).eq('id',id):await db.from('patients').insert([payload]);
+  var r=id?await db.from('patients').update(payload).eq('id',id):await db.from('patients').insert([payload]).select().single();
   if(r.error){showToast('Failed to save','error');return;}
+  var newPatientId=id||(r.data&&r.data.id)||null;
   // refresh patient list
   var allPtsRes=await db.from('patients').select('*').order('name');
   if(!allPtsRes.error)allPts=allPtsRes.data||[];
@@ -6360,9 +6412,10 @@ async function savePatient(){
   closeMdl('pt-modal');
   if(_returnToAppt){
     _returnToAppt=false;
-    // return to appointment booking with name pre-filled
+    // return to appointment booking with name AND id pre-filled
     await openNewAppt();
     document.getElementById('am-patient').value=name;
+    document.getElementById('am-pid').value=newPatientId||'';
     // refresh datalist
     var dl=document.getElementById('pt-dl');
     if(dl)dl.innerHTML=allPts.map(function(p){return '<option value="'+p.name+'">';}).join('');
@@ -6419,7 +6472,7 @@ async function saveNextVisit(){
   if(!room){showToast('Select a room','error');return;}
   var end=m2t(t2m(time)+dur);
   var r=await db.from('appointments').insert([{
-    patient_name:pname,dentist:dentist||null,room:room,date:date,
+    patient_name:pname,patient_id:profState.pid||null,dentist:dentist||null,room:room,date:date,
     start_time:time,end_time:end,
     procedure_type:proc||null,status:'open'
   }]);
@@ -7021,6 +7074,15 @@ async function saveAppt(){
   var start=document.getElementById('am-start').value,end=document.getElementById('am-end').value;
   if(!pt||!dr||!room||!date||!start||!end){showToast('Fill all required fields','error');return;}
   if(t2m(end)<=t2m(start)){showToast('End must be after start','error');return;}
+  var pid=document.getElementById('am-pid').value||null;
+  // If multiple patients share this name and none was selected, block save
+  var matches=allPts.filter(function(p){return (p.name||'').trim().toLowerCase()===pt.toLowerCase();});
+  if(matches.length>1&&!pid){
+    showToast('Multiple patients named "'+pt+'" — please select which one above','error');
+    var dupWarn=document.getElementById('am-dup-warn');if(dupWarn)dupWarn.style.display='block';
+    return;
+  }
+  if(matches.length===1&&!pid)pid=matches[0].id;
   var id=document.getElementById('am-id').value;
   var status=document.getElementById('am-status').value||'open';
   var amTeeth=Object.keys(amSelTeeth).map(function(n){return parseInt(n);}).sort(function(a,b){return a-b;});
@@ -7031,7 +7093,7 @@ async function saveAppt(){
   var sessOpt=sessSel?sessSel.options[sessSel.selectedIndex]:null;
   var sessionName=sessOpt&&sessOpt.dataset.sessionName?sessOpt.dataset.sessionName:null;
   var sessionId=sessSel&&sessSel.value?sessSel.value:null;
-  var payload={patient_name:pt,dentist:dr,room:room,date:date,start_time:start,end_time:end,
+  var payload={patient_name:pt,patient_id:pid,dentist:dr,room:room,date:date,start_time:start,end_time:end,
     procedure_type:document.getElementById('am-proc').value||null,
     notes:document.getElementById('am-notes').value.trim()||null,
     status:status,teeth:amTeeth.length>0?amTeeth:null,
@@ -7468,7 +7530,7 @@ async function renderProf(id,name,tab){
     db.from('patients').select('*').eq('id',id).single(),
     db.from('invoices').select('*').eq('patient_id',id).order('date',{ascending:false}),
     db.from('procedures').select('*').eq('patient_id',id).order('date',{ascending:false}),
-    db.from('appointments').select('*').ilike('patient_name',name).order('date',{ascending:false}),
+    db.from('appointments').select('*').eq('patient_id',id).order('date',{ascending:false}),
     db.from('lab_orders').select('*').eq('patient_id',id).order('created_at',{ascending:false}).then(function(r){return r.error?{data:[]}:r;}),
     db.from('cases').select('*').eq('patient_id',id).order('created_at',{ascending:false}).then(function(r){return r.error?{data:[]}:r;})
   ]);
@@ -7484,6 +7546,16 @@ async function renderProf(id,name,tab){
   }
   var procs=results[2].data||[];
   var appts=results[3].data||[];
+  // LEGACY FALLBACK: appointments created before patient_id existed have patient_id=null.
+  // Only show them by name if this patient's name is UNIQUE across all patients —
+  // prevents data leaking between two different patients who happen to share a name.
+  if(appts.length===0){
+    var nameMatches=allPts.filter(function(pt){return (pt.name||'').trim().toLowerCase()===(p.name||'').trim().toLowerCase();});
+    if(nameMatches.length<=1){
+      var legacyR=await db.from('appointments').select('*').is('patient_id',null).ilike('patient_name',p.name).order('date',{ascending:false});
+      if(!legacyR.error&&legacyR.data&&legacyR.data.length)appts=legacyR.data;
+    }
+  }
   var labOrders=results[4].data||[];
   var cases=results[5].data||[];
   // Load case_visits via case IDs (case_visits has no patient_id column)
@@ -7520,7 +7592,7 @@ async function renderProf(id,name,tab){
     statC('var(--s50)','&#9719;','Appointments',appts.length)+
     '</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">'+
-    '<button class="btn btnp btnsm" onclick="openApptForPt(\''+p.name.replace(/'/g,'&#39;')+'\')">&#128197; Book appointment</button>'+
+    '<button class="btn btnp btnsm" onclick="openApptForPt(\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">&#128197; Book appointment</button>'+
     '<button class="btn btnsm" onclick="openAddProc(\''+id+'\')">&#10022; Record procedure</button>'+
     '</div>';
 
@@ -7551,7 +7623,7 @@ async function renderProf(id,name,tab){
         '</div></div>'+
         '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">'+
         (caseBal>0&&cs.invoice_id?'<button class="btn btnp btnxs" onclick="event.stopPropagation();openInvDetail(\''+cs.invoice_id+'\',\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\')">Pay</button>':'')+
-        '<button class="btn btnxs" onclick="event.stopPropagation();openApptForContinue(\''+p.name.replace(/'/g,'&#39;')+'\',\''+cs.id+'\',\''+cs.procedure_name.replace(/'/g,'&#39;')+'\')">+ Session</button>'+
+        '<button class="btn btnxs" onclick="event.stopPropagation();openApptForContinue(\''+id+'\',\''+p.name.replace(/'/g,'&#39;')+'\',\''+cs.id+'\',\''+cs.procedure_name.replace(/'/g,'&#39;')+'\')">+ Session</button>'+
         '</div></div>'+
         // Visits list
         '<div class="case-visits" id="case-visits-'+cs.id+'" style="display:none;">'+
@@ -7801,9 +7873,11 @@ async function markVisitLabReceived(visitId, pid, pname){
   renderProf(pid,pname);
 }
 
-async function openApptForContinue(pname, caseId, procName){
+async function openApptForContinue(pid, pname, caseId, procName){
   await openNewAppt();
   document.getElementById('am-patient').value=pname;
+  document.getElementById('am-pid').value=pid||'';
+  var dupWarn=document.getElementById('am-dup-warn');if(dupWarn)dupWarn.style.display='none';
   // Trigger open case detection
   await checkPatientBalance(pname);
   // Pre-select the case in the session dropdown
