@@ -1051,6 +1051,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <div class="msub" id="sal-sub">Monthly salary payment</div>
     <input type="hidden" id="sal-staff-id">
     <input type="hidden" id="sal-staff-name">
+    <input type="hidden" id="sal-category" value="Staff salaries">
     <div class="fgrp"><label class="flbl">Amount (IQD) <span class="req">*</span></label>
       <input class="finp" type="number" id="sal-amount" placeholder="0" min="0"></div>
     <div class="fgrp"><label class="flbl">Paid from wallet <span class="req">*</span></label>
@@ -3052,6 +3053,7 @@ function buildFO(){
       '<div style="font-size:9px;color:'+c.c+';font-weight:600;">🇺🇸 USD</div>'+
       '<div style="font-size:15px;font-weight:700;color:'+c.c+';">'+fusd(gUSD)+'</div></div>':'')+
       '<div style="font-size:10px;color:'+c.c+';margin-top:4px;border-top:1px solid '+c.border+';padding-top:4px;">- clinic exp: '+fiqd(Math.round(expPP))+(personalExp>0?' — personal: '+fiqd(Math.round(personalExp)):'')+'</div>'+
+      (canDo('create','payments')?'<button class="btn btnxs btnp" style="width:100%;margin-top:8px;" onclick="openSalaryPayment(\'\',\''+p.replace(/'/g,'&#39;')+'\','+Math.round(netIQD)+',\''+p.replace(/'/g,'&#39;')+'\',\'Partner withdrawal\',\'Withdraw — '+p.replace(/'/g,'&#39;')+'\')">&#128176; Withdraw</button>':'')+
       '</div>';
   });
   html+='</div>';
@@ -3163,9 +3165,12 @@ function buildFD(){
       '<div style="font-size:9px;color:#C2410C;font-weight:600;margin-bottom:2px;">&#127482;&#127480; USD WALLET</div>'+
       '<div style="font-size:15px;font-weight:700;color:#C2410C;">'+fusd(earnUSD)+'</div></div>':'')+
       '</div>'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'+
       (isPaid?'<span class="badge bg">&#10003; Paid</span>':'<span class="badge br">Not paid yet</span>')+
-      '<button class="btn btnxs" data-dr="'+dr+'" onclick="togDrPaidBtn(this)">'+(isPaid?'Undo':'Mark paid')+'</button></div>'+
+      '<div style="display:flex;gap:6px;">'+
+      '<button class="btn btnxs" data-dr="'+dr+'" onclick="togDrPaidBtn(this)">'+(isPaid?'Undo':'Mark paid')+'</button>'+
+      '<button class="btn btnxs btnp" onclick="openSalaryPayment(\'\',\''+dr.replace(/'/g,'&#39;')+'\','+Math.round(earnIQD)+',\'value\',\'Dentist payroll\',\'Pay dentist — '+dr.replace(/'/g,'&#39;')+'\')">&#128176; Pay dentist</button>'+
+      '</div></div>'+
       '</div></div>';
   });
   return html+'</div>';
@@ -3305,10 +3310,11 @@ async function deleteExpense(id){
 }
 
 // ══════════ SALARY PAYMENTS ════════════════════════════════════
-async function openSalaryPayment(staffId,staffName,defaultAmount,defaultWallet){
-  document.getElementById('sal-title').textContent='Pay salary — '+staffName;
-  document.getElementById('sal-staff-id').value=staffId;
+async function openSalaryPayment(staffId,staffName,defaultAmount,defaultWallet,category,title){
+  document.getElementById('sal-title').textContent=title||('Pay salary — '+staffName);
+  document.getElementById('sal-staff-id').value=staffId||'';
   document.getElementById('sal-staff-name').value=staffName;
+  document.getElementById('sal-category').value=category||'Staff salaries';
   document.getElementById('sal-date').value=fd(new Date());
   document.getElementById('sal-notes').value='';
   var walletSel=document.getElementById('sal-wallet');
@@ -3318,31 +3324,34 @@ async function openSalaryPayment(staffId,staffName,defaultAmount,defaultWallet){
   // Load pending adjustments for this staff member
   var adjR=await db.from('staff_adjustments').select('*').eq('staff_name',staffName);
   var allAdjs=adjR.data||[];
-  // Filter unpaid adjustments (those not yet included in a salary payment)
   var pendingRewards=allAdjs.filter(function(a){return a.type==='reward'&&!a.paid;}).reduce(function(s,a){return s+Number(a.amount||0);},0);
   var pendingPenalties=allAdjs.filter(function(a){return a.type==='penalty'&&!a.paid;}).reduce(function(s,a){return s+Number(a.amount||0);},0);
   var base=parseFloat(defaultAmount)||0;
   var net=base+pendingRewards-pendingPenalties;
-  document.getElementById('sal-amount').value=net;
-  // Show calculation breakdown in the sub text
+  // For "Pay amount" — start EMPTY so the admin enters it manually, but show the calculated net as a reference
+  document.getElementById('sal-amount').value='';
   var sub=document.getElementById('sal-sub');
   if(sub){
-    var parts=['Base: '+fu(base)];
+    var parts=['Earned/owed: '+fu(base)];
     if(pendingRewards>0)parts.push('<span style="color:var(--g700);">+ Rewards: '+fu(pendingRewards)+'</span>');
     if(pendingPenalties>0)parts.push('<span style="color:var(--r600);">− Penalties: '+fu(pendingPenalties)+'</span>');
-    parts.push('<strong>Net: '+fu(net)+'</strong>');
+    parts.push('<strong>Suggested: '+fu(net)+'</strong>');
     sub.innerHTML=parts.join(' &nbsp;·&nbsp; ');
   }
   openMdl('salary-modal');
 }
 async function saveSalaryPayment(){
   var staffId=document.getElementById('sal-staff-id').value;
+  // staff_id column is uuid — only pass it if it looks like a valid uuid, else null
+  var uuidRe=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if(!uuidRe.test(staffId))staffId=null;
   var staffName=document.getElementById('sal-staff-name').value;
   var amount=parseFloat(document.getElementById('sal-amount').value)||0;
   var wallet=document.getElementById('sal-wallet').value||'value';
   var date=document.getElementById('sal-date').value||fd(new Date());
   var notes=document.getElementById('sal-notes').value.trim()||null;
-  if(!amount){showToast('Enter salary amount','error');return;}
+  var category=document.getElementById('sal-category').value||'Staff salaries';
+  if(!amount){showToast('Enter the amount paid','error');return;}
   var r=await db.from('salary_payments').insert([{
     staff_id:staffId,staff_name:staffName,amount:amount,
     currency:'IQD',wallet:wallet,date:date,notes:notes
@@ -3350,12 +3359,12 @@ async function saveSalaryPayment(){
   if(r.error){showToast('Failed: '+r.error.message,'error');return;}
   // Also record as expense so it affects the wallet
   await db.from('expenses').insert([{
-    category:'Staff salaries',
-    description:'Salary: '+staffName+(notes?' — '+notes:''),
+    category:category,
+    description:category+': '+staffName+(notes?' — '+notes:''),
     amount:amount,currency:'IQD',wallet:wallet,
     date:date,type:'salary'
   }]).then(function(r){if(r.error)console.warn('Expense log warn:',r.error.message);});
-  showToast('Salary payment recorded ✅');
+  showToast('Payment recorded ✅');
   closeMdl('salary-modal');
   var r2=await db.from('expenses').select('*');finExps=r2.data||[];buildFinTab();
 }
@@ -6594,8 +6603,7 @@ async function openPayModalFromAppt(invId, invSummary){
   document.getElementById('pay-pid').value=inv.patient_id||'';
   document.getElementById('pay-pname').value=inv.patient_name||'';
   document.getElementById('pay-msub').textContent=(inv.procedure_name||'Procedure')+' · '+(inv.date||'');
-  document.getElementById('pay-amt-iqd').value=bal>0?Math.round(bal):'';
-  document.getElementById('pay-amt-usd').value='';
+  document.getElementById('pay-amt-iqd').value='';
   document.getElementById('pay-amt-usd').value='';
   document.getElementById('pay-date').value=fd(new Date());
   document.getElementById('pay-rate').value=IQD;
