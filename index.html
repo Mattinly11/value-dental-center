@@ -1184,6 +1184,52 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
   </div>
 </div>
 
+<!-- CUSTOM WHATSAPP TEMPLATE MODAL -->
+<div class="mbg" id="wa-custom-modal">
+  <div class="modal" style="max-width:520px;">
+    <div class="mtit" id="wa-custom-title">New special occasion message</div>
+    <div class="msub">Write the message in Arabic and Kurdish — use {{1}} for the patient's name</div>
+    <input type="hidden" id="wact-id">
+    <div class="fgrp"><label class="flbl">Title (for your reference) <span class="req">*</span></label>
+      <input class="finp" id="wact-title" placeholder="e.g. Newroz / Kurdish New Year"></div>
+    <div class="fgrp"><label class="flbl">&#127462;&#127479; Arabic</label>
+      <textarea class="finp" id="wact-ar" dir="rtl" rows="3" placeholder="نص الرسالة بالعربية..."></textarea></div>
+    <div class="fgrp"><label class="flbl">&#127472;&#127482; Kurdish</label>
+      <textarea class="finp" id="wact-ku" dir="rtl" rows="3" placeholder="دەقی پەیامەکە بە کوردی..."></textarea></div>
+    <div class="mac">
+      <button class="btn btnr" id="wact-del-btn" style="display:none;margin-right:auto;" onclick="deleteCustomTplFromModal()">Delete</button>
+      <button class="btn" onclick="closeMdl('wa-custom-modal')">Cancel</button>
+      <button class="btn btnp" onclick="saveCustomTpl()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- WHATSAPP BROADCAST MODAL -->
+<div class="mbg" id="wa-broadcast-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="mtit">&#128226; Send broadcast</div>
+    <div class="msub" id="wabc-sub">Choose who receives this message</div>
+    <input type="hidden" id="wabc-tpl-id">
+    <div class="fgrp"><label class="flbl">Audience</label>
+      <select class="finp" id="wabc-audience">
+        <option value="all">All patients (with WhatsApp opted-in)</option>
+        <option value="ar">Arabic-speaking patients only</option>
+        <option value="ku">Kurdish-speaking patients only</option>
+        <option value="active">Active patients only</option>
+      </select></div>
+    <div style="background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:10px 12px;font-size:11px;color:var(--a700);margin-bottom:8px;" id="wabc-count">
+      Calculating recipients...
+    </div>
+    <div style="background:var(--r50);border:1px solid var(--r100);border-radius:var(--radsm);padding:10px 12px;font-size:11px;color:var(--r700);margin-bottom:8px;">
+      &#9888; This sends a real WhatsApp message to every matched patient immediately. This cannot be undone.
+    </div>
+    <div class="mac">
+      <button class="btn" onclick="closeMdl('wa-broadcast-modal')">Cancel</button>
+      <button class="btn btnp" onclick="confirmBroadcast()">Send now</button>
+    </div>
+  </div>
+</div>
+
 <!-- DR RATE MODAL -->
 <div class="mbg" id="drr-modal">
   <div class="modal">
@@ -3875,6 +3921,35 @@ async function renderWhatsAppTab(){
   });
   html+='<div style="display:flex;justify-content:flex-end;"><button class="btn btnp" onclick="saveWaTemplates()">&#10003; Save all templates</button></div></div>';
 
+  // ═══════════ CUSTOM / SPECIAL OCCASION TEMPLATES ═══════════
+  var customR=await db.from('wa_custom_templates').select('*').order('created_at',{ascending:false});
+  var customTpls=customR.data||[];
+  html+='<div class="set-sec">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'+
+    '<div><div style="font-size:13px;font-weight:700;color:var(--s800);">&#127881; Special occasion messages</div>'+
+    '<div style="font-size:11px;color:var(--s400);margin-top:2px;">Create your own messages for occasions like Newroz, Eid, New Year, or anything else. These are sent manually as a broadcast — not on a schedule.</div></div>'+
+    '<button class="btn btnp btnsm" onclick="openNewCustomTpl()">+ New message</button>'+
+    '</div>';
+  if(!customTpls.length){
+    html+='<div style="text-align:center;padding:20px;color:var(--s400);font-size:12px;">No custom messages yet</div>';
+  } else {
+    customTpls.forEach(function(ct){
+      html+='<div style="border:1.5px solid var(--s200);border-radius:var(--radsm);padding:12px 14px;margin-bottom:10px;">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'+
+        '<div style="font-size:13px;font-weight:700;">'+ct.title+'</div>'+
+        '<div style="display:flex;gap:6px;">'+
+        '<button class="btn btnxs" onclick="openEditCustomTpl(\''+ct.id+'\')">Edit</button>'+
+        '<button class="btn btnxs btnr" onclick="deleteCustomTpl(\''+ct.id+'\')">Delete</button>'+
+        '<button class="btn btnxs btng" onclick="openBroadcast(\''+ct.id+'\',\''+ct.title.replace(/'/g,'&#39;')+'\')">&#128226; Send broadcast</button>'+
+        '</div></div>'+
+        '<div class="fg" style="margin-bottom:0;">'+
+        '<div style="font-size:11px;color:var(--s500);background:var(--s50);border-radius:6px;padding:8px 10px;" dir="rtl">&#127462;&#127479; '+(ct.body_ar||'—')+'</div>'+
+        '<div style="font-size:11px;color:var(--s500);background:var(--s50);border-radius:6px;padding:8px 10px;" dir="rtl">&#127472;&#127482; '+(ct.body_ku||'—')+'</div>'+
+        '</div></div>';
+    });
+  }
+  html+='</div>';
+
   // Message log
   html+='<div class="set-sec"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
     '<div style="font-size:13px;font-weight:700;color:var(--s800);">&#128203; Recent message log</div>'+
@@ -3940,6 +4015,94 @@ async function loadWaLog(){
         '<span style="font-size:10px;color:var(--s400);">'+(l.created_at?l.created_at.slice(0,16).replace('T',' '):'')+'</span>'+
         '</div>';
     }).join('')+'</div></div>';
+}
+
+// ═══════════ CUSTOM TEMPLATE CRUD ═══════════
+function openNewCustomTpl(){
+  document.getElementById('wa-custom-title').textContent='New special occasion message';
+  document.getElementById('wact-id').value='';
+  document.getElementById('wact-title').value='';
+  document.getElementById('wact-ar').value='';
+  document.getElementById('wact-ku').value='';
+  document.getElementById('wact-del-btn').style.display='none';
+  openMdl('wa-custom-modal');
+}
+async function openEditCustomTpl(id){
+  var r=await db.from('wa_custom_templates').select('*').eq('id',id).single();
+  if(r.error||!r.data){showToast('Not found','error');return;}
+  var ct=r.data;
+  document.getElementById('wa-custom-title').textContent='Edit special occasion message';
+  document.getElementById('wact-id').value=ct.id;
+  document.getElementById('wact-title').value=ct.title||'';
+  document.getElementById('wact-ar').value=ct.body_ar||'';
+  document.getElementById('wact-ku').value=ct.body_ku||'';
+  document.getElementById('wact-del-btn').style.display='inline-flex';
+  openMdl('wa-custom-modal');
+}
+async function saveCustomTpl(){
+  var title=document.getElementById('wact-title').value.trim();
+  if(!title){showToast('Enter a title','error');return;}
+  var id=document.getElementById('wact-id').value;
+  var payload={title:title,body_ar:document.getElementById('wact-ar').value.trim()||null,body_ku:document.getElementById('wact-ku').value.trim()||null};
+  var r=id?await db.from('wa_custom_templates').update(payload).eq('id',id):await db.from('wa_custom_templates').insert([payload]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast(id?'Updated ✅':'Message created ✅');
+  closeMdl('wa-custom-modal');renderWhatsAppTab();
+}
+async function deleteCustomTpl(id){
+  if(!confirm('Delete this message template?'))return;
+  await db.from('wa_custom_templates').delete().eq('id',id);
+  showToast('Deleted');renderWhatsAppTab();
+}
+function deleteCustomTplFromModal(){
+  var id=document.getElementById('wact-id').value;
+  if(id)deleteCustomTpl(id);
+  closeMdl('wa-custom-modal');
+}
+
+// ═══════════ BROADCAST ═══════════
+function openBroadcast(tplId,title){
+  document.getElementById('wabc-tpl-id').value=tplId;
+  document.getElementById('wabc-sub').textContent='Sending: '+title;
+  document.getElementById('wabc-audience').value='all';
+  updateBroadcastCount();
+  openMdl('wa-broadcast-modal');
+  document.getElementById('wabc-audience').onchange=updateBroadcastCount;
+}
+async function updateBroadcastCount(){
+  var audience=document.getElementById('wabc-audience').value;
+  var r=await db.from('patients').select('id,wa_phone,wa_lang,wa_status,wa_opt_in,status');
+  var pts=r.data||[];
+  var matched=pts.filter(function(p){
+    if(!p.wa_phone)return false;
+    if(p.wa_status==='invalid')return false;
+    if(p.wa_opt_in&&p.wa_opt_in.reminder===false&&audience==='all'){} // custom broadcasts not tied to a specific opt-in type, but respect overall validity
+    if(audience==='ar'&&p.wa_lang!=='ar')return false;
+    if(audience==='ku'&&p.wa_lang!=='ku')return false;
+    if(audience==='active'&&p.status!=='active')return false;
+    return true;
+  });
+  document.getElementById('wabc-count').innerHTML='&#128241; This will send to <strong>'+matched.length+'</strong> patient'+(matched.length!==1?'s':'')+' with a valid WhatsApp number.';
+}
+async function confirmBroadcast(){
+  var tplId=document.getElementById('wabc-tpl-id').value;
+  var audience=document.getElementById('wabc-audience').value;
+  if(!confirm('Send this message to all matching patients now? This cannot be undone.'))return;
+  closeMdl('wa-broadcast-modal');
+  showToast('Sending broadcast... this may take a moment');
+  try{
+    var resp=await fetch(SUPA+'/functions/v1/whatsapp-broadcast',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SKEY},
+      body:JSON.stringify({templateId:tplId,audience:audience})
+    });
+    var data=await resp.json();
+    if(!resp.ok)throw new Error(data.error||'Broadcast failed');
+    showToast('Broadcast sent to '+(data.sent||0)+' patients ✅');
+    renderWhatsAppTab();
+  }catch(err){
+    showToast('Broadcast failed: '+err.message+' — has the WhatsApp connection been set up yet?','error');
+  }
 }
 
 function renderSettings(){
