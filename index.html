@@ -437,6 +437,37 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         <select class="finp" id="pt-dr"><option value="">Select...</option><option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option><option>Dr. Mateen</option><option>Dr. Ibrahim</option><option>Dr. Mahmoud</option><option>Dr. Niwar</option><option>Dr. Dilveen</option></select></div>
     </div>
     <div class="fgrp"><label class="flbl">Medical notes</label><textarea class="finp" id="pt-notes" rows="2" placeholder="Allergies, conditions..."></textarea></div>
+    <!-- WHATSAPP SECTION -->
+    <div style="border:1.5px solid var(--s200);border-radius:var(--radsm);padding:12px 14px;margin-bottom:14px;background:var(--s50);">
+      <div style="font-size:12px;font-weight:700;color:var(--s700);margin-bottom:10px;">&#128241; WhatsApp messages</div>
+      <div class="fg" style="margin-bottom:10px;">
+        <div class="fgrp"><label class="flbl">Preferred language</label>
+          <select class="finp" id="pt-wa-lang">
+            <option value="ar">&#127462;&#127479; العربية (Arabic)</option>
+            <option value="ku">&#127472;&#127482; کوردی (Kurdish)</option>
+            <option value="en">English</option>
+          </select></div>
+        <div class="fgrp"><label class="flbl">WhatsApp number status</label>
+          <select class="finp" id="pt-wa-status">
+            <option value="unknown">Unknown / not checked</option>
+            <option value="valid">&#9989; Confirmed has WhatsApp</option>
+            <option value="invalid">&#9888; No WhatsApp on this number</option>
+          </select></div>
+      </div>
+      <div style="font-size:10px;color:var(--s400);margin-bottom:8px;">Choose which automatic messages this patient receives:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;" id="pt-wa-toggles">
+        <label style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid var(--s200);background:white;cursor:pointer;font-size:11px;font-weight:600;">
+          <input type="checkbox" id="pt-wa-reminder" checked style="accent-color:var(--b600);">Appointment reminders</label>
+        <label style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid var(--s200);background:white;cursor:pointer;font-size:11px;font-weight:600;">
+          <input type="checkbox" id="pt-wa-birthday" checked style="accent-color:var(--b600);">Birthday messages</label>
+        <label style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid var(--s200);background:white;cursor:pointer;font-size:11px;font-weight:600;">
+          <input type="checkbox" id="pt-wa-payment" checked style="accent-color:var(--b600);">Payment reminders</label>
+        <label style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid var(--s200);background:white;cursor:pointer;font-size:11px;font-weight:600;">
+          <input type="checkbox" id="pt-wa-recall" checked style="accent-color:var(--b600);">Recall / checkup reminders</label>
+        <label style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid var(--s200);background:white;cursor:pointer;font-size:11px;font-weight:600;">
+          <input type="checkbox" id="pt-wa-followup" checked style="accent-color:var(--b600);">Post-procedure follow-up</label>
+      </div>
+    </div>
     <div class="mac">
       <button class="btn btnr" id="pt-del-btn" style="display:none;margin-right:auto;" onclick="canDo('delete','patients')?deletePatient():showToast('Only Admin can delete patients','error')">Delete</button>
       <button class="btn" onclick="closePtModal()">Cancel</button>
@@ -1923,10 +1954,27 @@ function ptSearch(v){ptQ=v;buildPtList();}
 function setPtV(v){ptView=v;localStorage.setItem('vdc-view',v);buildPtList();}
 
 // ADD/EDIT PATIENT
+// Normalize Iraqi phone numbers to E.164 (+964) format for WhatsApp
+// Handles common formats: 07XXXXXXXXX, 7XXXXXXXXX, +9647XXXXXXXXX, 009647XXXXXXXXX
+function normalizeIraqiPhone(phone){
+  if(!phone)return null;
+  var digits=phone.replace(/[^\d+]/g,''); // strip spaces/dashes but keep leading +
+  digits=digits.replace(/\s/g,'');
+  if(digits.startsWith('+964'))return digits;
+  if(digits.startsWith('00964'))return '+'+digits.slice(2);
+  if(digits.startsWith('964'))return '+'+digits;
+  if(digits.startsWith('0'))return '+964'+digits.slice(1); // 07XXXXXXXXX -> +9647XXXXXXXXX
+  if(digits.startsWith('7')&&digits.length===10)return '+964'+digits; // 7XXXXXXXXX
+  return digits.startsWith('+')?digits:('+'+digits); // fallback
+}
+
 function openAddPt(){
   document.getElementById('pt-mtit').textContent='Add patient';
   ['pt-id','pt-name','pt-dob','pt-phone','pt-notes'].forEach(function(i){document.getElementById(i).value='';});
   document.getElementById('pt-gender').value='';document.getElementById('pt-status').value='new';document.getElementById('pt-dr').value='';
+  document.getElementById('pt-wa-lang').value='ar';
+  document.getElementById('pt-wa-status').value='unknown';
+  ['reminder','birthday','payment','recall','followup'].forEach(function(k){document.getElementById('pt-wa-'+k).checked=true;});
   document.getElementById('pt-del-btn').style.display='none';openMdl('pt-modal');
 }
 function openEditPt(id){
@@ -1936,6 +1984,12 @@ function openEditPt(id){
   document.getElementById('pt-dob').value=p.dob||'';document.getElementById('pt-gender').value=p.gender||'';
   document.getElementById('pt-phone').value=p.phone||'';document.getElementById('pt-status').value=p.status||'active';
   document.getElementById('pt-dr').value=p.primary_dentist||'';document.getElementById('pt-notes').value=p.medical_notes||'';
+  document.getElementById('pt-wa-lang').value=p.wa_lang||'ar';
+  document.getElementById('pt-wa-status').value=p.wa_status||'unknown';
+  var optIn=p.wa_opt_in||{};
+  ['reminder','birthday','payment','recall','followup'].forEach(function(k){
+    document.getElementById('pt-wa-'+k).checked=optIn[k]!==false; // default true unless explicitly false
+  });
   document.getElementById('pt-del-btn').style.display='inline-flex';openMdl('pt-modal');
 }
 async function savePatient(){
@@ -3696,19 +3750,214 @@ async function openEditAdj(id){
 // ══════════════════════ SETTINGS ═════════════════════════════════
 var settingsTab='general';
 
+// ══════════════════════ WHATSAPP MESSAGING SETTINGS ═══════════════
+var WA_MSG_TYPES=[
+  {key:'appointment_reminder',label:'Appointment reminder',desc:'Sent before a scheduled appointment',vars:'{{1}}=Patient name, {{2}}=Time, {{3}}=Dentist name',timing:true},
+  {key:'appt_confirmed',label:'Appointment confirmed (auto-reply)',desc:'Sent automatically when patient replies to confirm',vars:'{{1}}=Patient name, {{2}}=Time'},
+  {key:'appt_cancelled',label:'Appointment cancelled (auto-reply)',desc:'Sent automatically when patient replies to cancel',vars:'{{1}}=Patient name'},
+  {key:'birthday',label:'Birthday wish',desc:'Sent automatically on the patient\'s birthday',vars:'{{1}}=Patient name'},
+  {key:'payment_reminder',label:'Payment reminder',desc:'Sent for patients with an outstanding balance',vars:'{{1}}=Patient name, {{2}}=Amount due'},
+  {key:'recall',label:'Recall / checkup reminder',desc:'Sent after a period of inactivity',vars:'{{1}}=Patient name'},
+  {key:'followup',label:'Post-procedure follow-up',desc:'Sent the day after a major procedure',vars:'{{1}}=Patient name, {{2}}=Procedure name'}
+];
+// Default bilingual message text — fully editable below
+var WA_DEFAULTS={
+  appointment_reminder:{
+    ar:'مرحباً {{1}}، هذه رسالة تذكير من Value Dental Center بأن لديك موعد اليوم في الساعة {{2}} مع {{3}}.\n\nللتأكيد، يرجى الرد بكلمة "تأكيد"\nللإلغاء، يرجى الرد بكلمة "إلغاء"',
+    ku:'سلاو {{1}}، ئەمە بیرخستنەوەیەکە لە Value Dental Center، تۆ ئەمڕۆ کاتژمێر {{2}} لیکۆلینەوەیەکت هەیە لەگەڵ {{3}}.\n\nبۆ پەسەندکردن وەڵام بدەرەوە بە وشەی "پەسەندکردن"\nبۆ هەڵوەشاندنەوە وەڵام بدەرەوە بە وشەی "هەڵوەشاندنەوە"'
+  },
+  appt_confirmed:{
+    ar:'شكراً {{1}}! تم تأكيد موعدك اليوم في الساعة {{2}}. نراك قريباً في Value Dental Center.',
+    ku:'سوپاس {{1}}! کاتژمێرەکەی ئەمڕۆ {{2}} پەسەند کرا. لە Value Dental Center چاوەڕێتین.'
+  },
+  appt_cancelled:{
+    ar:'تم إلغاء موعدك في Value Dental Center. يمكنكم التواصل معنا في أي وقت لتحديد موعد جديد.',
+    ku:'کاتژمێرەکەت لە Value Dental Center هەڵوەشێنرایەوە. تکایە پەیوەندیمان پێوەبکە بۆ دیاریکردنی کاتژمێرێکی نوێ.'
+  },
+  birthday:{
+    ar:'عيد ميلاد سعيد {{1}}! 🎉 نتمنى لك يوماً جميلاً من فريق Value Dental Center.',
+    ku:'پیرۆزە ڕۆژی لەدایکبوونت {{1}}! 🎉 هیوادارین ڕۆژێکی خۆش بۆت هەبێت لە لایەن تیمی Value Dental Center.'
+  },
+  payment_reminder:{
+    ar:'مرحباً {{1}}، لديك رصيد متبقي بقيمة {{2}} في Value Dental Center. يمكنك تسديده في زيارتك القادمة أو التواصل معنا.',
+    ku:'سلاو {{1}}، باڵانسێکی {{2}} لەسەرتە لە Value Dental Center. دەتوانیت لە سەردانی داهاتووت بیدەیت یان پەیوەندیمان پێوەبکە.'
+  },
+  recall:{
+    ar:'مرحباً {{1}}، لم نرك منذ فترة في Value Dental Center. ننصح بزيارة دورية للفحص — يمكنكم التواصل معنا لتحديد موعد.',
+    ku:'سلاو {{1}}، ماوەیەکە نەتدیوین لە Value Dental Center. پێشنیار دەکەین سەردانێکی پشکنین بکەیت — پەیوەندیمان پێوەبکە بۆ دیاریکردنی کاتژمێر.'
+  },
+  followup:{
+    ar:'مرحباً {{1}}، نتمنى أن تكون بخير بعد {{2}} يوم أمس في Value Dental Center. إذا كان لديك أي استفسار يرجى التواصل معنا.',
+    ku:'سلاو {{1}}، هیوادارین باش بیت دوای {{2}} دوێنێ لە Value Dental Center. ئەگەر هیچ پرسیارێکت هەیە تکایە پەیوەندیمان پێوەبکە.'
+  }
+};
+var WA_DEFAULT_WORDS={
+  confirm:{ar:'تأكيد، نعم، تاكيد',ku:'پەسەندکردن، بەڵێ'},
+  cancel:{ar:'إلغاء، لا، الغاء',ku:'هەڵوەشاندنەوە، نەخێر'}
+};
+
+async function loadWaSettings(){
+  var r=await db.from('wa_settings').select('*').eq('id',1).single();
+  if(r.error||!r.data){
+    return {id:1,master_enabled:false,reminder_hours_before:3,recall_months:6,
+      confirm_words:{ar:WA_DEFAULT_WORDS.confirm.ar,ku:WA_DEFAULT_WORDS.confirm.ku},
+      cancel_words:{ar:WA_DEFAULT_WORDS.cancel.ar,ku:WA_DEFAULT_WORDS.cancel.ku}};
+  }
+  return r.data;
+}
+
+async function renderWhatsAppTab(){
+  var el=document.getElementById('settings-body');
+  if(!el)return;
+  el.innerHTML='<div class="loader"><div class="spinner"></div></div>';
+  var settings=await loadWaSettings();
+  var tplR=await db.from('wa_templates').select('*');
+  var tpls={};(tplR.data||[]).forEach(function(t){if(!tpls[t.msg_key])tpls[t.msg_key]={};tpls[t.msg_key][t.lang]=t;});
+
+  var html=
+    // Connection status
+    '<div class="set-sec">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--s800);">&#128241; WhatsApp Automation</div>'+
+    '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">'+
+    '<span style="font-size:12px;font-weight:600;">'+(settings.master_enabled?'Enabled':'Disabled')+'</span>'+
+    '<input type="checkbox" id="wa-master" '+(settings.master_enabled?'checked':'')+' style="width:36px;height:20px;accent-color:var(--g600);" onchange="toggleWaMaster(this.checked)">'+
+    '</label></div>'+
+    '<div style="font-size:11px;color:var(--s400);">Connects to your clinic\'s WhatsApp Business number via Twilio. Messages send automatically on a schedule once connected and enabled.</div>'+
+    '<div style="background:var(--a50);border:1px solid var(--a100);border-radius:var(--radsm);padding:10px 12px;margin-top:10px;font-size:11px;color:var(--a700);">'+
+    '&#9888; Connection setup (Twilio credentials, scheduled sending) is configured separately by your developer — this page controls message content, timing, and per-patient preferences.'+
+    '</div></div>'+
+
+    // Timing settings
+    '<div class="set-sec">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:12px;">&#9201; Timing</div>'+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Appointment reminder</div><div style="font-size:10px;color:var(--s400);">Send how many hours before the appointment?</div></div>'+
+    '<div style="display:flex;align-items:center;gap:6px;"><input type="number" class="finp" id="wa-reminder-hours" value="'+(settings.reminder_hours_before||3)+'" style="width:70px;text-align:center;" min="1" max="48"><span style="font-size:11px;color:var(--s400);">hours before</span></div></div>'+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Recall reminder</div><div style="font-size:10px;color:var(--s400);">Send after this many months without a visit</div></div>'+
+    '<div style="display:flex;align-items:center;gap:6px;"><input type="number" class="finp" id="wa-recall-months" value="'+(settings.recall_months||6)+'" style="width:70px;text-align:center;" min="1" max="24"><span style="font-size:11px;color:var(--s400);">months</span></div></div>'+
+    '</div>'+
+
+    // Reply keywords
+    '<div class="set-sec">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:4px;">&#128172; Reply keywords</div>'+
+    '<div style="font-size:11px;color:var(--s400);margin-bottom:12px;">Words a patient can reply with to confirm or cancel — comma-separated, not case sensitive.</div>'+
+    '<div class="fg">'+
+    '<div class="fgrp"><label class="flbl">Confirm words (Arabic)</label><input class="finp" id="wa-confirm-ar" dir="rtl" value="'+((settings.confirm_words||{}).ar||WA_DEFAULT_WORDS.confirm.ar)+'"></div>'+
+    '<div class="fgrp"><label class="flbl">Confirm words (Kurdish)</label><input class="finp" id="wa-confirm-ku" dir="rtl" value="'+((settings.confirm_words||{}).ku||WA_DEFAULT_WORDS.confirm.ku)+'"></div>'+
+    '</div>'+
+    '<div class="fg">'+
+    '<div class="fgrp"><label class="flbl">Cancel words (Arabic)</label><input class="finp" id="wa-cancel-ar" dir="rtl" value="'+((settings.cancel_words||{}).ar||WA_DEFAULT_WORDS.cancel.ar)+'"></div>'+
+    '<div class="fgrp"><label class="flbl">Cancel words (Kurdish)</label><input class="finp" id="wa-cancel-ku" dir="rtl" value="'+((settings.cancel_words||{}).ku||WA_DEFAULT_WORDS.cancel.ku)+'"></div>'+
+    '</div>'+
+    '<div style="display:flex;justify-content:flex-end;"><button class="btn btnp btnsm" onclick="saveWaSettings()">Save timing &amp; keywords</button></div>'+
+    '</div>';
+
+  // Message templates — one section per type, with Arabic/Kurdish side by side
+  html+='<div class="set-sec"><div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:4px;">&#128221; Message templates</div>'+
+    '<div style="font-size:11px;color:var(--s400);margin-bottom:14px;">Write each message in Arabic and Kurdish. Use {{1}}, {{2}}, {{3}} as placeholders — they\'ll be filled in automatically (patient name, time, dentist, etc.)</div>';
+
+  WA_MSG_TYPES.forEach(function(mt){
+    var ar=(tpls[mt.key]&&tpls[mt.key].ar)?tpls[mt.key].ar.body:(WA_DEFAULTS[mt.key]?WA_DEFAULTS[mt.key].ar:'');
+    var ku=(tpls[mt.key]&&tpls[mt.key].ku)?tpls[mt.key].ku.body:(WA_DEFAULTS[mt.key]?WA_DEFAULTS[mt.key].ku:'');
+    var enabled=(tpls[mt.key]&&tpls[mt.key].ar)?tpls[mt.key].ar.enabled!==false:true;
+    html+='<div style="border:1.5px solid var(--s200);border-radius:var(--radsm);padding:14px;margin-bottom:12px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'+
+      '<div><div style="font-size:13px;font-weight:700;">'+mt.label+'</div><div style="font-size:10px;color:var(--s400);">'+mt.desc+'</div></div>'+
+      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><span style="font-size:11px;font-weight:600;">'+(enabled?'On':'Off')+'</span>'+
+      '<input type="checkbox" id="wa-en-'+mt.key+'" '+(enabled?'checked':'')+' style="accent-color:var(--g600);"></label>'+
+      '</div>'+
+      '<div style="font-size:10px;color:var(--b600);font-family:monospace;margin-bottom:8px;">'+mt.vars+'</div>'+
+      (mt.timing?'':'')+
+      '<div class="fg">'+
+      '<div class="fgrp"><label class="flbl">&#127462;&#127479; Arabic</label><textarea class="finp" id="wa-ar-'+mt.key+'" dir="rtl" rows="4" style="font-family:inherit;">'+ar+'</textarea></div>'+
+      '<div class="fgrp"><label class="flbl">&#127472;&#127482; Kurdish</label><textarea class="finp" id="wa-ku-'+mt.key+'" dir="rtl" rows="4" style="font-family:inherit;">'+ku+'</textarea></div>'+
+      '</div></div>';
+  });
+  html+='<div style="display:flex;justify-content:flex-end;"><button class="btn btnp" onclick="saveWaTemplates()">&#10003; Save all templates</button></div></div>';
+
+  // Message log
+  html+='<div class="set-sec"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--s800);">&#128203; Recent message log</div>'+
+    '<button class="btn btnsm" onclick="renderWhatsAppTab()">Refresh</button></div>'+
+    '<div id="wa-log"></div></div>';
+
+  el.innerHTML=html;
+  loadWaLog();
+}
+
+function toggleWaMaster(checked){
+  db.from('wa_settings').upsert([{id:1,master_enabled:checked}]).then(function(r){
+    if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+    showToast(checked?'WhatsApp automation enabled':'WhatsApp automation disabled');
+    renderWhatsAppTab();
+  });
+}
+
+async function saveWaSettings(){
+  var payload={
+    id:1,
+    reminder_hours_before:parseInt(document.getElementById('wa-reminder-hours').value)||3,
+    recall_months:parseInt(document.getElementById('wa-recall-months').value)||6,
+    confirm_words:{ar:document.getElementById('wa-confirm-ar').value.trim(),ku:document.getElementById('wa-confirm-ku').value.trim()},
+    cancel_words:{ar:document.getElementById('wa-cancel-ar').value.trim(),ku:document.getElementById('wa-cancel-ku').value.trim()}
+  };
+  var r=await db.from('wa_settings').upsert([payload]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast('Timing & keywords saved ✅');
+}
+
+async function saveWaTemplates(){
+  var rows=[];
+  WA_MSG_TYPES.forEach(function(mt){
+    var enabled=document.getElementById('wa-en-'+mt.key).checked;
+    ['ar','ku'].forEach(function(lang){
+      var body=document.getElementById('wa-'+lang+'-'+mt.key).value.trim();
+      rows.push({msg_key:mt.key,lang:lang,body:body,enabled:enabled});
+    });
+  });
+  var r=await db.from('wa_templates').upsert(rows,{onConflict:'msg_key,lang'});
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast('Templates saved ✅');
+}
+
+async function loadWaLog(){
+  var el=document.getElementById('wa-log');if(!el)return;
+  var r=await db.from('wa_message_log').select('*').order('created_at',{ascending:false}).limit(30);
+  var logs=r.data||[];
+  if(!logs.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--s400);font-size:12px;">No messages sent yet</div>';return;}
+  var statusColors={queued:'var(--s400)',sent:'var(--b600)',delivered:'var(--g600)',failed:'var(--r600)',replied:'var(--a600)'};
+  var statusIcons={queued:'&#9203;',sent:'&#128228;',delivered:'&#9989;',failed:'&#10060;',replied:'&#128172;'};
+  el.innerHTML='<div class="vdc-card"><div class="vdc-card-body" style="padding:0;max-height:400px;overflow-y:auto;">'+
+    logs.map(function(l){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--s100);">'+
+        '<span style="font-size:16px;">'+(statusIcons[l.status]||'&#8226;')+'</span>'+
+        '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:12px;font-weight:700;">'+(l.patient_name||'—')+' <span style="font-size:10px;color:var(--s400);font-weight:400;">· '+(l.msg_key||'')+' · '+(l.lang||'')+'</span></div>'+
+        '<div style="font-size:10px;color:var(--s400);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(l.body||'').slice(0,80)+'</div>'+
+        (l.reply_text?'<div style="font-size:10px;color:var(--a700);margin-top:2px;">&#8627; Reply: '+l.reply_text+(l.reply_action?' ('+l.reply_action+')':'')+'</div>':'')+
+        '</div>'+
+        '<span style="font-size:10px;font-weight:700;color:'+(statusColors[l.status]||'var(--s400)')+';text-transform:uppercase;">'+(l.status||'')+'</span>'+
+        '<span style="font-size:10px;color:var(--s400);">'+(l.created_at?l.created_at.slice(0,16).replace('T',' '):'')+'</span>'+
+        '</div>';
+    }).join('')+'</div></div>';
+}
+
 function renderSettings(){
   if(!canAccessSection('settings')){accessDenied('settings');return;}
   document.getElementById('pg-content').innerHTML=
-    '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:18px;" id="settings-tabs">'+
+    '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:18px;flex-wrap:wrap;" id="settings-tabs">'+
     '<button class="fin-tab'+(settingsTab==='general'?' act':'')+'" onclick="settingsTab=\'general\';renderSettings()">&#9881; General</button>'+
     (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='accounts'?' act':'')+'" onclick="settingsTab=\'accounts\';renderSettings()">&#128100; Accounts</button>':'')+
     (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='dentists'?' act':'')+'" onclick="settingsTab=\'dentists\';renderSettings()">&#9673; Dentists</button>':'')+
+    (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='whatsapp'?' act':'')+'" onclick="settingsTab=\'whatsapp\';renderSettings()">&#128241; WhatsApp</button>':'')+
     '</div>'+
     '<div id="settings-body"></div>';
   if(settingsTab==='accounts'&&can('canManageAccounts')){
     renderAccountsTab();
   } else if(settingsTab==='dentists'&&can('canManageAccounts')){
     renderDentistsTab();
+  } else if(settingsTab==='whatsapp'&&can('canManageAccounts')){
+    renderWhatsAppTab();
   } else {
     renderGeneralTab();
   }
@@ -6561,6 +6810,9 @@ function openAddPtFromAppt(){
   document.getElementById('pt-status').value = 'new';
   document.getElementById('pt-dr').value = '';
   document.getElementById('pt-notes').value = '';
+  document.getElementById('pt-wa-lang').value='ar';
+  document.getElementById('pt-wa-status').value='unknown';
+  ['reminder','birthday','payment','recall','followup'].forEach(function(k){document.getElementById('pt-wa-'+k).checked=true;});
   document.getElementById('pt-del-btn').style.display = 'none';
   openMdl('pt-modal');
 }
@@ -6576,9 +6828,21 @@ async function savePatient(){
   var name=document.getElementById('pt-name').value.trim();
   if(!name){showToast('Enter patient name','error');return;}
   var id=document.getElementById('pt-id').value;
+  var rawPhone=document.getElementById('pt-phone').value.trim()||null;
+  var waOptIn={
+    reminder:document.getElementById('pt-wa-reminder').checked,
+    birthday:document.getElementById('pt-wa-birthday').checked,
+    payment:document.getElementById('pt-wa-payment').checked,
+    recall:document.getElementById('pt-wa-recall').checked,
+    followup:document.getElementById('pt-wa-followup').checked
+  };
   var payload={name:name,dob:document.getElementById('pt-dob').value||null,
     gender:document.getElementById('pt-gender').value||null,
-    phone:document.getElementById('pt-phone').value.trim()||null,
+    phone:rawPhone,
+    wa_phone:normalizeIraqiPhone(rawPhone),
+    wa_lang:document.getElementById('pt-wa-lang').value||'ar',
+    wa_status:document.getElementById('pt-wa-status').value||'unknown',
+    wa_opt_in:waOptIn,
     status:document.getElementById('pt-status').value,
     primary_dentist:document.getElementById('pt-dr').value||null,
     medical_notes:document.getElementById('pt-notes').value.trim()||null};
