@@ -2709,6 +2709,9 @@ async function openPtFromAppt(apptId,ptName){
 }
 async function updateAS(ns){
   if(!detailApptId)return;
+  // Capture appointment info BEFORE updating, so we know the previous status
+  var prevAppt=(allAppts||[]).find(function(a){return a.id===detailApptId;});
+  var prevStatus=prevAppt?prevAppt.status:null;
   var updates={status:ns};
   if(ns==='checkedin')updates.checkin_time=new Date().toISOString();
   else updates.checkin_time=null;
@@ -2719,6 +2722,10 @@ async function updateAS(ns){
   if(!ar.error)allAppts=ar.data||[];
   await loadApptInvoices();
   buildSched();
+  // ── NOTIFY THE DENTIST whenever the status actually changes ──
+  if(prevAppt&&prevStatus!==ns&&prevAppt.dentist){
+    notifyDentistOfStatusChange(prevAppt.dentist,ns,prevAppt.patient_name,prevAppt.room,prevAppt.start_time,savedApptId,prevAppt.patient_id);
+  }
   // if marked completed, immediately open record procedure
   if(ns==='completed'){
     var appt=allAppts.find(function(a){return a.id===savedApptId;});
@@ -8025,12 +8032,22 @@ async function saveAppt(){
 // status changes to one they care about (confirmed / checked-in / in-progress).
 async function notifyDentistOfStatusChange(dentistName,status,patientName,room,startTime,apptId,patientId){
   var STATUS_NOTIF={
+    open:{icon:'&#128311;',title:patientName+' — appointment opened',color:'blue',
+      message:'Set back to open'+(room?' · Room '+room:'')},
     confirmed:{icon:'&#9989;',title:patientName+' confirmed',color:'green',
       message:'Confirmed for '+(startTime?startTime.slice(0,5):'')+(room?' · Room '+room:'')},
     checkedin:{icon:'&#128679;',title:patientName+' has arrived',color:'amber',
       message:'Checked in'+(room?' · Room '+room:'')+' — ready when you are'},
     inprogress:{icon:'&#128260;',title:patientName+' — in progress',color:'blue',
-      message:'Procedure started'+(room?' · Room '+room:'')}
+      message:'Procedure started'+(room?' · Room '+room:'')},
+    completed:{icon:'&#9989;',title:patientName+' — completed',color:'green',
+      message:'Appointment marked completed'+(room?' · Room '+room:'')},
+    noshow:{icon:'&#128308;',title:patientName+' — no show',color:'red',
+      message:'Patient did not show up for '+(startTime?startTime.slice(0,5):'')+(room?' · Room '+room:'')},
+    delayed:{icon:'&#128993;',title:patientName+' — delayed',color:'amber',
+      message:'Appointment marked delayed'+(room?' · Room '+room:'')},
+    cancelled:{icon:'&#10060;',title:patientName+' — cancelled',color:'red',
+      message:'Appointment cancelled'+(startTime?' ('+startTime.slice(0,5)+')':'')}
   };
   var cfg=STATUS_NOTIF[status];
   if(!cfg)return;
