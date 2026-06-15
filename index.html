@@ -242,14 +242,29 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 /* NOTIFICATION BELL */
 .notif-bell{position:relative;background:none;border:1px solid var(--s200);border-radius:var(--radsm);width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--s600);}
 .notif-bell:hover{background:var(--s50);}
-.notif-badge{position:absolute;top:-4px;right:-4px;background:var(--r600);color:white;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;display:none;}
+.notif-bell.pulse{animation:notifPulse 1.2s ease-in-out 2;}
+@keyframes notifPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.18);color:var(--b600);border-color:var(--b400);}}
+.notif-badge{position:absolute;top:-4px;right:-4px;background:var(--r600);color:white;border-radius:50%;min-width:16px;height:16px;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;display:none;padding:0 3px;}
 .notif-badge.show{display:flex;}
-.notif-panel{position:absolute;top:42px;right:0;width:320px;background:white;border-radius:var(--rad);border:1px solid var(--s200);box-shadow:0 8px 32px rgba(0,0,0,0.15);z-index:200;display:none;max-height:400px;overflow-y:auto;}
-.notif-panel.open{display:block;}
-.notif-item{padding:10px 14px;border-bottom:1px solid var(--s100);font-size:12px;}
+.notif-panel{position:absolute;top:42px;right:0;width:360px;background:white;border-radius:var(--rad);border:1px solid var(--s200);box-shadow:0 8px 32px rgba(0,0,0,0.15);z-index:200;display:none;max-height:480px;display:none;flex-direction:column;}
+.notif-panel.open{display:flex;}
+.notif-list-scroll{overflow-y:auto;flex:1;}
+.notif-tab{padding:5px 11px;border-radius:20px;border:1.5px solid var(--s200);background:white;font-size:10px;font-weight:700;color:var(--s500);cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit;}
+.notif-tab.act{background:var(--b600);border-color:var(--b600);color:white;}
+.notif-item{padding:10px 14px;border-bottom:1px solid var(--s100);font-size:12px;cursor:pointer;transition:background 0.15s;display:flex;gap:10px;align-items:flex-start;}
+.notif-item:hover{background:var(--s50);}
 .notif-item:last-child{border-bottom:none;}
 .notif-item.red{border-left:3px solid var(--r500);}
 .notif-item.amber{border-left:3px solid var(--a500);}
+.notif-item.green{border-left:3px solid var(--g500);}
+.notif-item.blue{border-left:3px solid var(--b500);}
+.notif-item.unread{background:var(--b50);}
+.notif-item .ni-icon{font-size:18px;flex-shrink:0;line-height:1.3;}
+.notif-item .ni-body{flex:1;min-width:0;}
+.notif-item .ni-title{font-weight:700;color:var(--s800);margin-bottom:1px;}
+.notif-item .ni-msg{color:var(--s500);font-size:11px;}
+.notif-item .ni-time{color:var(--s400);font-size:10px;margin-top:2px;}
+.notif-item .ni-dot{width:7px;height:7px;border-radius:50%;background:var(--b600);flex-shrink:0;margin-top:5px;}
 /* EXPIRY */
 .expiry-ok{color:var(--g700);font-size:10px;}
 .expiry-warn{color:var(--a600);font-size:10px;font-weight:700;}
@@ -313,7 +328,9 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
   .vdc-card-body{overflow-x:auto;}
   .tbl{min-width:500px;}
   .stock-grid{grid-template-columns:repeat(2,1fr) !important;gap:10px;}
-  .notif-panel{right:-50px;width:280px;}
+  .notif-panel{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;max-height:100%;border-radius:0;z-index:1000;}
+  .notif-panel.open{display:flex;}
+  #notif-overlay.show{display:block;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:999;}
   #pg-actions .btn{padding:6px 10px;font-size:11px;}
   #pg-actions .btnsm{padding:5px 8px;}
   .cal-room-filters{display:flex;gap:6px;overflow-x:auto;padding:8px 12px;background:white;border-bottom:1px solid var(--s200);-webkit-overflow-scrolling:touch;scrollbar-width:none;}
@@ -404,14 +421,19 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
             <span class="notif-badge" id="notif-badge">0</span>
           </button>
           <div class="notif-panel" id="notif-panel">
-            <div style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--s600);border-bottom:1px solid var(--s200);display:flex;justify-content:space-between;align-items:center;">
-              <span>&#128276; Alerts</span>
-              <button onclick="toggleNotifPanel()" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--s400);">&#10005;</button>
+            <div style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--s700);border-bottom:1px solid var(--s200);display:flex;justify-content:space-between;align-items:center;">
+              <span id="notif-panel-back-wrap"><span>&#128276; Notifications</span></span>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button onclick="markAllNotifsRead()" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--b600);font-weight:700;">Mark all read</button>
+                <button onclick="toggleNotifPanel()" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--s400);" id="notif-close-btn">&#10005;</button>
+              </div>
             </div>
+            <div id="notif-tabs" style="display:flex;gap:4px;padding:8px 10px;border-bottom:1px solid var(--s100);overflow-x:auto;"></div>
             <div id="notif-list"><div style="padding:20px;text-align:center;color:var(--s400);font-size:12px;">All clear ✓</div></div>
           </div>
         </div>
       </div>
+      <div class="drawer-overlay" id="notif-overlay" onclick="toggleNotifPanel()" style="display:none;"></div>
       <div class="content" id="pg-content"><div class="loader"><div class="spinner"></div>Loading...</div></div>
     </div>
   </div>
@@ -4890,6 +4912,22 @@ async function openLabDetail(labId){
     if(btn)openEditSvc(btn.dataset.svcid);
   });
 }
+// Notify the ordering dentist when a lab order comes back
+async function notifyLabReceived(orderId){
+  try{
+    var r=await db.from('lab_orders').select('*').eq('id',orderId).single();
+    var ord=r.data;
+    if(!ord||!ord.dentist)return;
+    await createNotification({
+      cat:'lab',type:'green',color:'green',icon:'&#129514;',
+      title:'Lab work ready — '+(ord.patient_name||'patient'),
+      message:(ord.procedure_name||'Lab order')+' has come back from the lab',
+      target_dentist:ord.dentist,target_role:null,
+      link_section:'patients',link_id:ord.patient_id||null,
+      link_extra:ord.patient_id?{name:ord.patient_name}:null
+    });
+  }catch(e){console.warn('lab notif failed',e);}
+}
 async function markLabReceivedInline(btn){
   var orderId=btn.dataset.orderId;
   var labId=btn.dataset.labId;
@@ -4897,6 +4935,7 @@ async function markLabReceivedInline(btn){
   var r=await db.from('lab_orders').update({status:'received',received_date:fd(new Date())}).eq('id',orderId);
   if(r.error){showToast('Failed','error');return;}
   showToast('Lab order marked received ✅');
+  notifyLabReceived(orderId);
   openLabDetail(labId);
 }
 function openAddLab(){
@@ -5500,37 +5539,283 @@ function buildStockAlertsTab(today){
   return html;
 }
 
-// ── NOTIFICATION BELL ──
-function updateStockNotifications(){
+// ══════════════════════ NOTIFICATION CENTER ══════════════════════
+var notifTab='all'; // current active tab in the panel
+var _liveNotifs=[]; // computed-on-the-fly alerts (stock, appointments, whatsapp, finance)
+var _storedNotifs=[]; // rows from the notifications table (real-time events)
+
+// Does a stored notification belong to the current user?
+function notifMatchesUser(n){
+  if(!currentUser)return false;
+  if(currentUser.role==='admin')return true; // admin sees everything (oversight)
+  if(n.target_dentist)return currentUser.linked_dentist===n.target_dentist;
+  if(n.target_role)return currentUser.role===n.target_role;
+  return true; // general notification — visible to everyone
+}
+
+// Build all LIVE (computed-on-the-fly) alerts: stock + appointments-today + whatsapp issues + finance
+function buildLiveNotifs(){
   var alerts=[];
-  stockItems.forEach(function(item){
+  var isAdmin=currentUser&&currentUser.role==='admin';
+  var isRecep=currentUser&&(currentUser.role==='receptionist'||currentUser.role==='assistant'||isAdmin);
+  var myDentist=currentUser&&currentUser.linked_dentist;
+
+  // ── STOCK ──
+  (stockItems||[]).forEach(function(item){
     var qty=Number(item.quantity||0);
     var minQty=Number(item.min_quantity||0);
-    if(qty===0) alerts.push({type:'red',msg:'&#128230; <strong>'+(item.name)+'</strong> — out of stock'});
-    else if(qty<=minQty) alerts.push({type:'amber',msg:'&#9888; <strong>'+(item.name)+'</strong> — low stock ('+qty+' '+( item.unit||'')+')'});
+    if(qty===0)alerts.push({cat:'stock',type:'red',icon:'&#128230;',title:item.name,msg:'Out of stock',link:{section:'stocks'}});
+    else if(qty<=minQty)alerts.push({cat:'stock',type:'amber',icon:'&#9888;',title:item.name,msg:'Low stock ('+qty+' '+(item.unit||'')+')',link:{section:'stocks'}});
     if(item.expiry_date){
       var daysLeft=Math.ceil((new Date(item.expiry_date)-new Date())/(1000*60*60*24));
       if(daysLeft<=(item.expiry_warning_days||30)){
-        alerts.push({type:daysLeft<=7?'red':'amber',msg:'&#128197; <strong>'+(item.name)+'</strong> — '+(daysLeft<=0?'expired':daysLeft+' days to expiry')});
+        alerts.push({cat:'stock',type:daysLeft<=7?'red':'amber',icon:'&#128197;',title:item.name,msg:(daysLeft<=0?'Expired':daysLeft+' days to expiry'),link:{section:'stocks'}});
       }
     }
   });
-  var badge=document.getElementById('notif-badge');
-  var list=document.getElementById('notif-list');
-  if(badge){if(alerts.length){badge.textContent=alerts.length;badge.classList.add('show');}else{badge.classList.remove('show');}}
-  if(list){
-    list.innerHTML=alerts.length?
-      alerts.map(function(a){return '<div class="notif-item '+a.type+'">'+a.msg+'</div>';}).join(''):
-      '<div style="padding:20px;text-align:center;color:var(--s400);font-size:12px;">All clear &#10003;</div>';
+
+  // ── APPOINTMENTS TODAY (starting within 60 minutes, not yet checked in) ──
+  var now=new Date();
+  var todayStr=fd(now);
+  (allAppts||[]).forEach(function(a){
+    if(a.date!==todayStr)return;
+    if(!['open','confirmed'].includes(a.status))return;
+    if(!isAdmin&&!isRecep&&myDentist&&a.dentist!==myDentist)return; // dentists only see their own
+    if(!a.start_time)return;
+    var apptTime=new Date(todayStr+'T'+a.start_time);
+    var minsUntil=(apptTime-now)/60000;
+    if(minsUntil>=0&&minsUntil<=60){
+      alerts.push({cat:'appointments',type:'blue',icon:'&#9200;',title:(a.patient_name||'Patient')+' — '+a.start_time.slice(0,5),
+        msg:'Appointment in '+Math.round(minsUntil)+' min'+(a.dentist?' with '+a.dentist:'')+(a.room?' · Room '+a.room:''),
+        link:{section:'appointments'}});
+    }
+  });
+
+  // ── WHATSAPP ISSUES (admin/reception only) ──
+  if(isRecep&&_waIssues){
+    _waIssues.forEach(function(w){alerts.push(w);});
+  }
+
+  // ── FINANCE: outstanding balances, recall, pending plans, payroll (admin/reception) ──
+  if(isRecep&&_financeAlerts){
+    _financeAlerts.forEach(function(f){alerts.push(f);});
+  }
+
+  return alerts;
+}
+
+// Lightweight async loaders for alert categories that need their own queries —
+// results cached in globals and refreshed periodically (not on every render)
+var _waIssues=[];
+async function refreshWaIssues(){
+  if(!currentUser||currentUser.role==='dentist')return;
+  try{
+    var r=await db.from('wa_message_log').select('*').in('status',['failed','replied']).order('created_at',{ascending:false}).limit(20);
+    var rows=r.data||[];
+    var out=[];
+    rows.forEach(function(l){
+      if(l.status==='failed'){
+        out.push({cat:'whatsapp',type:'red',icon:'&#10060;',title:l.patient_name||'Unknown',msg:'WhatsApp message failed to deliver ('+(l.msg_key||'')+')',link:{section:'settings'}});
+      } else if(l.status==='replied'&&!l.reply_action){
+        out.push({cat:'whatsapp',type:'amber',icon:'&#128172;',title:l.patient_name||'Unknown',msg:'Replied: "'+(l.reply_text||'').slice(0,40)+'" — needs a human reply',link:{section:'settings'}});
+      }
+    });
+    _waIssues=out;
+  }catch(e){_waIssues=[];}
+}
+
+var _financeAlerts=[];
+async function refreshFinanceAlerts(){
+  if(!currentUser||currentUser.role==='dentist')return;
+  try{
+    var out=[];
+    // Outstanding wallet loans
+    var loanR=await db.from('wallet_loans').select('*').eq('status','outstanding');
+    (loanR.data||[]).forEach(function(l){
+      out.push({cat:'finance',type:'amber',icon:'&#128202;',title:l.borrower_wallet+' owes '+l.lender_wallet,
+        msg:fu(Number(l.amount||0))+' outstanding internal loan',link:{section:'finance'}});
+    });
+    _financeAlerts=out;
+  }catch(e){_financeAlerts=[];}
+}
+
+// ── STORED (real-time) NOTIFICATIONS ──
+async function loadStoredNotifs(){
+  if(!currentUser)return;
+  try{
+    var r=await db.from('notifications').select('*').order('created_at',{ascending:false}).limit(50);
+    _storedNotifs=(r.data||[]).filter(notifMatchesUser);
+  }catch(e){_storedNotifs=[];}
+}
+
+async function createNotification(row){
+  try{await db.from('notifications').insert([Object.assign({is_read:false},row)]);}
+  catch(e){console.warn('notif insert failed',e);}
+}
+
+async function markAllNotifsRead(){
+  var unread=_storedNotifs.filter(function(n){return !n.is_read;});
+  if(!unread.length)return;
+  var ids=unread.map(function(n){return n.id;});
+  await db.from('notifications').update({is_read:true}).in('id',ids);
+  _storedNotifs.forEach(function(n){n.is_read=true;});
+  renderNotifPanel();
+}
+
+async function markNotifRead(id){
+  await db.from('notifications').update({is_read:true}).eq('id',id);
+  var n=_storedNotifs.find(function(x){return x.id===id;});
+  if(n)n.is_read=true;
+}
+
+// Click a notification — mark read (if stored) and navigate
+function onNotifClick(item){
+  if(item._storedId)markNotifRead(item._storedId);
+  toggleNotifPanel(true); // force close
+  if(item.link&&item.link.section){
+    if(item.link.section==='patients'&&item.link.id){
+      goTo('patients');
+      openProf(item.link.id,item.link.name||'');
+    } else {
+      goTo(item.link.section);
+    }
   }
 }
-function toggleNotifPanel(){
-  var p=document.getElementById('notif-panel');if(p)p.classList.toggle('open');
+
+// ── MAIN REFRESH — call this whenever data changes ──
+function updateStockNotifications(){ refreshNotifBadgeAndPanel(); }
+async function refreshNotifBadgeAndPanel(){
+  if(!currentUser)return;
+  _liveNotifs=buildLiveNotifs();
+  var unreadStored=_storedNotifs.filter(function(n){return !n.is_read&&notifMatchesUser(n);});
+  var total=_liveNotifs.length+unreadStored.length;
+  var badge=document.getElementById('notif-badge');
+  if(badge){
+    if(total>0){badge.textContent=total>99?'99+':total;badge.classList.add('show');}
+    else{badge.classList.remove('show');}
+  }
+  renderNotifPanel();
+}
+
+var NOTIF_CAT_LABELS={all:'All',mine:'My patients',appointments:'Appointments',finance:'Finance',whatsapp:'WhatsApp',stock:'Stock'};
+function setNotifTab(tab){notifTab=tab;renderNotifPanel();}
+
+function renderNotifPanel(){
+  var listEl=document.getElementById('notif-list');
+  var tabsEl=document.getElementById('notif-tabs');
+  if(!listEl||!tabsEl)return;
+
+  // Build combined item list with category tags
+  var items=[];
+  _liveNotifs.forEach(function(a){items.push(Object.assign({_unread:false,_time:null},a));});
+  _storedNotifs.forEach(function(n){
+    items.push({
+      cat:n.cat||'mine',type:n.color||'blue',icon:n.icon||'&#128276;',
+      title:n.title,msg:n.message,link:n.link_section?{section:n.link_section,id:n.link_id,name:(n.link_extra&&n.link_extra.name)}:null,
+      _unread:!n.is_read,_storedId:n.id,_time:n.created_at
+    });
+  });
+
+  // Determine which tabs to show based on role
+  var isAdmin=currentUser&&currentUser.role==='admin';
+  var isDentistOrPartner=currentUser&&(currentUser.role==='dentist'||currentUser.role==='partner');
+  var tabs=['all'];
+  if(isDentistOrPartner||isAdmin)tabs.push('mine');
+  tabs.push('appointments');
+  if(isAdmin||(currentUser&&(currentUser.role==='receptionist'||currentUser.role==='assistant'))){tabs.push('finance');tabs.push('whatsapp');}
+  tabs.push('stock');
+
+  tabsEl.innerHTML=tabs.map(function(t){
+    return '<button class="notif-tab'+(notifTab===t?' act':'')+'" onclick="setNotifTab(\''+t+'\')">'+NOTIF_CAT_LABELS[t]+'</button>';
+  }).join('');
+
+  // Filter by tab
+  var filtered=items.filter(function(it){
+    if(notifTab==='all')return true;
+    if(notifTab==='mine')return it.cat==='mine'||it.cat==='checkin'||it.cat==='lab'||it.cat==='loan';
+    return it.cat===notifTab;
+  });
+
+  // Sort: unread/realtime first (with time), then live alerts
+  filtered.sort(function(a,b){
+    if(a._time&&b._time)return new Date(b._time)-new Date(a._time);
+    if(a._time&&!b._time)return -1;
+    if(!a._time&&b._time)return 1;
+    return 0;
+  });
+
+  if(!filtered.length){
+    listEl.innerHTML='<div class="notif-list-scroll"><div style="padding:24px;text-align:center;color:var(--s400);font-size:12px;">All clear &#10003;</div></div>';
+    return;
+  }
+
+  listEl.innerHTML='<div class="notif-list-scroll">'+filtered.map(function(it,idx){
+    var timeLabel=it._time?timeAgo(it._time):'';
+    return '<div class="notif-item '+it.type+(it._unread?' unread':'')+'" onclick="onNotifClick(_notifClickItems['+idx+'])">'+
+      (it._unread?'<div class="ni-dot"></div>':'<span class="ni-icon">'+it.icon+'</span>')+
+      '<div class="ni-body">'+
+      '<div class="ni-title">'+it.title+'</div>'+
+      '<div class="ni-msg">'+it.msg+'</div>'+
+      (timeLabel?'<div class="ni-time">'+timeLabel+'</div>':'')+
+      '</div></div>';
+  }).join('')+'</div>';
+  window._notifClickItems=filtered;
+}
+
+function timeAgo(iso){
+  var diff=(Date.now()-new Date(iso).getTime())/1000;
+  if(diff<60)return 'just now';
+  if(diff<3600)return Math.floor(diff/60)+'m ago';
+  if(diff<86400)return Math.floor(diff/3600)+'h ago';
+  return Math.floor(diff/86400)+'d ago';
+}
+
+function toggleNotifPanel(forceClose){
+  var p=document.getElementById('notif-panel');
+  var ov=document.getElementById('notif-overlay');
+  if(!p)return;
+  if(forceClose===true){p.classList.remove('open');if(ov)ov.classList.remove('show');return;}
+  p.classList.toggle('open');
+  if(ov)ov.classList.toggle('show',p.classList.contains('open'));
+  if(p.classList.contains('open'))refreshNotifBadgeAndPanel();
 }
 document.addEventListener('click',function(e){
   var wrap=document.getElementById('notif-wrap');
-  if(wrap&&!wrap.contains(e.target)){var p=document.getElementById('notif-panel');if(p)p.classList.remove('open');}
+  var p=document.getElementById('notif-panel');
+  if(wrap&&p&&p.classList.contains('open')&&!wrap.contains(e.target)){
+    p.classList.remove('open');
+    var ov=document.getElementById('notif-overlay');if(ov)ov.classList.remove('show');
+  }
 });
+
+// ── REALTIME SUBSCRIPTION ──
+var _notifChannel=null;
+function startNotifRealtime(){
+  if(_notifChannel)return;
+  _notifChannel=db.channel('notifications-channel')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications'},function(payload){
+      var n=payload.new;
+      if(!notifMatchesUser(n))return;
+      _storedNotifs.unshift(n);
+      refreshNotifBadgeAndPanel();
+      var bell=document.getElementById('notif-bell-btn');
+      if(bell){bell.classList.remove('pulse');void bell.offsetWidth;bell.classList.add('pulse');}
+      showToast((n.icon?n.icon.replace(/&#(\d+);/,function(_,c){return String.fromCodePoint(c);})+' ':'')+n.title);
+    })
+    .subscribe();
+}
+
+async function initNotifCenter(){
+  await loadStoredNotifs();
+  refreshWaIssues();
+  refreshFinanceAlerts();
+  refreshNotifBadgeAndPanel();
+  startNotifRealtime();
+  // periodic refresh for live-computed categories
+  setInterval(function(){
+    refreshWaIssues();refreshFinanceAlerts();refreshNotifBadgeAndPanel();
+  },120000); // every 2 minutes
+}
 
 // ── CATEGORY MANAGEMENT ──
 async function openStockCatMgr(){
@@ -5822,6 +6107,7 @@ async function initStockNotifications(){
   var cR=await db.from('stock_categories').select('*').order('name');
   stockCats=cR.data||[];
   updateStockNotifications();
+  initNotifCenter();
 }
 // ══════════════════════ DIAGNOSIS & TREATMENT PLAN ═══════════════
 var diagSelTeeth={}, diagIsPrim=false;
@@ -6246,6 +6532,16 @@ async function saveWalletLoan(){
   if(r.error){showToast('Failed: '+r.error.message,'error');return;}
   showToast('Loan recorded ✅ — visible in Finance → Internal Debts');
   closeMdl('wallet-loan-modal');
+  // Notify the lending partner that their wallet was borrowed from
+  if(lender&&lender!=='value'&&PARTNERS.indexOf(lender)>=0){
+    createNotification({
+      cat:'finance',type:'amber',color:'amber',icon:'&#128202;',
+      title:borrower+' borrowed from your wallet',
+      message:fu(amount)+' — '+(notes||'internal loan'),
+      target_dentist:lender,target_role:null,
+      link_section:'finance',link_id:null,link_extra:null
+    });
+  }
 }
 function openNewLoanDialog(){
   openWalletLoan(PARTNERS[0]||'value',0,'');
@@ -7098,6 +7394,7 @@ async function markLabReceived(labOrderId, pid, pname){
   var r=await db.from('lab_orders').update({status:'received',received_date:fd(new Date())}).eq('id',labOrderId);
   if(r.error){showToast('Failed: '+r.error.message,'error');return;}
   showToast('Lab work marked as received ✅');
+  notifyLabReceived(labOrderId);
   if(pid&&pname)renderProf(pid,pname);
 }
 
@@ -7135,6 +7432,7 @@ async function markLabReceivedFromList(orderId, labId, labName){
   var r=await db.from('lab_orders').update({status:'received',received_date:fd(new Date())}).eq('id',orderId);
   if(r.error){showToast('Failed','error');return;}
   showToast('Marked received ✅');
+  notifyLabReceived(orderId);
   // refresh the lab detail view
   var cont=document.getElementById('lab-orders-section');
   if(cont){var html=await renderLabOrders(labId,labName);cont.innerHTML=html;}
@@ -7691,6 +7989,12 @@ async function saveAppt(){
   if(matches.length===1&&!pid)pid=matches[0].id;
   var id=document.getElementById('am-id').value;
   var status=document.getElementById('am-status').value||'open';
+  // Capture the PREVIOUS status (for new status-change notifications) before saving
+  var prevStatus=null;
+  if(id){
+    var existingAppt=(allAppts||[]).find(function(a){return a.id===id;});
+    prevStatus=existingAppt?existingAppt.status:null;
+  }
   var amTeeth=Object.keys(amSelTeeth).map(function(n){return parseInt(n);}).sort(function(a,b){return a-b;});
   // Get case/session info from panel
   var caseIdEl=document.getElementById('am-case-id');
@@ -7710,7 +8014,37 @@ async function saveAppt(){
   showToast(id?'Appointment updated':'Appointment booked');closeMdl('am-modal');
   var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
   if(!ar.error)allAppts=ar.data||[];buildSched();
+  // ── NOTIFY THE DENTIST when status changes to confirmed / checked-in / in-progress ──
+  if(id&&prevStatus!==status&&dr){
+    var apptId=id;
+    notifyDentistOfStatusChange(dr,status,pt,room,start,apptId,pid);
+  }
 }
+
+// Sends a real-time notification to the assigned dentist when an appointment's
+// status changes to one they care about (confirmed / checked-in / in-progress).
+async function notifyDentistOfStatusChange(dentistName,status,patientName,room,startTime,apptId,patientId){
+  var STATUS_NOTIF={
+    confirmed:{icon:'&#9989;',title:patientName+' confirmed',color:'green',
+      message:'Confirmed for '+(startTime?startTime.slice(0,5):'')+(room?' · Room '+room:'')},
+    checkedin:{icon:'&#128679;',title:patientName+' has arrived',color:'amber',
+      message:'Checked in'+(room?' · Room '+room:'')+' — ready when you are'},
+    inprogress:{icon:'&#128260;',title:patientName+' — in progress',color:'blue',
+      message:'Procedure started'+(room?' · Room '+room:'')}
+  };
+  var cfg=STATUS_NOTIF[status];
+  if(!cfg)return;
+  await createNotification({
+    cat:'checkin',type:status,color:cfg.color,icon:cfg.icon,
+    title:cfg.title,message:cfg.message,
+    target_dentist:dentistName,target_role:null,
+    link_section:'patients',link_id:patientId||null,
+    link_extra:patientId?{name:patientName}:null,
+    appointment_id:apptId
+  });
+}
+
+
 
 // ══════════════ PROC MODAL OPEN — NEW VS CONTINUING CASE ═════════
 async function openAddProc(pid){
