@@ -8253,15 +8253,16 @@ async function saveAppt(){
     status:status,teeth:amTeeth.length>0?amTeeth:null,
     case_id:caseId||null,session_name:sessionName||null};
   if(status==='checkedin')payload.checkin_time=new Date().toISOString();
-  var r=id?await db.from('appointments').update(payload).eq('id',id):await db.from('appointments').insert([payload]);
+  var r=id?await db.from('appointments').update(payload).eq('id',id):await db.from('appointments').insert([payload]).select();
   if(r.error){showToast('Failed to save','error');console.error(r.error);return;}
   showToast(id?'Appointment updated':'Appointment booked');closeMdl('am-modal');
   var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
   if(!ar.error)allAppts=ar.data||[];buildSched();
   // ── NOTIFY THE DENTIST when status changes to confirmed / checked-in / in-progress ──
-  if(id&&prevStatus!==status&&dr){
-    var apptId=id;
-    notifyDentistOfStatusChange(dr,status,pt,room,start,apptId,pid);
+  // Covers both: (a) an existing appointment whose status changed, and
+  // (b) a brand-new appointment booked directly with a non-"open" status.
+  if(dr&&((id&&prevStatus!==status)||(!id&&status!=='open'))){
+    notifyDentistOfStatusChange(dr,status,pt,room,start,id||(r.data&&r.data[0]&&r.data[0].id)||null,pid);
   }
 }
 
