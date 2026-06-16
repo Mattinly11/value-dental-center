@@ -1803,7 +1803,7 @@ function goTo(s){
     var tb=document.querySelector('.topbar');
     if(tb){var rfDiv=document.createElement('button');rfDiv.id='topbar-refresh';rfDiv.title='Refresh';
       rfDiv.style.cssText='background:none;border:1px solid var(--s200);border-radius:var(--radsm);width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--s500);display:flex;align-items:center;justify-content:center;';
-      rfDiv.innerHTML='&#8635;';rfDiv.onclick=function(){currentSection&&goTo(currentSection);};
+      rfDiv.innerHTML='&#8635;';rfDiv.onclick=function(){currentSection&&goTo(currentSection);refreshAllNotifData();};
       tb.insertBefore(rfDiv,tb.querySelector('#pg-actions'));rfEl=rfDiv;}
   }
   currentSection=s;
@@ -4134,6 +4134,86 @@ async function confirmBroadcast(){
   }
 }
 
+// ══════════════════════ NOTIFICATION THRESHOLDS (Settings) ═══════════
+var _notifThresholds={
+  id:1,
+  balance_threshold:50000,      // IQD — alert if patient owes more than this
+  balance_enabled:true,
+  payroll_enabled:true,
+  recall_heads_up_days:7,        // alert staff this many days BEFORE the WhatsApp recall fires
+  recall_enabled:true,
+  treatment_plan_days:14,        // alert if a "planned" item has sat this long
+  treatment_plan_enabled:true,
+  birthday_enabled:true
+};
+async function loadNotifThresholds(){
+  try{
+    var r=await db.from('notif_settings').select('*').eq('id',1).single();
+    if(!r.error&&r.data)_notifThresholds=Object.assign({},_notifThresholds,r.data);
+  }catch(e){/* table may not exist yet — use defaults */}
+}
+
+async function renderNotifSettingsTab(){
+  var el=document.getElementById('settings-body');if(!el)return;
+  await loadNotifThresholds();
+  var t=_notifThresholds;
+  el.innerHTML=
+    '<div class="set-sec">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--s800);margin-bottom:4px;">&#128276; Notification thresholds</div>'+
+    '<div style="font-size:11px;color:var(--s400);margin-bottom:14px;">Control when alerts appear in the notification bell for admin and reception.</div>'+
+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Outstanding balance alerts</div>'+
+    '<div style="font-size:10px;color:var(--s400);">Alert when a patient owes more than this amount</div></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;">'+
+    '<input type="number" class="finp" id="ns-balance-threshold" value="'+(t.balance_threshold||50000)+'" style="width:110px;text-align:right;">'+
+    '<span style="font-size:11px;color:var(--s400);">IQD</span>'+
+    '<input type="checkbox" id="ns-balance-enabled" '+(t.balance_enabled!==false?'checked':'')+' style="width:36px;height:20px;accent-color:var(--g600);"></div></div>'+
+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Unpaid dentist payroll</div>'+
+    '<div style="font-size:10px;color:var(--s400);">Alert if a dentist hasn\'t been paid yet this calendar month</div></div>'+
+    '<input type="checkbox" id="ns-payroll-enabled" '+(t.payroll_enabled!==false?'checked':'')+' style="width:36px;height:20px;accent-color:var(--g600);"></div>'+
+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Recall heads-up</div>'+
+    '<div style="font-size:10px;color:var(--s400);">Notify staff this many days before the WhatsApp recall message goes out, so they can call instead</div></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;">'+
+    '<input type="number" class="finp" id="ns-recall-days" value="'+(t.recall_heads_up_days||7)+'" style="width:70px;text-align:center;">'+
+    '<span style="font-size:11px;color:var(--s400);">days before</span>'+
+    '<input type="checkbox" id="ns-recall-enabled" '+(t.recall_enabled!==false?'checked':'')+' style="width:36px;height:20px;accent-color:var(--g600);"></div></div>'+
+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Pending treatment plans</div>'+
+    '<div style="font-size:10px;color:var(--s400);">Alert the dentist if a "planned" item has been waiting this long without being started</div></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;">'+
+    '<input type="number" class="finp" id="ns-tplan-days" value="'+(t.treatment_plan_days||14)+'" style="width:70px;text-align:center;">'+
+    '<span style="font-size:11px;color:var(--s400);">days</span>'+
+    '<input type="checkbox" id="ns-tplan-enabled" '+(t.treatment_plan_enabled!==false?'checked':'')+' style="width:36px;height:20px;accent-color:var(--g600);"></div></div>'+
+
+    '<div class="set-row"><div><div style="font-size:12px;font-weight:600;">Birthdays today</div>'+
+    '<div style="font-size:10px;color:var(--s400);">Show a reminder when a patient\'s birthday is today</div></div>'+
+    '<input type="checkbox" id="ns-birthday-enabled" '+(t.birthday_enabled!==false?'checked':'')+' style="width:36px;height:20px;accent-color:var(--g600);"></div>'+
+
+    '<div style="display:flex;justify-content:flex-end;margin-top:10px;"><button class="btn btnp btnsm" onclick="saveNotifThresholds()">Save</button></div>'+
+    '</div>';
+}
+
+async function saveNotifThresholds(){
+  var payload={
+    id:1,
+    balance_threshold:parseFloat(document.getElementById('ns-balance-threshold').value)||0,
+    balance_enabled:document.getElementById('ns-balance-enabled').checked,
+    payroll_enabled:document.getElementById('ns-payroll-enabled').checked,
+    recall_heads_up_days:parseInt(document.getElementById('ns-recall-days').value)||7,
+    recall_enabled:document.getElementById('ns-recall-enabled').checked,
+    treatment_plan_days:parseInt(document.getElementById('ns-tplan-days').value)||14,
+    treatment_plan_enabled:document.getElementById('ns-tplan-enabled').checked,
+    birthday_enabled:document.getElementById('ns-birthday-enabled').checked
+  };
+  var r=await db.from('notif_settings').upsert([payload]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  _notifThresholds=payload;
+  showToast('Notification settings saved ✅');
+  refreshAllNotifData();
+}
+
 function renderSettings(){
   if(!canAccessSection('settings')){accessDenied('settings');return;}
   document.getElementById('pg-content').innerHTML=
@@ -4142,6 +4222,7 @@ function renderSettings(){
     (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='accounts'?' act':'')+'" onclick="settingsTab=\'accounts\';renderSettings()">&#128100; Accounts</button>':'')+
     (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='dentists'?' act':'')+'" onclick="settingsTab=\'dentists\';renderSettings()">&#9673; Dentists</button>':'')+
     (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='whatsapp'?' act':'')+'" onclick="settingsTab=\'whatsapp\';renderSettings()">&#128241; WhatsApp</button>':'')+
+    (can('canManageAccounts')?'<button class="fin-tab'+(settingsTab==='notifications'?' act':'')+'" onclick="settingsTab=\'notifications\';renderSettings()">&#128276; Notifications</button>':'')+
     '</div>'+
     '<div id="settings-body"></div>';
   if(settingsTab==='accounts'&&can('canManageAccounts')){
@@ -4150,6 +4231,8 @@ function renderSettings(){
     renderDentistsTab();
   } else if(settingsTab==='whatsapp'&&can('canManageAccounts')){
     renderWhatsAppTab();
+  } else if(settingsTab==='notifications'&&can('canManageAccounts')){
+    renderNotifSettingsTab();
   } else {
     renderGeneralTab();
   }
@@ -5603,9 +5686,14 @@ function buildLiveNotifs(){
     _waIssues.forEach(function(w){alerts.push(w);});
   }
 
-  // ── FINANCE: outstanding balances, recall, pending plans, payroll (admin/reception) ──
+  // ── FINANCE: outstanding balances, internal loans, payroll (admin/reception) ──
   if(isRecep&&_financeAlerts){
     _financeAlerts.forEach(function(f){alerts.push(f);});
+  }
+
+  // ── CARE: recall heads-up, pending treatment plans, birthdays ──
+  if(_careAlerts){
+    _careAlerts.forEach(function(f){alerts.push(f);});
   }
 
   return alerts;
@@ -5636,14 +5724,146 @@ async function refreshFinanceAlerts(){
   if(!currentUser||currentUser.role==='dentist')return;
   try{
     var out=[];
+    await loadNotifThresholds();
+    var t=_notifThresholds;
+
     // Outstanding wallet loans
     var loanR=await db.from('wallet_loans').select('*').eq('status','outstanding');
     (loanR.data||[]).forEach(function(l){
       out.push({cat:'finance',type:'amber',icon:'&#128202;',title:l.borrower_wallet+' owes '+l.lender_wallet,
         msg:fu(Number(l.amount||0))+' outstanding internal loan',link:{section:'finance'}});
     });
+
+    // ── OUTSTANDING PATIENT BALANCES ──
+    if(t.balance_enabled!==false){
+      var invR=await db.from('invoices').select('id,patient_id,fee,fee_currency,patient_name');
+      var invs=invR.data||[];
+      if(invs.length){
+        var invIds=invs.map(function(i){return i.id;});
+        var payR=await db.from('payments').select('invoice_id,amount').in('invoice_id',invIds);
+        var paidByInv={};
+        (payR.data||[]).forEach(function(p){paidByInv[p.invoice_id]=(paidByInv[p.invoice_id]||0)+Number(p.amount||0);});
+        var balByPatient={};
+        invs.forEach(function(inv){
+          var bal=toIQD(Number(inv.fee||0),inv.fee_currency)-(paidByInv[inv.id]||0);
+          if(bal>0){
+            var key=inv.patient_id||inv.patient_name;
+            if(!balByPatient[key])balByPatient[key]={name:inv.patient_name,id:inv.patient_id,total:0};
+            balByPatient[key].total+=bal;
+          }
+        });
+        Object.values(balByPatient).forEach(function(b){
+          if(b.total>=(t.balance_threshold||50000)){
+            out.push({cat:'finance',type:'amber',icon:'&#128181;',title:b.name+' has an outstanding balance',
+              msg:fu(Math.round(b.total))+' due',link:{section:'patients',id:b.id,name:b.name}});
+          }
+        });
+      }
+    }
+
+    // ── UNPAID DENTIST PAYROLL THIS MONTH ──
+    if(t.payroll_enabled!==false){
+      var monthStart=new Date();monthStart.setDate(1);
+      var monthStartStr=fd(monthStart);
+      var payrollR=await db.from('salary_payments').select('staff_name,date').gte('date',monthStartStr);
+      var paidThisMonth=new Set((payrollR.data||[]).map(function(p){return p.staff_name;}));
+      REG.forEach(function(dr){
+        if(!paidThisMonth.has(dr)){
+          out.push({cat:'finance',type:'amber',icon:'&#128176;',title:dr+' — payroll not yet paid',
+            msg:'No salary payment recorded for '+monthStart.toLocaleString('en-US',{month:'long'}),
+            link:{section:'finance'}});
+        }
+      });
+    }
+
     _financeAlerts=out;
-  }catch(e){_financeAlerts=[];}
+  }catch(e){console.warn('finance alerts error',e);_financeAlerts=[];}
+}
+
+// ── RECALL HEADS-UP & PENDING TREATMENT PLANS (admin/reception + assigned dentist) ──
+var _careAlerts=[];
+async function refreshCareAlerts(){
+  if(!currentUser)return;
+  try{
+    var out=[];
+    await loadNotifThresholds();
+    var t=_notifThresholds;
+    var isAdmin=currentUser.role==='admin';
+    var isRecep=isAdmin||currentUser.role==='receptionist'||currentUser.role==='assistant';
+    var myDentist=currentUser.linked_dentist;
+
+    // ── RECALL HEADS-UP (admin/reception only — gives staff a chance to call before the WhatsApp recall fires) ──
+    if(isRecep&&t.recall_enabled!==false){
+      var waS=await db.from('wa_settings').select('*').eq('id',1).single();
+      var recallMonths=(waS.data&&waS.data.recall_months)||6;
+      var headsUpDays=t.recall_heads_up_days||7;
+      // lowerBound = the date that WOULD trigger the recall TODAY (lastDate <= lowerBound → already recalled)
+      var lowerBound=new Date();lowerBound.setMonth(lowerBound.getMonth()-recallMonths);
+      // upperBound = lastDate that will trigger the recall within headsUpDays from now
+      var upperBound=new Date(lowerBound);upperBound.setDate(upperBound.getDate()+headsUpDays);
+      var lowerStr=fd(lowerBound),upperStr=fd(upperBound);
+      var pr=await db.from('patients').select('id,name,status').eq('status','active');
+      var patients=pr.data||[];
+      for(var i=0;i<patients.length;i++){
+        var p=patients[i];
+        var lastR=await db.from('appointments').select('date').eq('patient_id',p.id).order('date',{ascending:false}).limit(1);
+        var lastDate=lastR.data&&lastR.data[0]?lastR.data[0].date:null;
+        // in the "heads up" window: hasn't crossed the recall line yet, but will within headsUpDays
+        if(lastDate&&lastDate>lowerStr&&lastDate<=upperStr){
+          out.push({cat:'finance',type:'blue',icon:'&#128197;',title:p.name+' is due for a recall soon',
+            msg:'Last visit was over '+recallMonths+' months ago — consider calling before the automated reminder',
+            link:{section:'patients',id:p.id,name:p.name}});
+        }
+      }
+    }
+
+    // ── PENDING TREATMENT PLAN ITEMS ──
+    if(t.treatment_plan_enabled!==false){
+      var days=t.treatment_plan_days||14;
+      var cutoffDate=new Date();cutoffDate.setDate(cutoffDate.getDate()-days);
+      var itemsR=await db.from('diagnosis_items').select('*').eq('status','planned').lte('created_at',cutoffDate.toISOString());
+      var pendingItems=itemsR.data||[];
+      if(pendingItems.length){
+        var planIds=[...new Set(pendingItems.map(function(i){return i.plan_id;}))];
+        var plansR=await db.from('diagnosis_plans').select('id,patient_id,dentist').in('id',planIds);
+        var plansById={};(plansR.data||[]).forEach(function(pl){plansById[pl.id]=pl;});
+        var patientIds=[...new Set(Object.values(plansById).map(function(pl){return pl.patient_id;}).filter(Boolean))];
+        var ptsR=patientIds.length?await db.from('patients').select('id,name').in('id',patientIds):{data:[]};
+        var ptsById={};(ptsR.data||[]).forEach(function(pp){ptsById[pp.id]=pp;});
+
+        pendingItems.forEach(function(item){
+          var plan=plansById[item.plan_id];
+          if(!plan)return;
+          var dentist=plan.dentist;
+          var patient=ptsById[plan.patient_id];
+          var patientName=patient?patient.name:'Patient';
+          // dentists see only their own patients; admin/reception see all
+          if(!isAdmin&&!isRecep&&myDentist&&dentist!==myDentist)return;
+          out.push({cat:'mine',type:'amber',icon:'&#128221;',title:patientName+' — treatment not started',
+            msg:(item.treatment||'Planned treatment')+' has been pending '+days+'+ days'+(dentist?' ('+dentist+')':''),
+            link:{section:'patients',id:plan.patient_id,name:patientName}});
+        });
+      }
+    }
+
+    // ── BIRTHDAYS TODAY ──
+    if(isRecep&&t.birthday_enabled!==false){
+      var today=new Date();
+      var mm=String(today.getMonth()+1).padStart(2,'0');
+      var dd=String(today.getDate()).padStart(2,'0');
+      var bR=await db.from('patients').select('id,name,dob').not('dob','is',null);
+      (bR.data||[]).forEach(function(p){
+        if(!p.dob)return;
+        var parts=p.dob.split('-');
+        if(parts.length===3&&parts[1]===mm&&parts[2]===dd){
+          out.push({cat:'appointments',type:'green',icon:'&#127881;',title:p.name+'\'s birthday is today!',
+            msg:'Consider wishing them well during their visit',link:{section:'patients',id:p.id,name:p.name}});
+        }
+      });
+    }
+
+    _careAlerts=out;
+  }catch(e){console.warn('care alerts error',e);_careAlerts=[];}
 }
 
 // ── STORED (real-time) NOTIFICATIONS ──
@@ -5784,7 +6004,23 @@ function toggleNotifPanel(forceClose){
   if(forceClose===true){p.classList.remove('open');if(ov)ov.classList.remove('show');return;}
   p.classList.toggle('open');
   if(ov)ov.classList.toggle('show',p.classList.contains('open'));
-  if(p.classList.contains('open'))refreshNotifBadgeAndPanel();
+  if(p.classList.contains('open'))refreshAllNotifData();
+}
+// Re-fetches everything notification-related from the database — used when
+// opening the bell and when the page refresh button is clicked.
+async function refreshAllNotifData(){
+  var tasks=[loadStoredNotifs(),refreshWaIssues(),refreshFinanceAlerts(),refreshCareAlerts()];
+  // Keep live-computed alerts (stock, appointments-today) accurate too
+  tasks.push(db.from('stock_items').select('*').order('name').then(function(r){if(!r.error)stockItems=r.data||[];}));
+  tasks.push(db.from('appointments').select('*').eq('date',fd(new Date())).then(function(r){
+    if(!r.error){
+      // merge today's appointments into allAppts without disturbing other dates being viewed
+      var today=fd(new Date());
+      allAppts=(allAppts||[]).filter(function(a){return a.date!==today;}).concat(r.data||[]);
+    }
+  }));
+  await Promise.all(tasks);
+  refreshNotifBadgeAndPanel();
 }
 document.addEventListener('click',function(e){
   var wrap=document.getElementById('notif-wrap');
@@ -5816,11 +6052,12 @@ async function initNotifCenter(){
   await loadStoredNotifs();
   refreshWaIssues();
   refreshFinanceAlerts();
+  refreshCareAlerts();
   refreshNotifBadgeAndPanel();
   startNotifRealtime();
   // periodic refresh for live-computed categories
   setInterval(function(){
-    refreshWaIssues();refreshFinanceAlerts();refreshNotifBadgeAndPanel();
+    refreshWaIssues();refreshFinanceAlerts();refreshCareAlerts();refreshNotifBadgeAndPanel();
   },120000); // every 2 minutes
 }
 
