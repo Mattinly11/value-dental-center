@@ -2076,6 +2076,7 @@ async function deletePatient(){
   if(!id)return;
   // check for unpaid invoices — BLOCK if any exist
   var invR=await db.from('invoices').select('id,fee,fee_currency,status').eq('patient_id',id);
+  if(invR.error){showToast('Could not check invoices — try again ('+invR.error.message+')','error');return;}
   var invs=invR.data||[];
   var unpaid=invs.filter(function(i){return i.status!=='paid';});
   if(unpaid.length>0){
@@ -2083,21 +2084,49 @@ async function deletePatient(){
     return;
   }
   if(!confirm('Delete patient "'+name+'"? This will also delete all their records. This cannot be undone.'))return;
-  // Delete case_visits first (child of cases)
+
+  // Each step is checked. If any step fails, we STOP immediately and tell the
+  // user exactly what was and wasn't deleted, instead of silently continuing
+  // and claiming success.
   var casesR=await db.from('cases').select('id').eq('patient_id',id);
+  if(casesR.error){showToast('Delete stopped before any changes were made: '+casesR.error.message,'error');return;}
   var caseIds=(casesR.data||[]).map(function(c){return c.id;});
-  if(caseIds.length){await db.from('case_visits').delete().in('case_id',caseIds);}
-  // Delete cases
-  await db.from('cases').delete().eq('patient_id',id);
-  // Delete lab orders
-  await db.from('lab_orders').delete().eq('patient_id',id).then(function(){});
-  // Delete payments, invoices, procedures, appointments, then patient
+
+  if(caseIds.length){
+    var cvR=await db.from('case_visits').delete().in('case_id',caseIds);
+    if(cvR.error){showToast('Delete stopped while removing case visits — nothing else was deleted: '+cvR.error.message,'error');return;}
+  }
+  var casesDelR=await db.from('cases').delete().eq('patient_id',id);
+  if(casesDelR.error){showToast('Delete stopped while removing cases — case visits were removed, the rest were not: '+casesDelR.error.message,'error');return;}
+
+  var labR=await db.from('lab_orders').delete().eq('patient_id',id);
+  if(labR.error){showToast('Delete stopped while removing lab orders — cases were removed, the rest were not: '+labR.error.message,'error');return;}
+
   var invIds=invs.map(function(i){return i.id;});
-  if(invIds.length){await db.from('payments').delete().in('invoice_id',invIds);}
-  await db.from('invoices').delete().eq('patient_id',id);
-  await db.from('procedures').delete().eq('patient_id',id);
-  await db.from('appointments').delete().ilike('patient_name',name);
-  await db.from('patients').delete().eq('id',id);
+  if(invIds.length){
+    var payDelR=await db.from('payments').delete().in('invoice_id',invIds);
+    if(payDelR.error){showToast('Delete stopped while removing payments — please check this patient\'s records: '+payDelR.error.message,'error');return;}
+  }
+  var invDelR=await db.from('invoices').delete().eq('patient_id',id);
+  if(invDelR.error){showToast('Delete stopped while removing invoices — payments were removed, the rest were not: '+invDelR.error.message,'error');return;}
+
+  var procDelR=await db.from('procedures').delete().eq('patient_id',id);
+  if(procDelR.error){showToast('Delete stopped while removing procedures — invoices were removed, the rest were not: '+procDelR.error.message,'error');return;}
+
+  // Delete appointments by patient_id (not name) so a same-named patient is never affected.
+  // Legacy appointments saved before patient_id existed (patient_id is null) are matched by
+  // name ONLY if that name is unique across all patients — same safe-fallback rule used
+  // elsewhere in the app for reading appointment history.
+  var apptDelR=await db.from('appointments').delete().eq('patient_id',id);
+  if(apptDelR.error){showToast('Delete stopped while removing appointments — procedures were removed, the rest were not: '+apptDelR.error.message,'error');return;}
+  var nameMatches=(allPts||[]).filter(function(p){return (p.name||'').trim().toLowerCase()===(name||'').trim().toLowerCase();});
+  if(nameMatches.length<=1){
+    await db.from('appointments').delete().is('patient_id',null).ilike('patient_name',name);
+  }
+
+  var ptDelR=await db.from('patients').delete().eq('id',id);
+  if(ptDelR.error){showToast('Almost done, but the patient record itself could not be removed — everything else was deleted: '+ptDelR.error.message,'error');return;}
+
   showToast('Patient deleted');closeMdl('pt-modal');renderPatients();
 }
 // ══════════════════════ PATIENT PROFILE ══════════════════════════
@@ -2239,21 +2268,28 @@ async function deleteProc(){
   if(!id)return;
   // find linked invoice
   var invR=await db.from('invoices').select('id').eq('procedure_id',id);
+  if(invR.error){showToast('Could not check linked invoice — try again: '+invR.error.message,'error');return;}
   var invs=invR.data||[];
   var invIds=invs.map(function(i){return i.id;});
   var hasPayments=false;
   if(invIds.length){
     var payR=await db.from('payments').select('id').in('invoice_id',invIds);
+    if(payR.error){showToast('Could not check payments — try again: '+payR.error.message,'error');return;}
     hasPayments=(payR.data||[]).length>0;
   }
   var msg='Delete this procedure?';
   if(invIds.length)msg+='\nThis will also delete the linked invoice'+(hasPayments?' and all its payments.':'.') ;
   if(!confirm(msg))return;
   if(invIds.length){
-    if(hasPayments)await db.from('payments').delete().in('invoice_id',invIds);
-    await db.from('invoices').delete().eq('procedure_id',id);
+    if(hasPayments){
+      var payDelR=await db.from('payments').delete().in('invoice_id',invIds);
+      if(payDelR.error){showToast('Delete stopped while removing payments — nothing else was deleted: '+payDelR.error.message,'error');return;}
+    }
+    var invDelR=await db.from('invoices').delete().eq('procedure_id',id);
+    if(invDelR.error){showToast('Delete stopped while removing the invoice — payments were removed, the procedure was not: '+invDelR.error.message,'error');return;}
   }
-  await db.from('procedures').delete().eq('id',id);
+  var procDelR=await db.from('procedures').delete().eq('id',id);
+  if(procDelR.error){showToast('The invoice was removed, but the procedure itself could not be deleted: '+procDelR.error.message,'error');return;}
   showToast('Procedure deleted');closeMdl('proc-modal');
   if(profState.pid)loadClinical(profState.pid);
 }
@@ -2303,8 +2339,10 @@ async function savePayment(){
   var date=document.getElementById('pay-date').value;
   var pid=document.getElementById('pay-pid').value;
   var pname=document.getElementById('pay-pname').value;
-  await db.from('payments').insert([{invoice_id:invId,amount:amt,method:method,date:date}]);
+  var insR=await db.from('payments').insert([{invoice_id:invId,amount:amt,method:method,date:date}]);
+  if(insR.error){showToast('Payment was NOT saved — please try again: '+insR.error.message,'error');return;}
   var pr=await db.from('payments').select('*').eq('invoice_id',invId);
+  if(pr.error){showToast('Payment was saved, but the invoice status could not be refreshed. Please reopen this invoice to confirm. ('+pr.error.message+')','error');closeMdl('pay-modal');closeMdl('ad-modal');return;}
   var pays=pr.data||[];
   var ir=await db.from('invoices').select('fee,fee_currency').eq('id',invId).single();
   var rawFee=Number((ir.data||{}).fee||0);
@@ -2312,10 +2350,11 @@ async function savePayment(){
   var totalFee=toIQD(rawFee,rawCurr);
   var totalPaid2=pays.reduce(function(s,p){return s+Number(p.amount||0);},0);
   var ns=totalPaid2>=totalFee?'paid':totalPaid2>0?'partial':'unpaid';
-  await db.from('invoices').update({status:ns}).eq('id',invId);
+  var statR=await db.from('invoices').update({status:ns}).eq('id',invId);
+  if(statR.error){showToast('Payment of '+amt+' was saved, but the invoice status could not be updated automatically. ('+statR.error.message+')','error');}
   // If invoice is for a case, mark case complete when fully paid
   if(ns==='paid'){
-    db.from('cases').update({status:'completed'}).eq('invoice_id',invId).then(function(){});
+    db.from('cases').update({status:'completed'}).eq('invoice_id',invId).then(function(r){if(r.error)console.warn('Case completion update failed:',r.error.message);});
   }
   showToast('Payment recorded! 💰');
   closeMdl('pay-modal');
@@ -2534,7 +2573,8 @@ async function onDragU(e){
   var nsm=Math.max(t2m(clinicOpen),Math.min(t2m(clinicClose)-d.dur,d.origSM+dm));
   var ns=m2t(nsm),ne=m2t(nsm+d.dur),nr=d.hoverRoom||d.origRoom;
   if(ns===m2t(d.origSM)&&nr===d.origRoom){buildSched();return;}
-  await db.from('appointments').update({start_time:ns,end_time:ne,room:nr}).eq('id',d.id);
+  var moveR=await db.from('appointments').update({start_time:ns,end_time:ne,room:nr}).eq('id',d.id);
+  if(moveR.error){showToast('Could not move — try again: '+moveR.error.message,'error');buildSched();return;}
   showToast('Moved to '+nr+' at '+ns);
   var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
   if(!ar.error)allAppts=ar.data||[];buildSched();
@@ -2562,7 +2602,8 @@ async function onResU(e){
   var nem=Math.max(r.origSM+SLOT_MIN,Math.min(t2m(clinicClose),r.origEM+dm));
   var ne=m2t(nem);
   if(ne===m2t(r.origEM)){buildSched();return;}
-  await db.from('appointments').update({end_time:ne}).eq('id',r.id);
+  var resR=await db.from('appointments').update({end_time:ne}).eq('id',r.id);
+  if(resR.error){showToast('Could not resize — try again: '+resR.error.message,'error');buildSched();return;}
   showToast('End time: '+ne);
   var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
   if(!ar.error)allAppts=ar.data||[];buildSched();
@@ -2666,7 +2707,9 @@ function openApptForPt(pid,pname){
 function selAS(k){document.getElementById('am-status').value=k;buildSG('am-status-grid',k,'selAS');}
 async function deleteAppt(){
   var id=document.getElementById('am-id').value;if(!id||!confirm('Cancel appointment?'))return;
-  await db.from('appointments').delete().eq('id',id);showToast('Cancelled');closeMdl('am-modal');
+  var r=await db.from('appointments').delete().eq('id',id);
+  if(r.error){showToast('Could not cancel — try again: '+r.error.message,'error');return;}
+  showToast('Cancelled');closeMdl('am-modal');
   var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
   if(!ar.error)allAppts=ar.data||[];buildSched();
 }
@@ -2715,7 +2758,8 @@ async function updateAS(ns){
   var updates={status:ns};
   if(ns==='checkedin')updates.checkin_time=new Date().toISOString();
   else updates.checkin_time=null;
-  await db.from('appointments').update(updates).eq('id',detailApptId);
+  var updR=await db.from('appointments').update(updates).eq('id',detailApptId);
+  if(updR.error){showToast('Could not update status — try again: '+updR.error.message,'error');return;}
   var savedApptId=detailApptId;
   closeMdl('ad-modal');detailApptId=null;
   var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
@@ -2723,6 +2767,8 @@ async function updateAS(ns){
   await loadApptInvoices();
   buildSched();
   // ── NOTIFY THE DENTIST whenever the status actually changes ──
+  // Only reached if the database update above succeeded, so the dentist is
+  // never notified of a status change that didn't really happen.
   if(prevAppt&&prevStatus!==ns&&prevAppt.dentist){
     notifyDentistOfStatusChange(prevAppt.dentist,ns,prevAppt.patient_name,prevAppt.room,prevAppt.start_time,savedApptId,prevAppt.patient_id);
   }
@@ -2736,13 +2782,21 @@ async function updateAS(ns){
 }
 async function delApptDetail(){
   if(!detailApptId||!confirm('Cancel this appointment?'))return;
-  await db.from('appointments').delete().eq('id',detailApptId);
+  var r=await db.from('appointments').delete().eq('id',detailApptId);
+  if(r.error){showToast('Could not cancel — try again: '+r.error.message,'error');return;}
   showToast('Cancelled');closeMdl('ad-modal');detailApptId=null;
   var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));
   if(!ar.error)allAppts=ar.data||[];buildSched();
 }
-function editApptDetail(){
-  var a=allAppts.find(function(x){return x.id===detailApptId;});if(!a)return;
+async function editApptDetail(){
+  if(!detailApptId)return;
+  // Fetch fresh from the database rather than trusting the in-memory schedule
+  // cache — the cache only updates on user action, so if a second person changed
+  // this same appointment moments ago (different tab, different device), the
+  // cached copy here could be stale and silently overwrite their change.
+  var r=await db.from('appointments').select('*').eq('id',detailApptId).single();
+  if(r.error||!r.data){showToast('Could not load this appointment — it may have been changed or removed. Refreshing...','error');closeMdl('ad-modal');var ar=await db.from('appointments').select('*').eq('date',fd(currentDate));if(!ar.error)allAppts=ar.data||[];buildSched();return;}
+  var a=r.data;
   closeMdl('ad-modal');
   document.getElementById('am-mtit').textContent='Edit appointment';
   document.getElementById('am-id').value=a.id;document.getElementById('am-patient').value=a.patient_name||'';
@@ -3719,7 +3773,8 @@ async function saveAdj(){
 async function deleteAdj(){
   var id=document.getElementById('adj-id').value;
   if(!id||!confirm('Delete this adjustment?'))return;
-  await db.from('staff_adjustments').delete().eq('id',id);
+  var r=await db.from('staff_adjustments').delete().eq('id',id);
+  if(r.error){showToast('Could not delete — try again: '+r.error.message,'error');return;}
   showToast('Deleted');closeMdl('adj-modal');buildFAdj();
 }
 async function buildFAdj(){
@@ -4080,7 +4135,8 @@ async function saveCustomTpl(){
 }
 async function deleteCustomTpl(id){
   if(!confirm('Delete this message template?'))return;
-  await db.from('wa_custom_templates').delete().eq('id',id);
+  var r=await db.from('wa_custom_templates').delete().eq('id',id);
+  if(r.error){showToast('Could not delete — try again: '+r.error.message,'error');return;}
   showToast('Deleted');renderWhatsAppTab();
 }
 function deleteCustomTplFromModal(){
@@ -4721,7 +4777,8 @@ async function deleteAccount(){
   var id=document.getElementById('acc-id').value;if(!id)return;
   if(currentUser&&currentUser.id===id){showToast('Cannot delete your own account','error');return;}
   if(!confirm('Delete this account?'))return;
-  await db.from('staff_accounts').delete().eq('id',id);
+  var r=await db.from('staff_accounts').delete().eq('id',id);
+  if(r.error){showToast('Could not delete — try again: '+r.error.message,'error');return;}
   showToast('Account deleted');closeMdl('acc-modal');renderAccountsTab();
 }
 
@@ -5060,13 +5117,19 @@ async function deleteLab(){
   var id=document.getElementById('lab-id').value;
   if(!id)return;
   var procR=await db.from('procedures').select('id').eq('lab_id',id).limit(1);
+  if(procR.error){showToast('Could not check procedures — try again: '+procR.error.message,'error');return;}
   if((procR.data||[]).length>0){showToast('Cannot delete: lab is used in recorded procedures.','error');return;}
   var svcR=await db.from('lab_services').select('id').eq('lab_id',id);
+  if(svcR.error){showToast('Could not check services — try again: '+svcR.error.message,'error');return;}
   var svcCount=(svcR.data||[]).length;
   var msg='Delete this lab?'+(svcCount>0?' This will also delete '+svcCount+' service'+(svcCount>1?'s':'')+'.':'');
   if(!confirm(msg))return;
-  if(svcCount>0)await db.from('lab_services').delete().eq('lab_id',id);
-  await db.from('labs').delete().eq('id',id);
+  if(svcCount>0){
+    var svcDelR=await db.from('lab_services').delete().eq('lab_id',id);
+    if(svcDelR.error){showToast('Delete stopped while removing services — the lab itself was not deleted: '+svcDelR.error.message,'error');return;}
+  }
+  var labDelR=await db.from('labs').delete().eq('id',id);
+  if(labDelR.error){showToast('Services were removed, but the lab itself could not be deleted: '+labDelR.error.message,'error');return;}
   showToast('Lab deleted');closeMdl('lab-modal');renderLabs();
 }
 function openAddSvc(labId,labName){
@@ -5109,7 +5172,8 @@ async function saveSvc(){
 async function deleteSvc(){
   var id=document.getElementById('svc-id').value;
   if(!id||!confirm('Delete this service?'))return;
-  await db.from('lab_services').delete().eq('id',id);
+  var r=await db.from('lab_services').delete().eq('id',id);
+  if(r.error){showToast('Could not delete — try again: '+r.error.message,'error');return;}
   var delLabId=document.getElementById('svc-lab-id').value;
   showToast('Deleted');closeMdl('svc-modal');
   var lr4=await db.from('labs').select('*').order('name');
@@ -5381,7 +5445,8 @@ async function saveFixture(){
 async function deleteFixture(){
   var id=document.getElementById('fixture-id').value;
   if(!id||!confirm('Delete this fixture?'))return;
-  await db.from('implant_fixtures').delete().eq('id',id);
+  var r=await db.from('implant_fixtures').delete().eq('id',id);
+  if(r.error){showToast('Could not delete — try again: '+r.error.message,'error');return;}
   showToast('Fixture deleted');closeMdl('fixture-modal');allFixtures=[];renderLabs();
 }
 
@@ -6114,7 +6179,8 @@ async function saveStockCat(){
 async function deleteStockCat(){
   var id=document.getElementById('sc-id').value;
   if(!id||!confirm('Delete this category? Items in this category will become uncategorized.'))return;
-  await db.from('stock_categories').delete().eq('id',id);
+  var r=await db.from('stock_categories').delete().eq('id',id);
+  if(r.error){showToast('Could not delete — try again: '+r.error.message,'error');return;}
   showToast('Category deleted');
   closeMdl('stock-cat-modal');
   await openStockCatMgr();
@@ -6214,8 +6280,10 @@ async function saveStockItem(){
 async function deleteStockItem(){
   var id=document.getElementById('si-id').value;
   if(!id||!confirm('Delete this stock item and all its history?'))return;
-  await db.from('stock_history').delete().eq('item_id',id);
-  await db.from('stock_items').delete().eq('id',id);
+  var histDelR=await db.from('stock_history').delete().eq('item_id',id);
+  if(histDelR.error){showToast('Delete stopped while removing history — the item was not deleted: '+histDelR.error.message,'error');return;}
+  var itemDelR=await db.from('stock_items').delete().eq('id',id);
+  if(itemDelR.error){showToast('History was removed, but the item itself could not be deleted: '+itemDelR.error.message,'error');return;}
   showToast('Item deleted');
   closeMdl('stock-item-modal');
   await renderStocks();
@@ -7003,11 +7071,6 @@ async function renderProceduresAdmin(){
 }
 
 
-function toggleFixturePrice(){
-  var yn=document.getElementById('padm-implant-yn');
-  var fw=document.getElementById('padm-fixture-wrap');
-  if(yn&&fw)fw.style.display=yn.value==='yes'?'block':'none';
-}
 function toggleImplantField(){
   var v=document.getElementById('padm-lab').value;
   var w=document.getElementById('padm-implant-wrap');
@@ -7898,7 +7961,8 @@ async function deletePayment(payId, invId, pid){
 // ══════════ DELETE SUBSTAFF ════════════════════════════════════════
 async function deleteSubstaff(id){
   if(!id||!confirm('Delete this staff member?'))return;
-  await db.from('substaff').delete().eq('id',id);
+  var r0=await db.from('substaff').delete().eq('id',id);
+  if(r0.error){showToast('Could not delete — try again: '+r0.error.message,'error');return;}
   showToast('Staff member deleted');
   closeMdl('sub-modal');
   var r=await db.from('substaff').select('*');
@@ -9150,11 +9214,6 @@ function buildProcAdminUI(){
   });
 }
 
-// ══════════ COMPAT — old treatment plan functions (stubs) ══════════
-function setTPMode(mode){}
-function syncTreatmentCost(){}
-function resetTPSection(fee,currency){}
-async function loadPatientPlans(pid){}
 // ══════════ UPDATED saveProc — treatment plan logic ═══════════════
 
 </script>
