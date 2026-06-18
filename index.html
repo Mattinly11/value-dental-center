@@ -1534,7 +1534,7 @@ var ROLE_PERMS = {
     canRecordProcedures:false, canSeeAllPatients:false, canUseStock:true, canAddStock:false
   },
   receptionist: {
-    sections:['dashboard','patients','appointments','billing','stocks'],
+    sections:['dashboard','patients','appointments','billing','finance','stocks'],
     crud:{
       patients:   {c:true, e:true,  d:false},
       appointments:{c:true, e:true, d:false},
@@ -1545,7 +1545,7 @@ var ROLE_PERMS = {
       stock:      {c:false, e:false, d:false},
       labs:       {c:false, e:false, d:false}
     },
-    canSeeAllFinance:false, canManageAccounts:false, canSeeProcedureAdmin:false,
+    canSeeAllFinance:true, canManageAccounts:false, canSeeProcedureAdmin:false,
     canRecordProcedures:false, canSeeAllPatients:true, canUseStock:true, canAddStock:false
   }
 };
@@ -2072,6 +2072,7 @@ async function savePatient(){
   if(profState.pid===id)renderProf(profState.pid,profState.pname);else renderPatients();
 }
 async function deletePatient(){
+  if(!canDo('delete','patients')){showToast('Only Admin can delete patients','error');return;}
   var id=document.getElementById('pt-id').value,name=document.getElementById('pt-name').value;
   if(!id)return;
   // check for unpaid invoices — BLOCK if any exist
@@ -3318,8 +3319,17 @@ function buildFP(){
 function buildFD(){
   var pays=getMPays();
   var paidMap=JSON.parse(localStorage.getItem('vdc-dr-paid-'+finY+'-'+finM)||'{}');
+  // A dentist (not admin/partner/reception) may only see their own payroll card,
+  // never another dentist's earnings. Same scoping pattern used for patients/billing.
+  var visibleDentists=REG;
+  if(currentUser&&currentUser.role==='dentist'&&currentUser.linked_dentist){
+    visibleDentists=REG.filter(function(dr){return dr===currentUser.linked_dentist;});
+  }
   var html='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">';
-  REG.forEach(function(dr){
+  if(!visibleDentists.length){
+    return html+'</div><div style="text-align:center;padding:30px;color:var(--s400);">No payroll record found for your account</div>';
+  }
+  visibleDentists.forEach(function(dr){
     var rates=getDR(dr);
     var myPays=pays.filter(function(p){var inv=getInv(p.invoice_id);return inv&&inv.treating_dentist===dr;});
     // calculate IQD and USD earnings separately using dual currency split
@@ -4774,6 +4784,7 @@ async function saveAccount(){
   showToast(id?'Account updated ✅':'Account created ✅');closeMdl('acc-modal');renderAccountsTab();
 }
 async function deleteAccount(){
+  if(!can('canManageAccounts')){showToast('Only Admin can delete staff accounts','error');return;}
   var id=document.getElementById('acc-id').value;if(!id)return;
   if(currentUser&&currentUser.id===id){showToast('Cannot delete your own account','error');return;}
   if(!confirm('Delete this account?'))return;
@@ -7960,6 +7971,7 @@ async function deletePayment(payId, invId, pid){
 
 // ══════════ DELETE SUBSTAFF ════════════════════════════════════════
 async function deleteSubstaff(id){
+  if(!can('canManageAccounts')){showToast('Only Admin can delete staff records','error');return;}
   if(!id||!confirm('Delete this staff member?'))return;
   var r0=await db.from('substaff').delete().eq('id',id);
   if(r0.error){showToast('Could not delete — try again: '+r0.error.message,'error');return;}
