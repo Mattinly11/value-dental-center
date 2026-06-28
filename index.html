@@ -1642,60 +1642,35 @@ function loadCustomPerms(){
 }
 loadCustomPerms();
 
-// ── AUTH CONFIGURATION ──────────────────────────────────────────
-// The auth Edge Function URL — same Supabase project, /functions/v1/vdc-auth
-var AUTH_URL = SUPA + '/functions/v1/vdc-auth';
-// Active session token — sent with every database request after login
-var _vdcToken = null;
-
-// Rebuild the Supabase client using the current session token so that
-// every subsequent database call carries the JWT and RLS policies can
-// read the vdc_role claim from it.
-function _applyTokenToClient(token) {
-  _vdcToken = token;
-  db = supabase.createClient(SUPA, SKEY, {
-    global: {
-      headers: { 'Authorization': 'Bearer ' + token }
-    }
-  });
-}
-
 async function doLogin(){
   var u=document.getElementById('li-u').value.trim();
   var p=document.getElementById('li-p').value;
   if(!u||!p){var e=document.getElementById('li-err');e.textContent='Enter username and password';e.style.display='block';setTimeout(function(){e.style.display='none';},3000);return;}
 
-  // Call the server-side auth Edge Function — password is verified on the
-  // server, never sent in plain text to the database from the browser.
-  var resp, data;
-  try {
-    resp = await fetch(AUTH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u.toLowerCase(), password: p })
-    });
-    data = await resp.json();
-  } catch(err) {
-    var e3=document.getElementById('li-err');
-    e3.textContent='Could not connect — check your internet connection';
-    e3.style.display='block';
-    setTimeout(function(){e3.style.display='none';},4000);
-    return;
+  // Hash the entered password
+  var hash = await sha256(p);
+
+  // Look up in DB — try hash first, then plain text (for migration compatibility)
+  var r = await db.from('staff_accounts').select('*').eq('username',u).eq('is_active',true).limit(1);
+  var acc = null;
+  if(r.data&&r.data.length){
+    var candidate = r.data[0];
+    if(candidate.password_hash === hash || candidate.password_hash === p){
+      acc = candidate;
+      // Silently upgrade plain text to hash if needed
+      if(candidate.password_hash === p){
+        db.from('staff_accounts').update({password_hash:hash}).eq('id',candidate.id).then(function(){});
+      }
+    }
   }
 
-  if(!resp.ok || !data.token) {
+  if(!acc){
     var e2=document.getElementById('li-err');
-    e2.textContent=data.error||'Incorrect username or password';
+    e2.textContent='Incorrect username or password';
     e2.style.display='block';
     setTimeout(function(){e2.style.display='none';},3000);
     return;
   }
-
-  var acc = data.user;
-  var token = data.token;
-
-  // Apply the token to the Supabase client so RLS policies work
-  _applyTokenToClient(token);
 
   // Successful login — load personal permissions if set
   var personalPerms = null;
@@ -1708,7 +1683,7 @@ async function doLogin(){
     username: acc.username,
     role: acc.role,
     linked_dentist: acc.linked_dentist||null,
-    is_active: true,
+    is_active: acc.is_active,
     permissions: personalPerms
   };
   if(personalPerms && acc.role !== 'admin'){
@@ -1720,13 +1695,10 @@ async function doLogin(){
       if(personalPerms)ROLE_PERMS[acc.role]=Object.assign({},ROLE_PERMS[acc.role],personalPerms);
     }
   }
+  sessionStorage.setItem('vdc-session', JSON.stringify(currentUser));
 
-  // Store session — include token so it's restored on page refresh
-  sessionStorage.setItem('vdc-session', JSON.stringify({
-    user: currentUser,
-    token: token,
-    expires: Date.now() + (data.expires_in * 1000)
-  }));
+  // Update last login timestamp
+  db.from('staff_accounts').update({last_login:new Date().toISOString()}).eq('id',acc.id).then(function(){});
 
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='block';
@@ -1816,21 +1788,11 @@ window.onload=async function(){_attachChipDelegation();
   // Support both old format (direct user object) and new format (with token + expires)
   if(savedSession){
     var token=null,user=null,expires=null;
-    if(savedSession.token&&savedSession.user){
-      // New format — check expiry
-      token=savedSession.token;
-      user=savedSession.user;
-      expires=savedSession.expires||0;
-      if(Date.now()>expires){
-        // Token expired — force re-login
-        sessionStorage.removeItem('vdc-session');
-        return;
-      }
-      _applyTokenToClient(token);
-      currentUser=user;
-    } else if(savedSession.role){
-      // Old format (from before Step 3 deployment) — clear and force re-login
-      // This happens exactly once per user after the app update is deployed.
+    if(savedSession.role){
+      // Simple session format — restore directly
+      currentUser=savedSession;
+    } else if(savedSession.user&&savedSession.token){
+      // New token format stored but Edge Function not deployed — clear and re-login
       sessionStorage.removeItem('vdc-session');
       return;
     }
