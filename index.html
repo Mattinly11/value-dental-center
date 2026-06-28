@@ -132,15 +132,15 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .tooth-btn.completed{background:#10B981;border-color:#059669;color:white;}
 /* APPOINTMENTS */
 .schedule-wrap{background:white;border-radius:var(--rad);border:1px solid var(--s200);overflow:auto;max-height:calc(100vh - 320px);}
-.sch-header{display:grid;grid-template-columns:64px repeat(5,1fr);border-bottom:2px solid var(--s200);position:sticky;top:0;background:white;z-index:10;min-width:800px;}
+.sch-header{display:grid;grid-template-columns:64px repeat(5,1fr);border-bottom:2px solid var(--s200);position:sticky;top:0;background:white;z-index:30;min-width:800px;}
 .sch-body{display:grid;grid-template-columns:64px repeat(5,1fr);min-width:800px;position:relative;}
 .sch-room-col{border-right:1px solid var(--s100);position:relative;}
 .sch-room-col:last-child{border-right:none;}
 .sch-mini-slot{position:absolute;left:0;right:0;cursor:crosshair;}
 .sch-mini-slot:hover{background:rgba(37,99,235,0.05);}
-.appt-block{position:absolute;left:2px;right:2px;border-radius:6px;padding:4px 6px;cursor:grab;z-index:10;overflow:hidden;border-left:3px solid;transition:box-shadow 0.12s;user-select:none;}
+.appt-block{position:absolute;left:2px;right:2px;border-radius:6px;padding:4px 6px;cursor:grab;z-index:5;overflow:hidden;border-left:3px solid;transition:box-shadow 0.12s;user-select:none;}
 .appt-block:active{cursor:grabbing;}
-.appt-block.dragging{opacity:0.5;z-index:50;}
+.appt-block.dragging{opacity:0.5;z-index:20;}
 .resize-handle{position:absolute;bottom:0;left:0;right:0;height:7px;cursor:ns-resize;z-index:15;}
 .resize-handle:hover{background:rgba(0,0,0,0.12);}
 .now-line{position:absolute;left:0;right:0;height:2px;background:#EF4444;z-index:15;pointer-events:none;}
@@ -221,6 +221,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
 .sess-row:last-child{border-bottom:none;}
 .sess-row:hover{background:var(--s50);}
 .sess-drag-handle{color:var(--s300);cursor:grab;font-size:16px;flex-shrink:0;}
+.sess-row.drag-over{background:var(--b50);border-top:2px solid var(--b400);}
 /* CASE RECORDING FORM */
 .case-summary-card{background:var(--b50);border:1.5px solid var(--b100);border-radius:var(--radsm);padding:14px;margin-bottom:14px;}
 .case-new-card{background:var(--g50);border:1.5px solid var(--g100);border-radius:var(--radsm);padding:14px;margin-bottom:14px;}
@@ -679,17 +680,23 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
           <select class="finp" id="proc-lab" onchange="onProcLabChange(this.value)"><option value="">Select lab...</option></select></div>
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Lab service</label>
           <select class="finp" id="proc-lab-svc" onchange="onProcSvcChange(this.value)"><option value="">Select service...</option></select></div>
-        <div class="fgrp" style="margin-bottom:0;"><label class="flbl" id="proc-lab-fee-lbl">Lab fee (IQD)</label>
+      </div>
+      <div class="fg" style="margin-bottom:0;">
+        <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Crown / lab units</label>
+          <input class="finp" type="number" id="proc-lab-units" placeholder="e.g. 3" min="1" value="" oninput="calcLabFee()" style="text-align:center;"></div>
+        <div class="fgrp" style="margin-bottom:0;"><label class="flbl" id="proc-lab-unit-price-lbl">Service price per unit</label>
+          <input class="finp" type="number" id="proc-lab-unit-price" placeholder="0" min="0" oninput="calcLabFee()" readonly style="background:var(--s50);"></div>
+        <div class="fgrp" style="margin-bottom:0;"><label class="flbl" id="proc-lab-fee-lbl">Total lab fee (IQD)</label>
           <input class="finp" type="number" id="proc-lab-fee" placeholder="0" min="0" oninput="updateProcNet()"></div>
       </div>
-      <!-- FIXTURES SECTION — shown when lab is involved -->
-      <div id="proc-fixtures-section" style="border-top:1px solid var(--p200);padding-top:8px;margin-top:4px;">
+      <!-- FIXTURES SECTION — shown when procedure is implant type -->
+      <div id="proc-fixtures-section" style="display:none;border-top:1px solid var(--p200);padding-top:8px;margin-top:8px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <div style="font-size:11px;font-weight:700;color:var(--p700);">&#129454; Implant fixtures placed</div>
           <button type="button" class="btn btnsm" onclick="addFixtureLine()" style="font-size:10px;padding:3px 10px;">+ Add fixture</button>
         </div>
         <div id="proc-fixture-lines"></div>
-        <div style="font-size:10px;color:var(--s400);margin-top:4px;">Add fixtures only if this session involves implant placement. Each fixture line = brand × qty.</div>
+        <div style="font-size:10px;color:var(--s400);margin-top:4px;">Each fixture line = brand + quantity. Price fills automatically from catalog.</div>
       </div>
     </div>
     <!-- NET DISPLAY -->
@@ -703,6 +710,26 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <!-- UNIT CALCULATION BAR — shown when procedure is per_unit -->
     <div id="proc-unit-bar" style="display:none;" class="unit-calc-bar">
       <span id="proc-unit-text">Select teeth to calculate</span>
+    </div>
+    <!-- IMPLANT COUNT — shown only for implant-type procedures -->
+    <div id="proc-implant-count-wrap" style="display:none;background:var(--b50);border:1px solid var(--b100);border-radius:var(--radsm);padding:10px 14px;margin-bottom:13px;">
+      <div style="font-size:11px;font-weight:700;color:var(--b700);margin-bottom:8px;">&#129454; Implant counts (independent of teeth chart)</div>
+      <div class="fg">
+        <div class="fgrp" style="margin-bottom:0;">
+          <label class="flbl">Number of implants placed</label>
+          <input class="finp" type="number" id="proc-implant-count" placeholder="e.g. 2" min="1" style="text-align:center;">
+          <div style="font-size:10px;color:var(--s400);margin-top:3px;">The physical implant fixtures placed — may differ from crown units</div>
+        </div>
+        <div class="fgrp" style="margin-bottom:0;">
+          <label class="flbl">Implant unit price (IQD)</label>
+          <input class="finp" type="number" id="proc-implant-unit-price" placeholder="0" min="0" oninput="calcImplantCost()" style="text-align:center;">
+        </div>
+        <div class="fgrp" style="margin-bottom:0;">
+          <label class="flbl">Total implant cost (IQD)</label>
+          <input class="finp" type="number" id="proc-implant-total" placeholder="0" min="0" style="background:var(--s50);" readonly>
+          <div style="font-size:10px;color:var(--s400);margin-top:3px;">Separate from lab/crown cost above</div>
+        </div>
+      </div>
     </div>
     <!-- FEE — shown only for new case -->
     <div id="proc-fee-wrap">
@@ -1615,36 +1642,60 @@ function loadCustomPerms(){
 }
 loadCustomPerms();
 
+// ── AUTH CONFIGURATION ──────────────────────────────────────────
+// The auth Edge Function URL — same Supabase project, /functions/v1/vdc-auth
+var AUTH_URL = SUPA + '/functions/v1/vdc-auth';
+// Active session token — sent with every database request after login
+var _vdcToken = null;
+
+// Rebuild the Supabase client using the current session token so that
+// every subsequent database call carries the JWT and RLS policies can
+// read the vdc_role claim from it.
+function _applyTokenToClient(token) {
+  _vdcToken = token;
+  db = supabase.createClient(SUPA, SKEY, {
+    global: {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }
+  });
+}
+
 async function doLogin(){
   var u=document.getElementById('li-u').value.trim();
   var p=document.getElementById('li-p').value;
   if(!u||!p){var e=document.getElementById('li-err');e.textContent='Enter username and password';e.style.display='block';setTimeout(function(){e.style.display='none';},3000);return;}
 
-  // Hash the entered password
-  var hash = await sha256(p);
-
-  // Look up in DB — try hash first, then plain text (for migration compatibility)
-  var r = await db.from('staff_accounts').select('*').eq('username',u).eq('is_active',true).limit(1);
-  var acc = null;
-  if(r.data&&r.data.length){
-    var candidate = r.data[0];
-    // Accept if hash matches OR plain text matches (covers both old and new accounts)
-    if(candidate.password_hash === hash || candidate.password_hash === p){
-      acc = candidate;
-      // Silently upgrade plain text to hash if needed
-      if(candidate.password_hash === p){
-        db.from('staff_accounts').update({password_hash:hash}).eq('id',candidate.id).then(function(){});
-      }
-    }
+  // Call the server-side auth Edge Function — password is verified on the
+  // server, never sent in plain text to the database from the browser.
+  var resp, data;
+  try {
+    resp = await fetch(AUTH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u.toLowerCase(), password: p })
+    });
+    data = await resp.json();
+  } catch(err) {
+    var e3=document.getElementById('li-err');
+    e3.textContent='Could not connect — check your internet connection';
+    e3.style.display='block';
+    setTimeout(function(){e3.style.display='none';},4000);
+    return;
   }
 
-  if(!acc){
+  if(!resp.ok || !data.token) {
     var e2=document.getElementById('li-err');
-    e2.textContent='Incorrect username or password';
+    e2.textContent=data.error||'Incorrect username or password';
     e2.style.display='block';
     setTimeout(function(){e2.style.display='none';},3000);
     return;
   }
+
+  var acc = data.user;
+  var token = data.token;
+
+  // Apply the token to the Supabase client so RLS policies work
+  _applyTokenToClient(token);
 
   // Successful login — load personal permissions if set
   var personalPerms = null;
@@ -1657,24 +1708,25 @@ async function doLogin(){
     username: acc.username,
     role: acc.role,
     linked_dentist: acc.linked_dentist||null,
-    is_active: acc.is_active,
-    permissions: personalPerms  // personal override — null means use role defaults
+    is_active: true,
+    permissions: personalPerms
   };
-  // Apply personal permissions over role defaults if they exist
   if(personalPerms && acc.role !== 'admin'){
     ROLE_PERMS[acc.role] = Object.assign({}, ROLE_PERMS[acc.role]||{}, personalPerms);
   } else if(acc.role !== 'admin' && !ROLE_PERMS[acc.role]){
-    // Custom role — load permissions from custom_roles table
     var crR=await db.from('custom_roles').select('permissions').eq('name',acc.role).single();
     if(!crR.error&&crR.data&&crR.data.permissions){
       ROLE_PERMS[acc.role]=crR.data.permissions;
       if(personalPerms)ROLE_PERMS[acc.role]=Object.assign({},ROLE_PERMS[acc.role],personalPerms);
     }
   }
-  sessionStorage.setItem('vdc-session', JSON.stringify(currentUser));
 
-  // Update last login timestamp
-  db.from('staff_accounts').update({last_login:new Date().toISOString()}).eq('id',acc.id).then(function(){});
+  // Store session — include token so it's restored on page refresh
+  sessionStorage.setItem('vdc-session', JSON.stringify({
+    user: currentUser,
+    token: token,
+    expires: Date.now() + (data.expires_in * 1000)
+  }));
 
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='block';
@@ -1682,7 +1734,6 @@ async function doLogin(){
   document.getElementById('sf-av').textContent=ini(acc.name)||u.slice(0,2).toUpperCase();
   document.getElementById('sf-role').textContent=acc.role.charAt(0).toUpperCase()+acc.role.slice(1);
 
-  // Build sidebar based on role
   buildSidebarForRole();
   await loadDentistsList();
   populateDrDropdowns();
@@ -1758,8 +1809,31 @@ function clearBackBtn(){
 }
 window.onload=async function(){_attachChipDelegation();
   var sess=sessionStorage.getItem('vdc-session');
+  var savedSession=null;
   if(sess){
-    try{currentUser=JSON.parse(sess);}catch(e){currentUser=null;}
+    try{savedSession=JSON.parse(sess);}catch(e){savedSession=null;}
+  }
+  // Support both old format (direct user object) and new format (with token + expires)
+  if(savedSession){
+    var token=null,user=null,expires=null;
+    if(savedSession.token&&savedSession.user){
+      // New format — check expiry
+      token=savedSession.token;
+      user=savedSession.user;
+      expires=savedSession.expires||0;
+      if(Date.now()>expires){
+        // Token expired — force re-login
+        sessionStorage.removeItem('vdc-session');
+        return;
+      }
+      _applyTokenToClient(token);
+      currentUser=user;
+    } else if(savedSession.role){
+      // Old format (from before Step 3 deployment) — clear and force re-login
+      // This happens exactly once per user after the app update is deployed.
+      sessionStorage.removeItem('vdc-session');
+      return;
+    }
   }
   if(currentUser&&currentUser.role){
     document.getElementById('login-screen').style.display='none';
@@ -2464,13 +2538,11 @@ function buildSched(){
       var recProcBtn='';
       if(a.status==='completed'){
         if(hasInv){
-          // Invoice found — show $ to pay (and Record if case_id so session notes can be added)
+          // Invoice found — show $ only. Record button removed once procedure is recorded.
           dollarBtn='<button class="dollar-btn'+(invPaid?' paid':'')+'" data-apptid="'+a.id+'" data-invid="'+hasInv.id+'" onclick="event.stopPropagation();clickDollar(event)">'+(invPaid?'✓':'$')+'</button>';
-          if(a.case_id){
-            recProcBtn='<button class="record-proc-btn" data-apptid="'+a.id+'" onclick="event.stopPropagation();clickRecordProc(event)" style="bottom:22px;">⚡ Record</button>';
-          }
+          // No Record button — procedure already recorded, $ icon is the action
         } else if(a.case_id){
-          // Follow-up session with case but invoice not in cache yet — show both buttons
+          // Follow-up session with case but invoice not in cache yet
           recProcBtn='<button class="record-proc-btn" data-apptid="'+a.id+'" onclick="event.stopPropagation();clickRecordProc(event)" style="bottom:22px;">⚡ Record</button>';
           dollarBtn='<button class="dollar-btn" data-apptid="'+a.id+'" data-caseid="'+a.case_id+'" onclick="event.stopPropagation();clickDollarFromCase(event)">$</button>';
         } else {
@@ -5247,18 +5319,41 @@ async function loadLabsForProc(){
   sel.innerHTML='<option value="">No lab</option>'+
     procLabCache.map(function(l){return '<option value="'+l.id+'">'+l.name+'</option>';}).join('');
 }
+function calcImplantCost(){
+  var count=parseFloat((document.getElementById('proc-implant-count')||{}).value)||0;
+  var unitPrice=parseFloat((document.getElementById('proc-implant-unit-price')||{}).value)||0;
+  var total=count*unitPrice;
+  var totalEl=document.getElementById('proc-implant-total');
+  if(totalEl)totalEl.value=total>0?total:'';
+}
+
 function onProcNameChange(name){
   var needsLab=getLabProcs().indexOf(name)>=0;
   var labSec=document.getElementById('proc-lab-section');
   if(labSec)labSec.style.display=needsLab?'block':'none';
+  // Show fixture and implant count sections only for implant-type procedures
+  var def=allProcDefs.find(function(d){return d.name===name;});
+  var isImplant=def&&(def.category==='Implant'||(def.name||'').toLowerCase().indexOf('implant')>=0);
+  var fixSec=document.getElementById('proc-fixtures-section');
+  if(fixSec)fixSec.style.display=isImplant?'block':'none';
+  var implCountWrap=document.getElementById('proc-implant-count-wrap');
+  if(implCountWrap)implCountWrap.style.display=isImplant?'block':'none';
   if(!needsLab){
     var pl=document.getElementById('proc-lab');var ps=document.getElementById('proc-lab-svc');var pf=document.getElementById('proc-lab-fee');
     if(pl)pl.value='';
     if(ps)ps.innerHTML='<option value="">Select service...</option>';
     if(pf)pf.value='';
+    var plu=document.getElementById('proc-lab-units');if(plu)plu.value='';
+    var plup=document.getElementById('proc-lab-unit-price');if(plup){plup.value='';plup.dataset.unitPrice='';}
     updateProcNet();return;
   }
-  autoMatchLabSvc(name);
+  // Do NOT auto-match lab/service — user chooses manually
+  var pl2=document.getElementById('proc-lab');if(pl2)pl2.value='';
+  var ps2=document.getElementById('proc-lab-svc');if(ps2)ps2.innerHTML='<option value="">Select service...</option>';
+  var pf2=document.getElementById('proc-lab-fee');if(pf2)pf2.value='';
+  var plu2=document.getElementById('proc-lab-units');if(plu2)plu2.value='';
+  var plup2=document.getElementById('proc-lab-unit-price');if(plup2){plup2.value='';plup2.dataset.unitPrice='';}
+  updateProcNet();
 }
 async function onProcLabChange(labId){
   var svcSel=document.getElementById('proc-lab-svc');if(!svcSel)return;
@@ -5275,27 +5370,31 @@ function onProcSvcChange(svcId){
   var svcSel=document.getElementById('proc-lab-svc');
   var opt=svcSel?Array.from(svcSel.options).find(function(o){return o.value===svcId;}):null;
   if(opt&&opt.dataset.price){
-    var pf=document.getElementById('proc-lab-fee');
-    if(pf){
-      var procName=document.getElementById('proc-name').value;
-      var def=allProcDefs.find(function(d){return d.name===procName;});
-      var labFeeType=def?def.lab_fee_type||'fixed':'fixed';
-      var units=Object.keys(procSelTeeth).length;
-      var unitPrice=parseFloat(opt.dataset.price)||0;
-      // Store unit price for later multiplication
-      pf.dataset.unitPrice=unitPrice;
-      pf.dataset.currency=opt.dataset.currency||'IQD';
-      // Apply multiplication if per_unit
-      if(labFeeType==='per_unit'&&units>0){
-        pf.value=units*unitPrice;
-      } else {
-        pf.value=unitPrice;
-      }
+    // Fill the unit price field — user enters units manually, calcLabFee computes total
+    var unitPriceEl=document.getElementById('proc-lab-unit-price');
+    var unitPriceLbl=document.getElementById('proc-lab-unit-price-lbl');
+    var labFeeLbl=document.getElementById('proc-lab-fee-lbl');
+    var currency=opt.dataset.currency||'IQD';
+    if(unitPriceEl){
+      unitPriceEl.value=opt.dataset.price;
+      unitPriceEl.dataset.currency=currency;
+      unitPriceEl.dataset.unitPrice=opt.dataset.price;
     }
-    var lbl=document.getElementById('proc-lab-fee-lbl');
-    if(lbl)lbl.textContent='Lab fee ('+(opt.dataset.currency||'IQD')+')';
-    updateProcNet();
+    if(unitPriceLbl)unitPriceLbl.textContent='Price per unit ('+currency+')';
+    if(labFeeLbl)labFeeLbl.textContent='Total lab fee ('+currency+')';
+    var pf=document.getElementById('proc-lab-fee');
+    if(pf)pf.dataset.currency=currency;
+    calcLabFee();
   }
+}
+function calcLabFee(){
+  var units=parseFloat((document.getElementById('proc-lab-units')||{}).value)||0;
+  var unitPrice=parseFloat((document.getElementById('proc-lab-unit-price')||{}).dataset.unitPrice)||
+                parseFloat((document.getElementById('proc-lab-unit-price')||{}).value)||0;
+  var total=units*unitPrice;
+  var pf=document.getElementById('proc-lab-fee');
+  if(pf)pf.value=total>0?total:'';
+  updateProcNet();
 }
 function autoMatchLabSvc(procName){
   // find a service that matches this procedure across all labs
@@ -5462,14 +5561,19 @@ async function deleteFixture(){
 }
 
 // Add a fixture line in the record procedure form
-function addFixtureLine(){
+async function addFixtureLine(){
   var container=document.getElementById('proc-fixture-lines');
   if(!container)return;
+  // Always fetch fresh from DB — the global allFixtures cache can be stale
+  // if the user visited Labs since the procedure form was opened
+  var r=await db.from('implant_fixtures').select('*').order('brand').order('model');
+  var fixtures=r.data||[];
+  if(!fixtures.length){showToast('No fixtures in catalog — add fixtures in Labs → Implant Fixtures first','error');return;}
   var idx=Date.now();
-  var fixtureOpts=allFixtures.map(function(f){
-    return '<option value="'+f.id+'" data-price="'+f.price+'" data-currency="'+(f.currency||'IQD')+'">'+(f.brand+(f.model?' '+f.model:''))+' ('+fmtAmt(f.price,f.currency||'IQD')+')</option>';
+  var fixtureOpts=fixtures.map(function(f){
+    return '<option value="'+f.id+'" data-price="'+f.price+'" data-currency="'+(f.currency||'IQD')+'">'+(f.brand+(f.model?' — '+f.model:''))+' ('+fmtAmt(f.price,f.currency||'IQD')+')</option>';
   }).join('');
-  var html='<div class="fixture-line" data-fixture-line="'+idx+'">'+
+  var html='<div class="fixture-line" data-fixture-line="'+idx+'" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
     '<select class="finp fixture-cat-sel" style="flex:2;" onchange="onFixturePicked(this)">'+
     '<option value="">Select fixture...</option>'+fixtureOpts+'</select>'+
     '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'+
@@ -5478,11 +5582,11 @@ function addFixtureLine(){
     '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">'+
     '<label style="font-size:10px;color:var(--p700);font-weight:600;white-space:nowrap;">Price</label>'+
     '<input type="number" class="finp fixture-price-inp" value="" min="0" style="width:90px;" placeholder="unit price" oninput="updateProcNet()"></div>'+
-    '<div style="font-size:10px;font-weight:700;color:var(--p700);white-space:nowrap;min-width:60px;" id="ftotal-'+idx+'">0</div>'+
-    '<button type="button" class="btn btnr btnxs" onclick="removeFixtureLine(this)" style="flex-shrink:0;">&#128465;</button>'+
+    '<button type="button" class="btn btnr btnxs" onclick="removeFixtureLine(this)" style="flex-shrink:0;">&#10005;</button>'+
     '</div>';
   container.insertAdjacentHTML('beforeend',html);
-  if(!allFixtures.length) showToast('No fixtures in catalog — add fixtures in Labs first','error');
+  // Also update global cache
+  allFixtures=fixtures;
 }
 function onFixturePicked(sel){
   var line=sel.closest('[data-fixture-line]');if(!line)return;
@@ -7767,7 +7871,15 @@ function saveIQDRate(){
 }
 
 function onPayRateChange(){
-  // update USD equivalent display
+  // Sync to global IQD rate immediately — most recent change wins everywhere
+  var newRate=parseInt(document.getElementById('pay-rate').value)||IQD;
+  if(newRate>0&&newRate!==IQD){
+    IQD=newRate;
+    localStorage.setItem('vdc-iqd-rate',newRate);
+    // Also update the Settings field if it's currently visible
+    var settEl=document.getElementById('settings-iqd-rate');
+    if(settEl)settEl.value=newRate;
+  }
   onPayUSD();
   updatePayBal();
 }
@@ -8399,7 +8511,15 @@ async function openAddProc(pid){
   hideCaseSummary(); hideProcSessionWrap();
   showNewCaseBanner();
   var labSec=document.getElementById('proc-lab-section'); if(labSec)labSec.style.display='none';
+  var fixSec=document.getElementById('proc-fixtures-section'); if(fixSec)fixSec.style.display='none';
+  var implWrap=document.getElementById('proc-implant-count-wrap'); if(implWrap)implWrap.style.display='none';
+  var pic=document.getElementById('proc-implant-count'); if(pic)pic.value='';
+  var piup=document.getElementById('proc-implant-unit-price'); if(piup)piup.value='';
+  var pit=document.getElementById('proc-implant-total'); if(pit)pit.value='';
   var pnd=document.getElementById('proc-net-disp'); if(pnd)pnd.style.display='none';
+  var plf=document.getElementById('proc-lab-fee'); if(plf)plf.value='';
+  var plu=document.getElementById('proc-lab-units'); if(plu)plu.value='';
+  var plup=document.getElementById('proc-lab-unit-price'); if(plup){plup.value='';plup.dataset.unitPrice='';}
   var plf=document.getElementById('proc-lab-fee'); if(plf)plf.value='';
   var pff=document.getElementById('proc-fixture-fee'); if(pff)pff.value='';
   var pfw=document.getElementById('proc-fixture-wrap'); if(pfw)pfw.style.display='none';
@@ -8454,8 +8574,15 @@ async function openAddProcFromAppt(appt){
   }
   document.getElementById('proc-del-btn').style.display='none';
   var labSec=document.getElementById('proc-lab-section');if(labSec)labSec.style.display='none';
+  var fixSec2=document.getElementById('proc-fixtures-section');if(fixSec2)fixSec2.style.display='none';
+  var implWrap2=document.getElementById('proc-implant-count-wrap');if(implWrap2)implWrap2.style.display='none';
+  var pic2=document.getElementById('proc-implant-count');if(pic2)pic2.value='';
+  var piup2=document.getElementById('proc-implant-unit-price');if(piup2)piup2.value='';
+  var pit2=document.getElementById('proc-implant-total');if(pit2)pit2.value='';
   var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
   var plf=document.getElementById('proc-lab-fee');if(plf)plf.value='';
+  var plu2=document.getElementById('proc-lab-units');if(plu2)plu2.value='';
+  var plup2=document.getElementById('proc-lab-unit-price');if(plup2){plup2.value='';plup2.dataset.unitPrice='';}
   var pff=document.getElementById('proc-fixture-fee');if(pff)pff.value='';
   var pfw=document.getElementById('proc-fixture-wrap');if(pfw)pfw.style.display='none';
   var pdh=document.getElementById('proc-def-hint');if(pdh)pdh.style.display='none';
@@ -8592,6 +8719,11 @@ async function saveProc(){
   var referrer=document.getElementById('proc-ref').value||null;
   var status=document.getElementById('proc-status').value||'completed';
   var date=document.getElementById('proc-date').value||null;
+  // Implant-specific counts (independent from teeth/crown counts)
+  var implantCount=parseInt((document.getElementById('proc-implant-count')||{}).value)||null;
+  var implantUnitPrice=parseFloat((document.getElementById('proc-implant-unit-price')||{}).value)||null;
+  var implantTotal=parseFloat((document.getElementById('proc-implant-total')||{}).value)||null;
+  var labUnits=parseInt((document.getElementById('proc-lab-units')||{}).value)||null;
 
   if(isContinuingCase){
     // ── CONTINUING EXISTING CASE ──────────────────────────────────
@@ -8631,7 +8763,9 @@ async function saveProc(){
       lab_fee:labFee,net_fee:(currentCaseData?Number(currentCaseData.agreed_fee):0)-labFee,
       lab_id:labId||null,lab_service_id:labSvcId||null,lab_name:labName||null,
       status:status,notes:notes,teeth:teeth.length>0?teeth:null,category:'general',
-      invoice_id:currentCaseData?currentCaseData.invoice_id:null
+      invoice_id:currentCaseData?currentCaseData.invoice_id:null,
+      implant_count:implantCount,implant_unit_price:implantUnitPrice,implant_total:implantTotal,
+      lab_units:labUnits
     };
     await db.from('procedures').insert([procPayload]);
     // Create lab order if lab involved
@@ -8643,8 +8777,12 @@ async function saveProc(){
         appointment_id:apptId||null,dentist:dentist||null,status:'pending',date:date||fd(new Date())
       }]).then(function(r){if(r.error)console.warn('Lab order warn:',r.error.message);});
     }
-    // Link appointment to case
-    if(apptId) await db.from('appointments').update({case_id:existingCaseId,session_name:sessionName}).eq('id',apptId);
+    // Link appointment to case AND sync teeth to what was actually done in this session
+    if(apptId){
+      var apptUpdate={case_id:existingCaseId,session_name:sessionName};
+      if(teeth.length>0)apptUpdate.teeth=teeth; // update to reflect actual teeth treated
+      await db.from('appointments').update(apptUpdate).eq('id',apptId);
+    }
     showToast('Session recorded ✅');
     if(currentSection==='appointments'){await loadApptInvoices();buildSched();}
   } else {
@@ -8656,7 +8794,9 @@ async function saveProc(){
       date:date,treating_dentist:dentist,referrer:referrer,
       fee:fee,fee_currency:feeCurrency,lab_fee:labFee,net_fee:fee-labFee,
       lab_id:labId||null,lab_service_id:labSvcId||null,lab_name:labName||null,
-      status:status,notes:notes,teeth:teeth.length>0?teeth:null,category:'general'
+      status:status,notes:notes,teeth:teeth.length>0?teeth:null,category:'general',
+      implant_count:implantCount,implant_unit_price:implantUnitPrice,implant_total:implantTotal,
+      lab_units:labUnits
     };
     var pR2=await db.from('procedures').insert([newProcPayload]).select().single();
     if(pR2.error){showToast('Failed: '+pR2.error.message,'error');return;}
@@ -8694,8 +8834,12 @@ async function saveProc(){
         lab_fee:labFee||0,lab_fee_currency:feeCurrency,
         lab_status:labId?'pending':'none'
       }]).then(function(r){if(r.error)console.warn('Visit create warn:',r.error.message);});
-      // Link appointment to case
-      if(apptId) await db.from('appointments').update({case_id:newCaseId,session_name:sessionName||'Session 1'}).eq('id',apptId);
+      // Link appointment to case AND sync teeth to what was actually done
+      if(apptId){
+        var apptUpdate2={case_id:newCaseId,session_name:sessionName||'Session 1'};
+        if(teeth.length>0)apptUpdate2.teeth=teeth; // update to reflect actual teeth treated
+        await db.from('appointments').update(apptUpdate2).eq('id',apptId);
+      }
     }
     // Create lab order if lab involved
     if(labId&&newInvId){
@@ -8738,18 +8882,77 @@ async function renderSessionsList(procDefId){
     el.innerHTML='<div style="text-align:center;padding:20px;color:var(--s400);font-size:12px;">No sessions yet — add your first session below</div>';
   } else {
     el.innerHTML=sessions.map(function(s,idx){
-      return '<div class="sess-row" data-sid="'+s.id+'">'+
-        '<span class="sess-drag-handle">&#9776;</span>'+
-        '<span style="font-size:12px;font-weight:600;color:var(--s700);flex:1;">'+s.name+'</span>'+
+      return '<div class="sess-row" data-sid="'+s.id+'" draggable="true" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--s100);">'+
+        '<span class="sess-drag-handle" title="Drag to reorder" style="cursor:grab;color:var(--s400);font-size:16px;flex-shrink:0;">&#9776;</span>'+
+        '<input type="text" class="finp sess-name-inp" value="'+s.name.replace(/"/g,'&quot;')+'" data-orig="'+s.name.replace(/"/g,'&quot;')+'" style="flex:1;padding:4px 8px;font-size:12px;font-weight:600;" onblur="saveSessionName(this,\''+s.id+'\',\''+procDefId+'\')">'+
         '<button class="btn btnr btnxs" onclick="deleteSession(\''+s.id+'\',\''+procDefId+'\')" title="Delete session">&#128465;</button>'+
         '</div>';
     }).join('');
+    // Wire up drag-to-reorder
+    initSessionDrag(el, procDefId);
   }
-  // Update the sessions button count on the procedure row in the background
   var sessBtn=document.querySelector('[data-sess-id="'+procDefId+'"]');
-  if(sessBtn){
-    sessBtn.textContent='📅 '+sessions.length+' session'+(sessions.length!==1?'s':'');
-  }
+  if(sessBtn){sessBtn.textContent='📅 '+sessions.length+' session'+(sessions.length!==1?'s':'');}
+}
+
+async function saveSessionName(inp, sessId, procDefId){
+  var newName=(inp.value||'').trim();
+  // Clean any trailing backslashes from data
+  newName=newName.replace(/\\+$/,'').trim();
+  if(!newName){inp.value=inp.dataset.orig;return;}
+  if(newName===inp.dataset.orig)return; // no change
+  var r=await db.from('procedure_sessions').update({name:newName}).eq('id',sessId);
+  if(r.error){showToast('Failed to save: '+r.error.message,'error');inp.value=inp.dataset.orig;return;}
+  inp.dataset.orig=newName;
+  showToast('Session renamed ✅');
+  // Refresh to sync
+  delete allProcSessions[procDefId];
+  await renderSessionsList(procDefId);
+}
+
+function initSessionDrag(container, procDefId){
+  var dragged=null;
+  container.querySelectorAll('.sess-row').forEach(function(row){
+    row.addEventListener('dragstart',function(e){
+      dragged=row;
+      row.style.opacity='0.4';
+      e.dataTransfer.effectAllowed='move';
+    });
+    row.addEventListener('dragend',function(){
+      row.style.opacity='';
+      dragged=null;
+      container.querySelectorAll('.sess-row').forEach(function(r){r.classList.remove('drag-over');});
+    });
+    row.addEventListener('dragover',function(e){
+      e.preventDefault();
+      if(row!==dragged){
+        container.querySelectorAll('.sess-row').forEach(function(r){r.classList.remove('drag-over');});
+        row.classList.add('drag-over');
+      }
+    });
+    row.addEventListener('drop',function(e){
+      e.preventDefault();
+      if(dragged&&row!==dragged){
+        var rows=Array.from(container.querySelectorAll('.sess-row'));
+        var fromIdx=rows.indexOf(dragged);
+        var toIdx=rows.indexOf(row);
+        if(fromIdx<toIdx)container.insertBefore(dragged,row.nextSibling);
+        else container.insertBefore(dragged,row);
+        // Save the new order to DB
+        saveSessionOrder(container, procDefId);
+      }
+    });
+  });
+}
+
+async function saveSessionOrder(container, procDefId){
+  var rows=Array.from(container.querySelectorAll('.sess-row'));
+  var updates=rows.map(function(r,idx){
+    return db.from('procedure_sessions').update({display_order:idx}).eq('id',r.dataset.sid);
+  });
+  await Promise.all(updates);
+  delete allProcSessions[procDefId];
+  showToast('Order saved ✅');
 }
 async function addSession(){
   var nameEl=document.getElementById('new-session-name');
@@ -9082,12 +9285,9 @@ async function renderProf(id,name,tab){
       else if(pr.status==='planned'&&!clinTeeth[t])clinTeeth[t]='planned';
     });
   });
-  // 3. Also pull teeth from completed appointments
-  appts.forEach(function(a){
-    if(a.teeth&&Array.isArray(a.teeth)&&a.status==='completed'){
-      a.teeth.forEach(function(t){if(!clinTeeth[t])clinTeeth[t]='completed';});
-    }
-  });
+  // NOTE: appointment teeth are intentionally NOT used for the clinical chart.
+  // The chart reflects what was actually recorded in procedure records only.
+  // Appointment teeth auto-update to match the procedure when a visit is saved.
   // Chart legend
   var chartLegend='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:10px;color:var(--s600);">'+
     '<div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;border-radius:3px;background:#FFFBEB;border:1.5px solid #F59E0B;"></div>Diagnosed</div>'+
