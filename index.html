@@ -3330,6 +3330,360 @@ function buildFP(){
     }).join('')+'</tbody></table></div></div>';
 }
 
+// ══════════════════ DENTIST FINANCIAL PROFILE ════════════════════
+// Per-dentist payout view — procedure ledger, expense breakdown,
+// payout calculation, history. Opened from Finance → Dentist Payroll.
+
+var _drProfileName=null; // currently-open dentist
+var _drProfileFrom=null; // date range start (YYYY-MM-DD)
+var _drProfileTo=null;   // date range end
+
+function openDrProfile(drName){
+  _drProfileName=drName;
+  // Default to current month
+  var now=new Date();
+  _drProfileFrom=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
+  var lastDay=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  _drProfileTo=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(lastDay).padStart(2,'0');
+  renderDrProfile();
+}
+
+async function renderDrProfile(){
+  var dr=_drProfileName;
+  if(!dr)return;
+  var from=_drProfileFrom,to=_drProfileTo;
+  var rates=getDR(dr);
+
+  document.getElementById('pg-content').innerHTML='<div class="loader"><div class="spinner"></div>Loading profile for '+dr+'...</div>';
+  document.getElementById('pg-actions').innerHTML=
+    '<button class="btn btnsm" onclick="setFinT(\'dentists\');buildFinTab()">&#8592; Back to payroll</button>';
+
+  // Load all data in parallel
+  var results=await Promise.all([
+    db.from('invoices').select('*').eq('treating_dentist',dr),
+    db.from('payments').select('*'),
+    db.from('procedures').select('*').eq('treating_dentist',dr),
+    db.from('dentist_expenses').select('*').eq('dentist_name',dr).order('date',{ascending:false}),
+    db.from('salary_payments').select('*').eq('staff_name',dr).order('date',{ascending:false})
+  ]);
+
+  var allInvs=results[0].data||[];
+  var allPays=results[1].data||[];
+  var allProcs=results[2].data||[];
+  var manualExps=results[3].data||[];
+  var payHistory=results[4].data||[];
+
+  // Filter to date range
+  function inRange(d){return d&&d>=from&&d<=to;}
+
+  // Period procedures (by procedure date)
+  var periodProcs=allProcs.filter(function(p){return inRange(p.date);});
+
+  // Period invoices linked to period procedures
+  var periodInvIds=periodProcs.map(function(p){return p.invoice_id;}).filter(Boolean);
+  var periodInvs=allInvs.filter(function(i){
+    // Include if invoice linked to a period procedure, OR if invoice date is in range
+    return periodInvIds.indexOf(i.id)>=0||(i.date&&inRange(i.date));
+  });
+  var periodInvIdSet=new Set(periodInvs.map(function(i){return i.id;}));
+
+  // Payments on period invoices
+  var periodPays=allPays.filter(function(p){return periodInvIdSet.has(p.invoice_id);});
+
+  // Period manual expenses
+  var periodManualExps=manualExps.filter(function(e){return inRange(e.date);});
+
+  // ── Build procedure ledger ──────────────────────────────────────
+  // Each procedure row needs: patient, type (own/referred), procedure name,
+  // date, teeth, gross fee, lab fee, net fee, dentist's split, payment status
+  var ledgerRows=[];
+  periodProcs.forEach(function(proc){
+    var inv=allInvs.find(function(i){return i.id===proc.invoice_id;});
+    var grossFee=inv?Number(inv.fee||0):Number(proc.fee||0);
+    var feeCurr=inv?inv.fee_currency||'IQD':'IQD';
+    var labFee=Number(proc.lab_fee||0);
+    var netFee=grossFee-toIQD(labFee,feeCurr);
+    // Referral type
+    var refType='Own patient';
+    var refBy='';
+    if(inv&&inv.referrer){refType='Referred';refBy=inv.referrer;}
+    // Payment status
+    var procPays=inv?periodPays.filter(function(p){return p.invoice_id===inv.id;}):[];
+    var totalPaid=procPays.reduce(function(s,p){return s+Number(p.amount_iqd||0)+Number(p.amount_usd||0)*IQD;},0);
+    var grossIQD=toIQD(grossFee,feeCurr);
+    var payStatus=totalPaid>=grossIQD?'paid':totalPaid>0?'partial':'unpaid';
+    // Dentist's split from actual payments received
+    var dentistEarned=0;
+    procPays.forEach(function(p){
+      var d=getPayDistDual(p,inv);
+      dentistEarned+=d.treaterIQD||0;
+    });
+    ledgerRows.push({
+      proc:proc,inv:inv,grossFee:grossFee,feeCurr:feeCurr,labFee:labFee,
+      netFee:netFee,refType:refType,refBy:refBy,payStatus:payStatus,
+      dentistEarned:dentistEarned,totalPaid:totalPaid
+    });
+  });
+
+  // ── Expense breakdown ───────────────────────────────────────────
+  // Lab fees grouped by lab name
+  var labFeesByLab={};
+  periodProcs.forEach(function(p){
+    if(!p.lab_fee||Number(p.lab_fee)===0)return;
+    var labName=p.lab_name||'Unknown lab';
+    if(!labFeesByLab[labName])labFeesByLab[labName]={total:0,count:0};
+    labFeesByLab[labName].total+=Number(p.lab_fee||0);
+    labFeesByLab[labName].count++;
+  });
+  var totalLabFees=Object.values(labFeesByLab).reduce(function(s,v){return s+v.total;},0);
+  var totalManualExp=periodManualExps.reduce(function(s,e){return s+Number(e.amount||0);},0);
+  var totalExpenses=totalLabFees+totalManualExp;
+
+  // ── Payout calculation ──────────────────────────────────────────
+  // Total collected (IQD equivalent) on this dentist's invoices in period
+  var totalCollectedIQD=0,totalCollectedUSD=0;
+  periodPays.forEach(function(p){totalCollectedIQD+=Number(p.amount_iqd||0);totalCollectedUSD+=Number(p.amount_usd||0);});
+  var totalCollectedInIQD=totalCollectedIQD+totalCollectedUSD*IQD;
+  // Net after lab expenses (applied proportionally)
+  var netAfterLab=Math.max(0,totalCollectedInIQD-totalLabFees);
+  // Dentist's split from all payments
+  var totalDentistSplitIQD=ledgerRows.reduce(function(s,r){return s+r.dentistEarned;},0);
+  // Subtract manual expenses from dentist's share
+  var finalPayout=Math.max(0,totalDentistSplitIQD-totalManualExp);
+
+  // ── Unpaid since last payout ───────────────────────────────────
+  var lastPayout=payHistory[0];
+  var lastPayoutDate=lastPayout?lastPayout.date:'—';
+  var lastPayoutAmt=lastPayout?Number(lastPayout.amount||0):0;
+
+  // ── Period label ───────────────────────────────────────────────
+  var fromLabel=from?new Date(from+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+  var toLabel=to?new Date(to+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+
+  // ── Render ─────────────────────────────────────────────────────
+  var html=
+    // Header
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap;">'+
+    '<div style="width:48px;height:48px;border-radius:50%;background:var(--b100);color:var(--b700);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;">'+dr.replace('Dr.','').trim().slice(0,2).toUpperCase()+'</div>'+
+    '<div><div style="font-size:18px;font-weight:800;color:var(--s900);">'+dr+'</div>'+
+    '<div style="font-size:12px;color:var(--s400);">Own: <strong>'+rates.ownPct+'%</strong> &nbsp;·&nbsp; Referred: <strong>'+rates.refPct+'%</strong>'+
+    (lastPayout?'&nbsp;·&nbsp; Last payout: <strong>'+lastPayoutDate+'</strong> ('+fu(Math.round(lastPayoutAmt))+')':'')+'</div></div>'+
+    // Date range controls
+    '<div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'+
+    '<input type="date" class="finp" id="drp-from" value="'+from+'" style="width:140px;" onchange="_drProfileFrom=this.value;renderDrProfile()">'+
+    '<span style="color:var(--s400);font-size:12px;">to</span>'+
+    '<input type="date" class="finp" id="drp-to" value="'+to+'" style="width:140px;" onchange="_drProfileTo=this.value;renderDrProfile()">'+
+    '<button class="btn btnsm btnp" onclick="drProfileThisMonth()">This month</button>'+
+    '</div></div>'+
+
+    // Summary stats
+    '<div class="stats-row" style="margin-bottom:20px;">'+
+    statC('var(--b50)','&#128203;','Procedures',periodProcs.length)+
+    statC('var(--g50)','&#128176;','Total collected',fu(Math.round(totalCollectedIQD))+(totalCollectedUSD>0?' + '+fusd(totalCollectedUSD):''))+
+    statC('var(--r50)','&#10134;','Total expenses',fu(Math.round(totalExpenses)))+
+    statC('var(--g50)','&#11088;','Dentist payout',fu(Math.round(finalPayout)))+
+    '</div>'+
+
+    // ── SECTION 1: PROCEDURE LEDGER ───────────────────────────────
+    '<div class="vdc-card" style="margin-bottom:16px;">'+
+    '<div class="vdc-card-hdr"><div class="vdc-card-title">&#128203; Procedure ledger &nbsp;<span style="font-size:11px;color:var(--s400);font-weight:400;">'+fromLabel+' → '+toLabel+'</span></div></div>'+
+    '<div class="vdc-card-body" style="padding:0;overflow-x:auto;">';
+
+  if(!ledgerRows.length){
+    html+='<div style="text-align:center;padding:30px;color:var(--s400);">No procedures in this period</div>';
+  } else {
+    var statusColors={paid:'var(--g600)',partial:'var(--a600)',unpaid:'var(--r600)'};
+    var statusLabels={paid:'Paid','partial':'Partial',unpaid:'Unpaid'};
+    html+='<table class="tbl"><thead><tr>'+
+      '<th>Date</th><th>Patient</th><th>Type</th><th>Procedure</th><th>Teeth</th>'+
+      '<th>Gross fee</th><th>Lab fee</th><th>Net fee</th><th>My split</th><th>Status</th>'+
+      '</tr></thead><tbody>';
+    var totGross=0,totLab=0,totNet=0,totSplit=0;
+    ledgerRows.forEach(function(r){
+      var p=r.proc;
+      var teethStr=p.teeth&&p.teeth.length?p.teeth.join(', '):'—';
+      var grossIQD=toIQD(r.grossFee,r.feeCurr);
+      var labIQD=toIQD(r.labFee,r.feeCurr);
+      totGross+=grossIQD;totLab+=labIQD;totNet+=grossIQD-labIQD;totSplit+=r.dentistEarned;
+      html+='<tr>'+
+        '<td style="font-size:10px;color:var(--s400);white-space:nowrap;">'+(p.date||'—')+'</td>'+
+'<td><spanstyle="font-weight:600;cursor:pointer;color:var(--b600);"onclick="openProf(\''+(r.inv&&r.inv.patient_id?r.inv.patient_id:'')+'\','+'\''+(r.inv?r.inv.patient_name||'\u2014':'\u2014')+'\')">'+(r.inv?r.inv.patient_name||'\u2014':'\u2014')+'</span></td>'+
+        '<td><span style="font-size:10px;font-weight:600;color:'+(r.refBy?'var(--a700)':'var(--b700)')+';">'+r.refType+(r.refBy?' ('+r.refBy+')':'')+'</span></td>'+
+        '<td style="font-size:11px;">'+(p.procedure_name||'—')+'</td>'+
+        '<td style="font-size:10px;color:var(--s500);">'+teethStr+'</td>'+
+        '<td style="font-weight:700;">'+(grossIQD>0?fu(Math.round(grossIQD)):'—')+'</td>'+
+        '<td style="color:var(--r600);">'+(labIQD>0?'-'+fu(Math.round(labIQD)):'—')+'</td>'+
+        '<td style="font-weight:700;color:var(--s700);">'+(grossIQD>0?fu(Math.round(grossIQD-labIQD)):'—')+'</td>'+
+        '<td style="font-weight:700;color:var(--g700);">'+(r.dentistEarned>0?fu(Math.round(r.dentistEarned)):'Unpaid')+'</td>'+
+        '<td><span style="font-size:10px;font-weight:700;color:'+statusColors[r.payStatus]+'">'+(statusLabels[r.payStatus]||r.payStatus)+'</span></td>'+
+        '</tr>';
+    });
+    html+='<tr style="background:var(--s50);font-weight:700;">'+
+      '<td colspan="5" style="text-align:right;font-size:11px;">TOTALS</td>'+
+      '<td>'+fu(Math.round(totGross))+'</td>'+
+      '<td style="color:var(--r600);">'+(totLab>0?'-'+fu(Math.round(totLab)):'—')+'</td>'+
+      '<td>'+fu(Math.round(totNet))+'</td>'+
+      '<td style="color:var(--g700);">'+fu(Math.round(totSplit))+'</td>'+
+      '<td></td></tr>';
+    html+='</tbody></table>';
+  }
+  html+='</div></div>';
+
+  // ── SECTION 2: EXPENSES ───────────────────────────────────────
+  html+='<div class="vdc-card" style="margin-bottom:16px;">'+
+    '<div class="vdc-card-hdr"><div class="vdc-card-title">&#10134; Expenses</div></div>'+
+    '<div class="vdc-card-body">';
+
+  // Procedure expenses (lab fees by lab)
+  if(Object.keys(labFeesByLab).length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--s600);text-transform:uppercase;margin-bottom:8px;">Lab & procedure expenses</div>'+
+      '<table class="tbl" style="margin-bottom:14px;"><thead><tr><th>Lab</th><th>Procedures</th><th>Total</th></tr></thead><tbody>';
+    Object.entries(labFeesByLab).forEach(function(e){
+      html+='<tr><td>'+e[0]+'</td><td style="color:var(--s400);">'+e[1].count+'</td><td style="font-weight:700;color:var(--r600);">-'+fu(Math.round(e[1].total))+'</td></tr>';
+    });
+    html+='</tbody></table>';
+  } else {
+    html+='<div style="font-size:12px;color:var(--s400);margin-bottom:12px;">No lab expenses recorded in this period</div>';
+  }
+
+  // Manual dentist-specific expenses
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'+
+    '<div style="font-size:11px;font-weight:700;color:var(--s600);text-transform:uppercase;">Manual expenses</div>'+
+    '<button class="btn btnsm btnp" onclick="openAddDrExp(\''+dr.replace(/'/g,'&#39;')+'\')">+ Add expense</button></div>';
+
+  if(periodManualExps.length){
+    html+='<table class="tbl"><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th></th></tr></thead><tbody>';
+    periodManualExps.forEach(function(e){
+      html+='<tr><td style="font-size:10px;color:var(--s400);">'+(e.date||'—')+'</td>'+
+        '<td>'+(e.description||'—')+'</td>'+
+        '<td style="font-weight:700;color:var(--r600);">-'+fu(Number(e.amount||0))+'</td>'+
+        '<td><button class="btn btnr btnxs" onclick="deleteDrExp(\''+e.id+'\')">&#128465;</button></td></tr>';
+    });
+    html+='</tbody></table>';
+  } else {
+    html+='<div style="font-size:12px;color:var(--s400);">No manual expenses for this period</div>';
+  }
+
+  html+='<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--s200);display:flex;justify-content:space-between;align-items:center;">'+
+    '<span style="font-size:13px;font-weight:700;color:var(--s700);">Total expenses</span>'+
+    '<span style="font-size:15px;font-weight:800;color:var(--r600);">-'+fu(Math.round(totalExpenses))+'</span></div>'+
+    '</div></div>';
+
+  // ── SECTION 3: PAYOUT CALCULATION ────────────────────────────
+  html+='<div class="vdc-card" style="margin-bottom:16px;border:2px solid var(--g200);">'+
+    '<div class="vdc-card-hdr" style="background:var(--g50);"><div class="vdc-card-title" style="color:var(--g800);">&#11088; Payout calculation</div></div>'+
+    '<div class="vdc-card-body">'+
+    '<div style="display:flex;flex-direction:column;gap:8px;">'+
+    drPayCalcRow('Total collected from patients',fu(Math.round(totalCollectedIQD))+(totalCollectedUSD>0?' + '+fusd(totalCollectedUSD):''),'var(--s700)',false)+
+    drPayCalcRow('Lab & procedure expenses','-'+fu(Math.round(totalLabFees)),'var(--r600)',false)+
+    drPayCalcRow('Net revenue after lab','= '+fu(Math.round(netAfterLab)),'var(--s800)',false)+
+    drPayCalcRow('Dentist split (from payments received)',''+fu(Math.round(totalDentistSplitIQD)),'var(--b700)',false)+
+    drPayCalcRow('Manual expenses deducted','-'+fu(Math.round(totalManualExp)),'var(--r600)',false)+
+    '</div>'+
+    '<div style="margin-top:16px;background:var(--g600);border-radius:var(--radsm);padding:16px;display:flex;justify-content:space-between;align-items:center;">'+
+    '<div><div style="font-size:11px;color:rgba(255,255,255,0.8);font-weight:600;">FINAL PAYOUT TO '+dr.toUpperCase()+'</div>'+
+    '<div style="font-size:10px;color:rgba(255,255,255,0.6);">'+fromLabel+' → '+toLabel+'</div></div>'+
+    '<div style="font-size:26px;font-weight:800;color:white;">'+fu(Math.round(finalPayout))+'</div></div>'+
+    '<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">'+
+    '<button class="btn" onclick="printDrPayoutReport(\''+dr.replace(/'/g,'&#39;')+'\','+Math.round(finalPayout)+',\''+from+'\',\''+to+'\')">&#128424; Print report</button>'+
+    '<button class="btn btnp" onclick="openSalaryPayment(\'\',\''+dr.replace(/'/g,'&#39;')+'\','+Math.round(finalPayout)+',\'value\',\'Dentist payroll\',\'Pay dentist — '+dr.replace(/'/g,'&#39;')+'\')">&#128176; Pay dentist</button>'+
+    '</div></div></div>';
+
+  // ── SECTION 4: PAYOUT HISTORY ─────────────────────────────────
+  html+='<div class="vdc-card" style="margin-bottom:16px;">'+
+    '<div class="vdc-card-hdr"><div class="vdc-card-title">&#128197; Payout history</div></div>'+
+    '<div class="vdc-card-body" style="padding:0;overflow-x:auto;">';
+  if(!payHistory.length){
+    html+='<div style="text-align:center;padding:20px;color:var(--s400);font-size:12px;">No payouts recorded yet</div>';
+  } else {
+    html+='<table class="tbl"><thead><tr><th>Date</th><th>Amount</th><th>Wallet</th><th>Notes</th></tr></thead><tbody>';
+    payHistory.forEach(function(p){
+      html+='<tr><td style="font-size:10px;color:var(--s400);">'+(p.date||'—')+'</td>'+
+        '<td style="font-weight:700;color:var(--g700);">'+fu(Number(p.amount||0))+'</td>'+
+        '<td style="font-size:11px;">'+(p.wallet||'—')+'</td>'+
+        '<td style="font-size:11px;color:var(--s400);">'+(p.notes||'—')+'</td></tr>';
+    });
+    html+='</tbody></table>';
+  }
+  html+='</div></div>';
+
+  document.getElementById('pg-content').innerHTML=html;
+}
+
+function drPayCalcRow(label,value,color,bold){
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--s100);">'+
+    '<span style="font-size:12px;color:var(--s600);">'+label+'</span>'+
+    '<span style="font-size:13px;font-weight:'+(bold?'800':'700')+';color:'+color+';">'+value+'</span></div>';
+}
+
+function drProfileThisMonth(){
+  var now=new Date();
+  _drProfileFrom=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
+  var lastDay=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  _drProfileTo=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(lastDay).padStart(2,'0');
+  renderDrProfile();
+}
+
+// ── MANUAL DENTIST EXPENSES ────────────────────────────────────
+function openAddDrExp(drName){
+  var old=document.getElementById('drexp-modal');if(old)old.remove();
+  var html='<div class="mbg open" id="drexp-modal" onclick="if(event.target===this)this.remove()" style="z-index:600;">'+
+    '<div class="modal" style="max-width:420px;">'+
+    '<div class="mtit">Add expense for '+drName+'</div>'+
+    '<div class="msub">This expense will be deducted from their payout</div>'+
+    '<input type="hidden" id="drexp-dr" value="'+drName+'">'+
+    '<div class="fgrp"><label class="flbl">Description <span class="req">*</span></label>'+
+    '<input class="finp" id="drexp-desc" placeholder="e.g. Dental course fee, Equipment..."></div>'+
+    '<div class="fg">'+
+    '<div class="fgrp"><label class="flbl">Amount (IQD) <span class="req">*</span></label>'+
+    '<input class="finp" type="number" id="drexp-amt" placeholder="0" min="0"></div>'+
+    '<div class="fgrp"><label class="flbl">Date</label>'+
+    '<input class="finp" type="date" id="drexp-date" value="'+fd(new Date())+'">'+'</div>'+
+    '</div>'+
+    '<div class="mac">'+
+    '<button class="btn" onclick="document.getElementById(\'drexp-modal\').remove()">Cancel</button>'+
+    '<button class="btn btnp" onclick="saveDrExp()">Save expense</button>'+
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+async function saveDrExp(){
+  var dr=document.getElementById('drexp-dr').value;
+  var desc=(document.getElementById('drexp-desc').value||'').trim();
+  var amt=parseFloat(document.getElementById('drexp-amt').value)||0;
+  var date=document.getElementById('drexp-date').value||fd(new Date());
+  if(!desc){showToast('Enter a description','error');return;}
+  if(!amt){showToast('Enter an amount','error');return;}
+  var r=await db.from('dentist_expenses').insert([{dentist_name:dr,description:desc,amount:amt,currency:'IQD',date:date}]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast('Expense added ✅');
+  document.getElementById('drexp-modal').remove();
+  renderDrProfile();
+}
+
+async function deleteDrExp(id){
+  if(!confirm('Delete this expense?'))return;
+  var r=await db.from('dentist_expenses').delete().eq('id',id);
+  if(r.error){showToast('Could not delete: '+r.error.message,'error');return;}
+  showToast('Expense removed');
+  renderDrProfile();
+}
+
+// ── PRINT PAYOUT REPORT ───────────────────────────────────────
+function printDrPayoutReport(drName,finalAmount,from,to){
+  printReceipt({
+    type:'debit',
+    recipientName:drName,
+    recipientRole:'Dentist',
+    amount:finalAmount,
+    currency:'IQD',
+    wallet:'Value Wallet',
+    category:'Dentist payroll',
+    date:fd(new Date()),
+    notes:'Period: '+from+' to '+to
+  });
+}
+
 function buildFD(){
   var pays=getMPays();
   var paidMap=JSON.parse(localStorage.getItem('vdc-dr-paid-'+finY+'-'+finM)||'{}');
@@ -3375,6 +3729,7 @@ function buildFD(){
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'+
       (isPaid?'<span class="badge bg">&#10003; Paid</span>':'<span class="badge br">Not paid yet</span>')+
       '<div style="display:flex;gap:6px;">'+
+      '<button class="btn btnxs" onclick="openDrProfile(\''+dr.replace(/'/g,'&#39;')+'\')">&#128203; Profile</button>'+
       '<button class="btn btnxs" data-dr="'+dr+'" onclick="togDrPaidBtn(this)">'+(isPaid?'Undo':'Mark paid')+'</button>'+
       '<button class="btn btnxs btnp" onclick="openSalaryPayment(\'\',\''+dr.replace(/'/g,'&#39;')+'\','+Math.round(earnIQD)+',\'value\',\'Dentist payroll\',\'Pay dentist — '+dr.replace(/'/g,'&#39;')+'\')">&#128176; Pay dentist</button>'+
       '</div></div>'+
