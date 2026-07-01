@@ -683,7 +683,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
       </div>
       <div class="fg" style="margin-bottom:0;">
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl">Crown / lab units</label>
-          <input class="finp" type="number" id="proc-lab-units" placeholder="e.g. 3" min="1" value="" oninput="calcLabFee()" style="text-align:center;"></div>
+          <input class="finp" type="number" id="proc-lab-units" placeholder="e.g. 3" min="1" value="" oninput="document.getElementById('proc-lab-units').dataset.manualOverride=(this.value!==this.dataset.lastAuto?'1':'');calcLabFee()" style="text-align:center;"></div>
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl" id="proc-lab-unit-price-lbl">Service price per unit</label>
           <input class="finp" type="number" id="proc-lab-unit-price" placeholder="0" min="0" oninput="calcLabFee()" readonly style="background:var(--s50);"></div>
         <div class="fgrp" style="margin-bottom:0;"><label class="flbl" id="proc-lab-fee-lbl">Total lab fee (IQD)</label>
@@ -5676,7 +5676,7 @@ function onProcNameChange(name){
     if(pl)pl.value='';
     if(ps)ps.innerHTML='<option value="">Select service...</option>';
     if(pf)pf.value='';
-    var plu=document.getElementById('proc-lab-units');if(plu)plu.value='';
+    var plu=document.getElementById('proc-lab-units');if(plu){plu.value='';plu.dataset.lastAuto='';plu.dataset.manualOverride='';}
     var plup=document.getElementById('proc-lab-unit-price');if(plup){plup.value='';plup.dataset.unitPrice='';}
     updateProcNet();return;
   }
@@ -5684,7 +5684,7 @@ function onProcNameChange(name){
   var pl2=document.getElementById('proc-lab');if(pl2)pl2.value='';
   var ps2=document.getElementById('proc-lab-svc');if(ps2)ps2.innerHTML='<option value="">Select service...</option>';
   var pf2=document.getElementById('proc-lab-fee');if(pf2)pf2.value='';
-  var plu2=document.getElementById('proc-lab-units');if(plu2)plu2.value='';
+  var plu2=document.getElementById('proc-lab-units');if(plu2){plu2.value='';plu2.dataset.lastAuto='';plu2.dataset.manualOverride='';}
   var plup2=document.getElementById('proc-lab-unit-price');if(plup2){plup2.value='';plup2.dataset.unitPrice='';}
   updateProcNet();
 }
@@ -5749,7 +5749,7 @@ function autoMatchLabSvc(procName){
 function calcUnitPrice(){
   var bar=document.getElementById('proc-unit-bar');
   var feeEl=document.getElementById('proc-fee');
-  var labEl=document.getElementById('proc-lab-fee');
+  var labUnitsEl=document.getElementById('proc-lab-units');
   if(!bar||!feeEl)return;
   var procName=document.getElementById('proc-name').value;
   var def=allProcDefs.find(function(d){return d.name===procName;});
@@ -5758,13 +5758,12 @@ function calcUnitPrice(){
   var unitPrice=Number(def.price||0);
   var curr=def.currency||'IQD';
   var feeType=def.fee_type||'fixed';
-  var labFeeType=def.lab_fee_type||'fixed';
   if(feeType==='per_unit'&&units>0&&unitPrice>0){
     var total=units*unitPrice;
     bar.style.display='flex';
     var txt=document.getElementById('proc-unit-text');
     if(txt)txt.innerHTML='&#128176; <strong>'+units+' units</strong> × '+fmtAmt(unitPrice,curr)+' = <strong>'+fmtAmt(total,curr)+'</strong> &nbsp;|&nbsp; You can override below';
-    // Auto-fill fee only if the field hasn't been manually changed (or is empty / matches previous auto)
+    // Auto-fill the agreed fee unless the user has manually overridden it
     if(def.price_override!=='no'){
       if(!feeEl.dataset.manualOverride||feeEl.dataset.lastAuto===feeEl.value){
         feeEl.value=total;
@@ -5773,13 +5772,19 @@ function calcUnitPrice(){
     } else {
       feeEl.value=total;
     }
-    // Auto-multiply lab fee if per_unit
-    if(labFeeType==='per_unit'&&labEl){
-      var labUnit=parseFloat(labEl.dataset.unitPrice||labEl.value)||0;
-      if(labUnit>0){
-        labEl.value=units*labUnit;
-      }
+    // ── Auto-populate crown/lab units from tooth count ──────────────
+    // Pre-fill with tooth count so the dentist doesn't have to retype it,
+    // but only if they haven't manually entered a different number.
+    // We track whether the field was ever manually edited via data-manual-override.
+    if(labUnitsEl&&!labUnitsEl.dataset.manualOverride){
+      labUnitsEl.value=units;
+      labUnitsEl.dataset.lastAuto=units;
+      // Recompute lab fee with the new auto-populated units
+      calcLabFee();
     }
+    // NOTE: We do NOT touch proc-lab-fee here. calcLabFee() is the sole
+    // authority for lab fee = crown_units × unit_price. Doing it here
+    // caused compounding bugs (total being read as unit price).
   } else if(feeType==='per_unit'&&units===0){
     bar.style.display='flex';
     var txt2=document.getElementById('proc-unit-text');
@@ -7611,6 +7616,8 @@ function onProcDefSelect(name){
   if(feeEl){
     // store price as-is in its original currency — NO conversion
     feeEl.value=def.price;
+    feeEl.dataset.manualOverride=''; // clear manual override when procedure changes
+    feeEl.dataset.lastAuto=def.price;
     feeEl.readOnly=def.price_override==='no';
     feeEl.style.background=def.price_override==='no'?'var(--s100)':'';
     feeEl.title=def.price_override==='no'?'Price locked by admin':'';
@@ -7640,6 +7647,9 @@ function onProcDefSelect(name){
     if(def.notes){hint.textContent='📋 '+def.notes;hint.style.display='block';}
     else hint.style.display='none';
   }
+  // Re-calculate unit price now that a procedure is selected — this handles the
+  // case where teeth were already on the chart before the procedure was chosen.
+  calcUnitPrice();
 }
 
 
@@ -8847,7 +8857,7 @@ async function openAddProc(pid){
   var fixSec=document.getElementById('proc-fixtures-section'); if(fixSec)fixSec.style.display='none';
   var pnd=document.getElementById('proc-net-disp'); if(pnd)pnd.style.display='none';
   var plf=document.getElementById('proc-lab-fee'); if(plf)plf.value='';
-  var plu=document.getElementById('proc-lab-units'); if(plu)plu.value='';
+  var plu=document.getElementById('proc-lab-units'); if(plu){plu.value='';plu.dataset.lastAuto='';plu.dataset.manualOverride='';}
   var plup=document.getElementById('proc-lab-unit-price'); if(plup){plup.value='';plup.dataset.unitPrice='';}
   var plf=document.getElementById('proc-lab-fee'); if(plf)plf.value='';
   var pff=document.getElementById('proc-fixture-fee'); if(pff)pff.value='';
@@ -8906,7 +8916,7 @@ async function openAddProcFromAppt(appt){
   var fixSec2=document.getElementById('proc-fixtures-section');if(fixSec2)fixSec2.style.display='none';
   var pnd=document.getElementById('proc-net-disp');if(pnd)pnd.style.display='none';
   var plf=document.getElementById('proc-lab-fee');if(plf)plf.value='';
-  var plu2=document.getElementById('proc-lab-units');if(plu2)plu2.value='';
+  var plu2=document.getElementById('proc-lab-units');if(plu2){plu2.value='';plu2.dataset.lastAuto='';plu2.dataset.manualOverride='';}
   var plup2=document.getElementById('proc-lab-unit-price');if(plup2){plup2.value='';plup2.dataset.unitPrice='';}
   var pff=document.getElementById('proc-fixture-fee');if(pff)pff.value='';
   var pfw=document.getElementById('proc-fixture-wrap');if(pfw)pfw.style.display='none';
