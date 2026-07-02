@@ -2180,14 +2180,34 @@ async function loadClinical(pid){
 }
 
 // DENTAL CHART
-function buildChart(states,sel,isPrim){
+// toothProcs = { toothNum: [{id, procedure_name, treating_dentist, date, status, patient_id, patient_name}] }
+// Used in the patient clinical chart only (not in the procedure recording form).
+function buildChart(states,sel,isPrim,toothProcs){
   var fdi=isPrim?FDI_PRIM:FDI_PERM;
-  sel=sel||{};states=states||{};
+  sel=sel||{};states=states||{};toothProcs=toothProcs||{};
   function tb(n,jaw){
     var st=states[n]||'',isS=sel[n];
     var cls='tooth-btn'+(jaw==='lower'?' lower':'')+(isS?' sel':(st?' '+st:''));
     var ic=isS?'✓':(st==='completed'?'✓':(st==='inprogress'?'~':(st==='planned'?'!':(st==='diagplanned'?'dx':''))));
-    return '<button class="'+cls+'" onclick="procTT('+n+')" title="Tooth '+n+(st?' - '+st:'')+'">'+(ic?'<span style="font-size:8px;line-height:1;">'+ic+'</span>':'')+
+    var procs=toothProcs[n]||[];
+    var count=procs.length;
+    // Build hover tooltip content
+    var tooltipAttr='';
+    if(count>0){
+      var tipLines=procs.map(function(p){
+        return (p.procedure_name||'Procedure')+(p.treating_dentist?' · '+p.treating_dentist:'')+(p.date?' ('+p.date+')':'');
+      }).join('&#10;');
+      tooltipAttr=' title="Tooth '+n+':&#10;'+tipLines+'"';
+    } else {
+      tooltipAttr=' title="Tooth '+n+(st?' - '+st:'')+'"';
+    }
+    // Badge showing procedure count (shown when >1 procedure on this tooth)
+    var badge=count>1?'<span style="position:absolute;top:-4px;right:-4px;background:#EF4444;color:white;border-radius:50%;width:13px;height:13px;font-size:7px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1;border:1.5px solid white;z-index:2;">'+count+'</span>':'';
+    // When multiple procs exist, clicking opens the multi-proc list rather than selecting the tooth
+    var clickHandler=count>1?'showToothProcList('+n+',event)':'procTT('+n+')';
+    // Dot indicator for single completed procedure with dentist info (makes it clear something is recorded)
+    var dot=count===1&&procs[0]?'<span style="position:absolute;top:-3px;right:-3px;background:#10B981;border-radius:50%;width:8px;height:8px;border:1.5px solid white;z-index:2;"></span>':'';
+    return '<button class="'+cls+'" style="position:relative;" onclick="'+clickHandler+'"'+tooltipAttr+'>'+badge+dot+(ic?'<span style="font-size:8px;line-height:1;">'+ic+'</span>':'')+
       '<span style="font-size:9px;font-weight:800;line-height:1;">'+n+'</span></button>';
   }
   var h='<div style="position:relative;padding:0 12px;text-align:center;">';
@@ -2201,6 +2221,64 @@ function buildChart(states,sel,isPrim){
   h+='<div style="position:absolute;left:0;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--s400);">R</div>';
   h+='<div style="position:absolute;right:0;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--s400);">L</div>';
   return h+'</div>';
+}
+
+// Called when clicking a tooth that has 2+ procedures — shows an inline list
+// so the user can choose which procedure record to open.
+var _clinToothProcs={}; // populated by renderProf alongside the chart
+function showToothProcList(toothNum,event){
+  // Remove any existing popup
+  var old=document.getElementById('tooth-proc-popup');if(old)old.remove();
+  var procs=_clinToothProcs[toothNum]||[];
+  if(!procs.length)return;
+  if(procs.length===1){
+    // Single procedure — open directly
+    openProcFromChart(procs[0]);return;
+  }
+  // Build popup positioned near the clicked button
+  var popup=document.createElement('div');
+  popup.id='tooth-proc-popup';
+  popup.style.cssText='position:fixed;z-index:500;background:white;border:1px solid var(--s200);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:10px;min-width:220px;max-width:280px;';
+  var rect=event.target.closest('.tooth-btn').getBoundingClientRect();
+  var top=Math.min(rect.bottom+6,window.innerHeight-200);
+  var left=Math.min(rect.left,window.innerWidth-290);
+  popup.style.top=top+'px';popup.style.left=left+'px';
+  var inner='<div style="font-size:11px;font-weight:700;color:var(--s600);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--s100);">Tooth '+toothNum+' — '+procs.length+' procedures</div>';
+  procs.forEach(function(p){
+    var statusColor=p.status==='completed'?'#059669':p.status==='inprogress'?'#7C3AED':'#F59E0B';
+    inner+='<div style="padding:7px 8px;border-radius:6px;margin-bottom:4px;cursor:pointer;border:1px solid var(--s100);" '+
+      'onmouseover="this.style.background=\'var(--s50)\'" onmouseout="this.style.background=\'\'" '+
+      'onclick="openProcFromChart('+JSON.stringify(p).replace(/"/g,'&quot;')+')">' +
+      '<div style="font-size:12px;font-weight:600;color:var(--s800);">'+(p.procedure_name||'Procedure')+'</div>'+
+      '<div style="font-size:10px;color:var(--s400);margin-top:2px;">'+
+      (p.treating_dentist?p.treating_dentist+' · ':'')+
+      (p.date?p.date+' · ':'')+
+      '<span style="color:'+statusColor+';font-weight:600;">'+(p.status||'')+'</span>'+
+      '</div></div>';
+  });
+  inner+='<button onclick="document.getElementById(\'tooth-proc-popup\').remove()" style="margin-top:4px;width:100%;font-size:11px;padding:5px;border-radius:6px;border:0.5px solid var(--s200);background:none;cursor:pointer;color:var(--s500);">Close</button>';
+  popup.innerHTML=inner;
+  document.body.appendChild(popup);
+  // Close on outside click
+  setTimeout(function(){
+    document.addEventListener('click',function closePop(e){
+      if(!document.getElementById('tooth-proc-popup'))return document.removeEventListener('click',closePop);
+      if(!document.getElementById('tooth-proc-popup').contains(e.target)){
+        document.getElementById('tooth-proc-popup').remove();
+        document.removeEventListener('click',closePop);
+      }
+    });
+  },10);
+}
+
+function openProcFromChart(proc){
+  var old=document.getElementById('tooth-proc-popup');if(old)old.remove();
+  // Navigate to the patient profile and open the procedure record
+  // The procedure is linked to a patient via patient_id — open their profile
+  // then scroll to/highlight that procedure in the timeline
+  if(proc.patient_id&&proc.patient_name){
+    openProf(proc.patient_id,proc.patient_name);
+  }
 }
 function procTT(n){if(procSelTeeth[n])delete procSelTeeth[n];else procSelTeeth[n]=true;renderProcChart();}
 function procQS(type){
@@ -9598,6 +9676,8 @@ async function renderProf(id,name,tab){
 
   // Clinical chart — merge diagnosis + procedure states
   var clinTeeth={};
+  // Build a map of tooth → [procedure records] for badge + tooltip + click-through
+  var toothProcs={};
   // 1. Apply diagnosis states first (lowest priority)
   allDiagItems.forEach(function(item){
     if(!item.teeth)return;
@@ -9607,27 +9687,42 @@ async function renderProf(id,name,tab){
       else if(item.status==='completed')clinTeeth[t]='completed';
     });
   });
-  // 2. Overlay actual procedure states (higher priority)
+  // 2. Overlay actual procedure states (higher priority) + build toothProcs map
   procs.slice().reverse().forEach(function(pr){
     if(pr.teeth&&Array.isArray(pr.teeth))pr.teeth.forEach(function(t){
       if(pr.status==='completed')clinTeeth[t]='completed';
       else if(pr.status==='inprogress'&&clinTeeth[t]!=='completed')clinTeeth[t]='inprogress';
       else if(pr.status==='planned'&&!clinTeeth[t])clinTeeth[t]='planned';
+      // Add this procedure to the tooth's procedure list for badge/popup
+      if(!toothProcs[t])toothProcs[t]=[];
+      // Avoid duplicates (same proc id)
+      if(!toothProcs[t].find(function(x){return x.id===pr.id;})){
+        toothProcs[t].push({
+          id:pr.id,
+          procedure_name:pr.procedure_name,
+          treating_dentist:pr.treating_dentist,
+          date:pr.date,
+          status:pr.status,
+          patient_id:id,
+          patient_name:p.name
+        });
+      }
     });
   });
-  // NOTE: appointment teeth are intentionally NOT used for the clinical chart.
-  // The chart reflects what was actually recorded in procedure records only.
-  // Appointment teeth auto-update to match the procedure when a visit is saved.
-  // Chart legend
+  // NOTE: appointment teeth intentionally NOT used — only procedure records drive the chart.
+  // Store in global so the popup click handler can access it
+  _clinToothProcs=toothProcs;
+  // Chart legend — updated to include multi-procedure badge explanation
   var chartLegend='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:10px;color:var(--s600);">'+
     '<div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;border-radius:3px;background:#FFFBEB;border:1.5px solid #F59E0B;"></div>Diagnosed</div>'+
     '<div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;border-radius:3px;background:#EDE9FE;border:1.5px solid #7C3AED;"></div>In progress</div>'+
     '<div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;border-radius:3px;background:#DCFCE7;border:1.5px solid #16A34A;"></div>Completed</div>'+
+    '<div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;border-radius:50%;background:#EF4444;color:white;font-size:7px;font-weight:800;display:flex;align-items:center;justify-content:center;">2</div><span>Multiple procedures — click to view</span></div>'+
     '</div>';
   // Always render clinical chart
   html+='<div class="vdc-card" style="margin-top:14px;"><div class="vdc-card-hdr"><div class="vdc-card-title">&#10022; Clinical chart</div>'+
     '<button class="btn btnsm" onclick="openAddProc(\''+id+'\')">+ Record procedure</button></div>'+
-    '<div class="vdc-card-body">'+chartLegend+buildChart(clinTeeth,{},false)+'</div></div>';
+    '<div class="vdc-card-body">'+chartLegend+buildChart(clinTeeth,{},false,toothProcs)+'</div></div>';
 
   document.getElementById('pg-content').innerHTML=html;
 }
