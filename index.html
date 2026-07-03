@@ -457,7 +457,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     <div class="fg">
       <div class="fgrp"><label class="flbl">Status</label><select class="finp" id="pt-status"><option value="new">New</option><option value="active">Active</option><option value="inprogress">In progress</option><option value="followup">Follow-up needed</option><option value="completed">Completed</option><option value="inactive">Inactive</option></select></div>
       <div class="fgrp"><label class="flbl">Primary dentist</label>
-        <select class="finp" id="pt-dr"><option value="">Select...</option><option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option><option>Dr. Mateen</option><option>Dr. Ibrahim</option><option>Dr. Mahmoud</option><option>Dr. Niwar</option><option>Dr. Dilveen</option></select></div>
+        <select class="finp" id="pt-dr"><option value="">Select...</option></select></div>
     </div>
     <div class="fgrp"><label class="flbl">Medical notes</label><textarea class="finp" id="pt-notes" rows="2" placeholder="Allergies, conditions..."></textarea></div>
     <!-- WHATSAPP SECTION -->
@@ -533,7 +533,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
         </div>
         <datalist id="pt-dl"></datalist></div>
       <div class="fgrp"><label class="flbl">Dentist <span class="req">*</span></label>
-        <select class="finp" id="am-dr"><option value="">Select...</option><option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option><option>Dr. Mateen</option><option>Dr. Ibrahim</option><option>Dr. Mahmoud</option><option>Dr. Niwar</option><option>Dr. Dilveen</option></select></div>
+        <select class="finp" id="am-dr"><option value="">Select...</option></select></div>
     </div>
     <div class="fg">
       <div class="fgrp"><label class="flbl">Room <span class="req">*</span></label>
@@ -668,9 +668,9 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F0F5F
     </div>
     <div class="fg">
       <div class="fgrp"><label class="flbl">Treating dentist</label>
-        <select class="finp" id="proc-dr"><option value="">Select...</option><option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option><option>Dr. Mateen</option><option>Dr. Ibrahim</option><option>Dr. Mahmoud</option><option>Dr. Niwar</option><option>Dr. Dilveen</option></select></div>
+        <select class="finp" id="proc-dr"><option value="">Select...</option></select></div>
       <div class="fgrp"><label class="flbl">Referred by (partner only)</label>
-        <select class="finp" id="proc-ref"><option value="">No referral</option><option>Dr. Sarmad</option><option>Dr. Akheenk</option><option>Dr. Shaveen</option></select></div>
+        <select class="finp" id="proc-ref"><option value="">No referral</option></select></div>
     </div>
     <!-- LAB SECTION -->
     <div id="proc-lab-section" style="display:none;background:var(--p50);border:1px solid var(--p100);border-radius:var(--radsm);padding:12px 14px;margin-bottom:13px;">
@@ -3155,8 +3155,8 @@ function buildFinUI(){
     '<button class="btn btnsm" onclick="setFinM(new Date().getMonth(),new Date().getFullYear())">This month</button>'+
     '</div>'+
     '<div style="display:flex;gap:2px;background:white;border-radius:var(--rad);border:1px solid var(--s200);padding:3px;margin-bottom:14px;flex-wrap:wrap;">'+
-    ['overview','payments','dentists','substaff','expenses','adjustments','debts'].map(function(t){
-      var L={overview:'Finance overview',payments:'Payment log',dentists:'Dentist payroll',substaff:'Substaff',expenses:'Expenses',adjustments:'Rewards & Penalties',debts:'Internal Debts'};
+    ['overview','payments','dentists','substaff','expenses','adjustments','debts','capital'].map(function(t){
+      var L={overview:'Finance overview',payments:'Payment log',dentists:'Dentist payroll',substaff:'Substaff',expenses:'Expenses',adjustments:'Rewards & Penalties',debts:'Internal Debts',capital:'Capital Contributions'};
       return '<button class="fin-tab'+(finTab===t?' act':'')+'" onclick="setFinT(\''+t+'\')">'+L[t]+'</button>';
     }).join('')+'</div>'+
     '<div id="fin-content"></div>';
@@ -3257,6 +3257,7 @@ function buildFinTab(){
   else if(finTab==='expenses')el.innerHTML=buildFE();
   else if(finTab==='adjustments'){buildFAdj();}
   else if(finTab==='debts'){buildFLoans();}
+  else if(finTab==='capital'){buildCapitalContributions();}
 }
 function buildFO(){
   var pays=getMPays(),exps=getME();
@@ -3469,58 +3470,60 @@ async function renderDrProfile(){
   ]);
 
   var allInvs=results[0].data||[];
-  var allPays=results[1].data||[];
+  var allPaysRaw=results[1].data||[];
   var allProcs=results[2].data||[];
   var manualExps=results[3].data||[];
   var payHistory=results[4].data||[];
 
   function inRange(d){return d&&d>=from&&d<=to;}
 
-  var periodProcs=allProcs.filter(function(p){return inRange(p.date);});
-  var periodInvIds=periodProcs.map(function(p){return p.invoice_id;}).filter(Boolean);
-  var periodInvs=allInvs.filter(function(i){
-    return periodInvIds.indexOf(i.id)>=0||(i.date&&inRange(i.date));
-  });
-  var periodInvIdSet=new Set(periodInvs.map(function(i){return i.id;}));
-  var periodPays=allPays.filter(function(p){return periodInvIdSet.has(p.invoice_id);});
+  // ── PERIOD SCOPE: driven by PAYMENT date, matching Finance Overview ──
+  // (Previously this scoped by the procedure's own date, which caused a real
+  // mismatch: a procedure recorded in June but paid in July would vanish from
+  // this profile's "July" view even though Finance Overview correctly counted
+  // that July payment. Every part of this app's finance logic is built around
+  // "when money actually arrived," not "when the dental work happened," so
+  // this profile now follows that same rule.)
+  var myInvIds={};allInvs.forEach(function(i){myInvIds[i.id]=true;});
+  var invById={};allInvs.forEach(function(i){invById[i.id]=i;});
+  var procsByInvId={};allProcs.forEach(function(p){if(p.invoice_id){(procsByInvId[p.invoice_id]=procsByInvId[p.invoice_id]||[]).push(p);}});
+  var periodPays=allPaysRaw.filter(function(p){return myInvIds[p.invoice_id]&&inRange(p.date);});
   var periodManualExps=manualExps.filter(function(e){return inRange(e.date);});
 
-  // ── Procedure ledger ──────────────────────────────────────────
-  // For partners: 100% of every payment is theirs, regardless of own/referred.
-  // For regular dentists: split applied via getPayDistDual (own%/referred%).
+  // ── Ledger rows — one row per qualifying payment, resolved back to its procedure/invoice ──
   var ledgerRows=[];
-  periodProcs.forEach(function(proc){
-    var inv=allInvs.find(function(i){return i.id===proc.invoice_id;});
-    var grossFee=inv?Number(inv.fee||0):Number(proc.fee||0);
-    var feeCurr=inv?inv.fee_currency||'IQD':'IQD';
-    var labFee=Number(proc.lab_fee||0);
+  var netOwnIQD=0,netRefIQD=0,netPartnerIQD=0; // pre-split, post-lab pools, used for the payout calc below
+  periodPays.forEach(function(pay){
+    var inv=invById[pay.invoice_id];if(!inv)return;
+    var procList=procsByInvId[inv.id]||[];
+    var proc=procList[0]||{}; // representative procedure for display (name/teeth/lab)
+    var d=getPayDistDual(pay,inv); // now correctly net-of-lab for every type, including partners
+    var payIQD=Number(pay.amount_iqd||0)+Number(pay.amount_usd||0)*IQD;
+    var labFeeIQD=toIQD(Number(inv.lab_fee||0),inv.fee_currency);
+    var feeIQD=toIQD(Number(inv.fee||0),inv.fee_currency);
+    var netRatio=feeIQD>0?Math.max(0,(feeIQD-labFeeIQD)/feeIQD):1;
+    var netPayIQD=payIQD*netRatio;
     var refType='Own patient',refBy='';
-    if(inv&&inv.referrer){refType='Referred';refBy=inv.referrer;}
-    var procPays=inv?periodPays.filter(function(p){return p.invoice_id===inv.id;}):[];
-    var totalPaid=procPays.reduce(function(s,p){return s+Number(p.amount_iqd||0)+Number(p.amount_usd||0)*IQD;},0);
-    var grossIQD=toIQD(grossFee,feeCurr);
-    var payStatus=totalPaid>=grossIQD?'paid':totalPaid>0?'partial':'unpaid';
-    var earned=0;
-    procPays.forEach(function(p){
-      if(isPartner){
-        // Partners keep 100% of their own work, own or referred — no split applied
-        earned+=Number(p.amount_iqd||0)+Number(p.amount_usd||0)*IQD;
-      } else {
-        var d=getPayDistDual(p,inv);
-        earned+=d.treaterIQD||0;
-      }
+    if(inv.referrer){refType='Referred';refBy=inv.referrer;}
+    var earned=(d.treaterIQD||0)+(d.treaterUSD||0)*IQD;
+    if(isPartner)netPartnerIQD+=netPayIQD;
+    else if(d.type==='referred')netRefIQD+=netPayIQD;
+    else netOwnIQD+=netPayIQD;
+    ledgerRows.push({
+      proc:proc,inv:inv,grossFee:Number(inv.fee||0),feeCurr:inv.fee_currency||'IQD',
+      labFee:Number(inv.lab_fee||0),refType:refType,refBy:refBy,
+      payStatus:inv.status||'paid', // this payment was received, so at minimum partial
+      earned:earned,totalPaid:payIQD,payDate:pay.date
     });
-    ledgerRows.push({proc:proc,inv:inv,grossFee:grossFee,feeCurr:feeCurr,labFee:labFee,
-      refType:refType,refBy:refBy,payStatus:payStatus,earned:earned,totalPaid:totalPaid});
   });
 
-  // ── Expense breakdown ───────────────────────────────────────────
+  // ── Expense breakdown (lab fees shown for context; manual expenses drive the payout math below) ──
   var labFeesByLab={};
-  periodProcs.forEach(function(p){
-    if(!p.lab_fee||Number(p.lab_fee)===0)return;
-    var labName=p.lab_name||'Unknown lab';
+  ledgerRows.forEach(function(r){
+    if(!r.labFee||Number(r.labFee)===0)return;
+    var labName=(r.proc&&r.proc.lab_name)||'Unknown lab';
     if(!labFeesByLab[labName])labFeesByLab[labName]={total:0,count:0};
-    labFeesByLab[labName].total+=Number(p.lab_fee||0);
+    labFeesByLab[labName].total+=toIQD(Number(r.labFee||0),r.feeCurr);
     labFeesByLab[labName].count++;
   });
   var totalLabFees=Object.values(labFeesByLab).reduce(function(s,v){return s+v.total;},0);
@@ -3528,12 +3531,30 @@ async function renderDrProfile(){
   var totalExpenses=totalLabFees+totalManualExp;
 
   // ── Payout calculation ──────────────────────────────────────────
+  // Model: lab fees are already netted out per-payment above (netOwnIQD/netRefIQD/
+  // netPartnerIQD are all POST-lab). Manual expenses are subtracted from this net
+  // pool BEFORE the ownPct/refPct split is applied — so the Value Wallet (or the
+  // referring partner) shares the cost of that expense in the same ratio it shares
+  // the revenue, exactly like a real accounting expense against shared earnings.
+  // ASSUMPTION (flagging this clearly): when a dentist has both own-patient and
+  // referred-patient income in the same period, a manual expense is deducted from
+  // the OWN-patient pool first, only spilling into the referred pool if the
+  // expense is larger than the own-patient net revenue. This is the sensible
+  // default for expenses tied to a dentist's own clinical work; tell me if you
+  // want it split proportionally across both pools instead.
   var totalCollectedIQD=0,totalCollectedUSD=0;
   periodPays.forEach(function(p){totalCollectedIQD+=Number(p.amount_iqd||0);totalCollectedUSD+=Number(p.amount_usd||0);});
-  var totalCollectedInIQD=totalCollectedIQD+totalCollectedUSD*IQD;
-  var netAfterLab=Math.max(0,totalCollectedInIQD-totalLabFees);
-  var totalSplitIQD=ledgerRows.reduce(function(s,r){return s+r.earned;},0);
-  var finalPayout=Math.max(0,totalSplitIQD-totalManualExp);
+  var netAfterLab=netOwnIQD+netRefIQD+netPartnerIQD;
+  var finalPayout=0;
+  if(isPartner){
+    finalPayout=Math.max(0,netPartnerIQD-totalManualExp);
+  } else {
+    var ownAfterExp=Math.max(0,netOwnIQD-totalManualExp);
+    var spillover=Math.max(0,totalManualExp-netOwnIQD);
+    var refAfterExp=Math.max(0,netRefIQD-spillover);
+    var ownPct=(rates.ownPct||0)/100,refPct=(rates.refPct||0)/100;
+    finalPayout=(ownAfterExp*ownPct)+(refAfterExp*refPct);
+  }
 
   var lastPayout=payHistory[0];
   var lastPayoutDate=lastPayout?lastPayout.date:'—';
@@ -3548,9 +3569,10 @@ async function renderDrProfile(){
     ledgerRows:ledgerRows,labFeesByLab:labFeesByLab,totalLabFees:totalLabFees,
     periodManualExps:periodManualExps,totalManualExp:totalManualExp,totalExpenses:totalExpenses,
     totalCollectedIQD:totalCollectedIQD,totalCollectedUSD:totalCollectedUSD,
-    netAfterLab:netAfterLab,totalSplitIQD:totalSplitIQD,finalPayout:finalPayout,
+    netAfterLab:netAfterLab,totalSplitIQD:finalPayout,finalPayout:finalPayout,
+    netOwnIQD:netOwnIQD,netRefIQD:netRefIQD,netPartnerIQD:netPartnerIQD,
     payHistory:payHistory,lastPayout:lastPayout,lastPayoutDate:lastPayoutDate,lastPayoutAmt:lastPayoutAmt,
-    periodProcCount:periodProcs.length
+    periodProcCount:ledgerRows.length
   };
 
   renderDrProfileBody();
@@ -3623,7 +3645,7 @@ function buildDrLedgerTab(c){
       var labIQD=toIQD(r.labFee,r.feeCurr);
       totGross+=grossIQD;totLab+=labIQD;totNet+=grossIQD-labIQD;totEarned+=r.earned;
       html+='<tr>'+
-        '<td style="font-size:10px;color:var(--s400);white-space:nowrap;">'+(p.date||'—')+'</td>'+
+        '<td style="font-size:10px;color:var(--s400);white-space:nowrap;">'+(r.payDate||p.date||'—')+'</td>'+
         '<td><span style="font-weight:600;cursor:pointer;color:var(--b600);" onclick="openProf(\''+(r.inv&&r.inv.patient_id?r.inv.patient_id:'')+'\',\''+(r.inv?(r.inv.patient_name||'—').replace(/'/g,'&#39;'):'—')+'\')">'+(r.inv?r.inv.patient_name||'—':'—')+'</span></td>'+
         '<td><span style="font-size:10px;font-weight:600;color:'+(r.refBy?'var(--a700)':'var(--b700)')+';">'+r.refType+(r.refBy?' ('+r.refBy+')':'')+(c.isPartner&&r.refBy?' — 100% kept':'')+'</span></td>'+
         '<td style="font-size:11px;">'+(p.procedure_name||'—')+'</td>'+
@@ -3684,19 +3706,37 @@ function buildDrExpensesTab(c){
 
 function buildDrPayoutTab(c){
   var dr=c.dr,isPartner=c.isPartner;
-  var splitLabel=isPartner?'Personal earnings (100% — no split)':'Dentist split (from payments received)';
   var finalLabel=isPartner?'FINAL PERSONAL EARNINGS — '+dr.toUpperCase():'FINAL PAYOUT TO '+dr.toUpperCase();
+  var rows='';
+  rows+=drPayCalcRow('Total collected from patients',fu(Math.round(c.totalCollectedIQD))+(c.totalCollectedUSD>0?' + '+fusd(c.totalCollectedUSD):''),'var(--s700)',false);
+  rows+=drPayCalcRow('Lab & procedure expenses','-'+fu(Math.round(c.totalLabFees)),'var(--r600)',false);
+  rows+=drPayCalcRow('Net revenue after lab','= '+fu(Math.round(c.netAfterLab)),'var(--s800)',false);
+  rows+=drPayCalcRow('Manual expenses (courses, materials, equipment)','-'+fu(Math.round(c.totalManualExp)),'var(--r600)',false);
+
+  if(isPartner){
+    var partnerNet=Math.max(0,c.netPartnerIQD-c.totalManualExp);
+    rows+=drPayCalcRow('Net after all expenses','= '+fu(Math.round(partnerNet)),'var(--s800)',true);
+    rows+=drPayCalcRow('Partner keeps 100% — no split',fu(Math.round(partnerNet)),'var(--g700)',true);
+  } else {
+    var ownAfterExp=Math.max(0,c.netOwnIQD-c.totalManualExp);
+    var spillover=Math.max(0,c.totalManualExp-c.netOwnIQD);
+    var refAfterExp=Math.max(0,c.netRefIQD-spillover);
+    if(c.netOwnIQD>0||ownAfterExp>0){
+      rows+=drPayCalcRow('Own-patient pool after expenses','= '+fu(Math.round(ownAfterExp)),'var(--s800)',false);
+      rows+=drPayCalcRow('&nbsp;&nbsp;→ My share ('+c.rates.ownPct+'%) / Value Wallet ('+(100-c.rates.ownPct)+'%)',fu(Math.round(ownAfterExp*c.rates.ownPct/100))+' / '+fu(Math.round(ownAfterExp*(100-c.rates.ownPct)/100)),'var(--b700)',false);
+    }
+    if(c.netRefIQD>0){
+      rows+=drPayCalcRow('Referred-patient pool after expenses','= '+fu(Math.round(refAfterExp)),'var(--s800)',false);
+      rows+=drPayCalcRow('&nbsp;&nbsp;→ My share ('+c.rates.refPct+'%) / Referring partner ('+(100-c.rates.refPct)+'%)',fu(Math.round(refAfterExp*c.rates.refPct/100))+' / '+fu(Math.round(refAfterExp*(100-c.rates.refPct)/100)),'var(--b700)',false);
+    }
+  }
+
   var html='<div class="vdc-card" style="border:2px solid var(--g200);">'+
     '<div class="vdc-card-hdr" style="background:var(--g50);"><div class="vdc-card-title" style="color:var(--g800);">&#11088; Payout calculation</div></div>'+
     '<div class="vdc-card-body">'+
-    '<div style="display:flex;flex-direction:column;gap:8px;">'+
-    drPayCalcRow('Total collected from patients',fu(Math.round(c.totalCollectedIQD))+(c.totalCollectedUSD>0?' + '+fusd(c.totalCollectedUSD):''),'var(--s700)',false)+
-    drPayCalcRow('Lab & procedure expenses','-'+fu(Math.round(c.totalLabFees)),'var(--r600)',false)+
-    drPayCalcRow('Net revenue after lab','= '+fu(Math.round(c.netAfterLab)),'var(--s800)',false)+
-    drPayCalcRow(splitLabel,''+fu(Math.round(c.totalSplitIQD)),'var(--b700)',false)+
-    drPayCalcRow('Manual expenses deducted','-'+fu(Math.round(c.totalManualExp)),'var(--r600)',false)+
-    '</div>'+
-    (isPartner?'<div style="font-size:10px;color:var(--p600);background:var(--p50);border-radius:6px;padding:8px 10px;margin-top:10px;">&#9432; This does not include this partner\'s share of the Value Wallet (clinic-wide revenue from other dentists). See Finance Overview for that separate figure.</div>':'')+
+    '<div style="display:flex;flex-direction:column;gap:8px;">'+rows+'</div>'+
+    '<div style="font-size:10px;color:var(--s400);background:var(--s50);border-radius:6px;padding:8px 10px;margin-top:10px;">&#9432; Lab fees and manual expenses are both deducted before the split — the Value Wallet (or referring partner) shares the cost of expenses in the same ratio it shares the revenue.'+
+    (isPartner?' Partners keep 100% of their own net revenue; this does not include this partner\'s separate share of the Value Wallet. See Finance Overview for that figure.':'')+'</div>'+
     '<div style="margin-top:16px;background:var(--g600);border-radius:var(--radsm);padding:16px;display:flex;justify-content:space-between;align-items:center;">'+
     '<div><div style="font-size:11px;color:rgba(255,255,255,0.8);font-weight:600;">'+finalLabel+'</div>'+
     '<div style="font-size:10px;color:rgba(255,255,255,0.6);">'+c.fromLabel+' → '+c.toLabel+'</div></div>'+
@@ -7389,6 +7429,147 @@ async function saveWalletLoan(){
 function openNewLoanDialog(){
   openWalletLoan(PARTNERS[0]||'value',0,'');
 }
+
+// ── FUND THE VALUE WALLET — splits a shortfall equally across all partners ──
+// Creates one wallet_loans row per partner (borrower=value, lender=each partner),
+// each repayable, exactly like any other internal loan — just created 3-at-once
+// instead of one at a time.
+function openFundValueWallet(){
+  var old=document.getElementById('fund-value-modal');if(old)old.remove();
+  var perPartner=PARTNERS.length?Math.round(1/PARTNERS.length*100)/100:0;
+  var html='<div class="mbg open" id="fund-value-modal" onclick="if(event.target===this)this.remove()" style="z-index:600;">'+
+    '<div class="modal" style="max-width:420px;">'+
+    '<div class="mtit">&#128176; Fund the Value Wallet</div>'+
+    '<div class="msub">Split equally across all '+PARTNERS.length+' partners — each becomes a repayable loan to the Value Wallet</div>'+
+    '<div class="fgrp"><label class="flbl">Total amount needed (IQD) <span class="req">*</span></label>'+
+    '<input class="finp" type="number" id="fv-amount" placeholder="0" min="0" oninput="updateFundValuePreview()"></div>'+
+    '<div id="fv-preview" style="background:var(--s50);border-radius:var(--radsm);padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--s600);"></div>'+
+    '<div class="fgrp"><label class="flbl">Reason</label>'+
+    '<input class="finp" id="fv-notes" placeholder="e.g. Rent, electricity, salaries..."></div>'+
+    '<div class="mac">'+
+    '<button class="btn" onclick="document.getElementById(\'fund-value-modal\').remove()">Cancel</button>'+
+    '<button class="btn btnp" onclick="saveFundValueWallet()">Record 3 loans</button>'+
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+  updateFundValuePreview();
+}
+function updateFundValuePreview(){
+  var total=parseFloat((document.getElementById('fv-amount')||{}).value)||0;
+  var el=document.getElementById('fv-preview');if(!el)return;
+  var each=PARTNERS.length?total/PARTNERS.length:0;
+  el.innerHTML=total>0?
+    'Each partner contributes <strong>'+fu(Math.round(each))+'</strong>:<br>'+PARTNERS.map(function(p){return '• '+p;}).join('<br>'):
+    'Enter an amount to see the split per partner';
+}
+async function saveFundValueWallet(){
+  var total=parseFloat(document.getElementById('fv-amount').value)||0;
+  var notes=document.getElementById('fv-notes').value.trim()||'Value Wallet funding';
+  if(!total){showToast('Enter an amount','error');return;}
+  if(!PARTNERS.length){showToast('No partners found','error');return;}
+  var each=Math.round(total/PARTNERS.length);
+  var date=fd(new Date());
+  var inserts=PARTNERS.map(function(p){
+    return db.from('wallet_loans').insert([{
+      borrower_wallet:'value',lender_wallet:p,amount:each,currency:'IQD',
+      notes:notes+' (equal split, 3 partners)',status:'outstanding',date:date
+    }]);
+  });
+  var results=await Promise.all(inserts);
+  var failed=results.filter(function(r){return r.error;});
+  if(failed.length){showToast('Some loans failed to save — check Internal Debts','error');return;}
+  showToast('Value Wallet funded ✅ — '+fu(each)+' recorded as a loan from each of '+PARTNERS.length+' partners');
+  document.getElementById('fund-value-modal').remove();
+  PARTNERS.forEach(function(p){
+    createNotification({
+      cat:'finance',type:'amber',color:'amber',icon:'&#128176;',
+      title:'Value Wallet needed funding',
+      message:'You contributed '+fu(each)+' — '+notes,
+      target_dentist:p,target_role:null,
+      link_section:'finance',link_id:null,link_extra:null
+    });
+  });
+  buildFinTab();
+}
+
+// ══════════════════ CAPITAL CONTRIBUTIONS ═════════════════════════
+// One-way investment into the clinic — never repaid, tracked separately
+// from earnings and separately from the internal loan system above.
+function openAddCapital(){
+  var old=document.getElementById('capital-modal');if(old)old.remove();
+  var html='<div class="mbg open" id="capital-modal" onclick="if(event.target===this)this.remove()" style="z-index:600;">'+
+    '<div class="modal" style="max-width:420px;">'+
+    '<div class="mtit">&#128176; Record capital contribution</div>'+
+    '<div class="msub">A one-way investment into the clinic — not a loan, never repaid</div>'+
+    '<div class="fgrp"><label class="flbl">Partner <span class="req">*</span></label>'+
+    '<select class="finp" id="cap-partner">'+PARTNERS.map(function(p){return '<option value="'+p+'">'+p+'</option>';}).join('')+'</select></div>'+
+    '<div class="fg">'+
+    '<div class="fgrp"><label class="flbl">Amount (IQD) <span class="req">*</span></label>'+
+    '<input class="finp" type="number" id="cap-amount" placeholder="0" min="0"></div>'+
+    '<div class="fgrp"><label class="flbl">Date</label>'+
+    '<input class="finp" type="date" id="cap-date" value="'+fd(new Date())+'"></div>'+
+    '</div>'+
+    '<div class="fgrp"><label class="flbl">Notes</label>'+
+    '<input class="finp" id="cap-notes" placeholder="e.g. New X-ray machine, clinic expansion..."></div>'+
+    '<div class="mac">'+
+    '<button class="btn" onclick="document.getElementById(\'capital-modal\').remove()">Cancel</button>'+
+    '<button class="btn btnp" onclick="saveCapitalContribution()">Save contribution</button>'+
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+async function saveCapitalContribution(){
+  var partner=document.getElementById('cap-partner').value;
+  var amount=parseFloat(document.getElementById('cap-amount').value)||0;
+  var date=document.getElementById('cap-date').value||fd(new Date());
+  var notes=document.getElementById('cap-notes').value.trim()||null;
+  if(!amount){showToast('Enter an amount','error');return;}
+  var r=await db.from('capital_contributions').insert([{
+    partner_name:partner,amount:amount,currency:'IQD',date:date,notes:notes
+  }]);
+  if(r.error){showToast('Failed: '+r.error.message,'error');return;}
+  showToast('Capital contribution recorded ✅');
+  document.getElementById('capital-modal').remove();
+  buildFinTab();
+}
+async function deleteCapitalContribution(id){
+  if(!confirm('Delete this capital contribution record?'))return;
+  var r=await db.from('capital_contributions').delete().eq('id',id);
+  if(r.error){showToast('Could not delete: '+r.error.message,'error');return;}
+  showToast('Deleted');
+  buildFinTab();
+}
+async function buildCapitalContributions(){
+  var el=document.getElementById('fin-content');if(!el)return;
+  el.innerHTML='<div class="loader"><div class="spinner"></div></div>';
+  var r=await db.from('capital_contributions').select('*').order('date',{ascending:false});
+  if(r.error){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--r600);">Could not load — has the capital_contributions table been created yet?</div>';return;}
+  var rows=r.data||[];
+  var totalByPartner={};PARTNERS.forEach(function(p){totalByPartner[p]=0;});
+  var grandTotal=0;
+  rows.forEach(function(c){totalByPartner[c.partner_name]=(totalByPartner[c.partner_name]||0)+Number(c.amount||0);grandTotal+=Number(c.amount||0);});
+
+  var html='<div class="stats-row">'+
+    statC('var(--g50)','&#128176;','Total capital invested',fu(Math.round(grandTotal)))+
+    PARTNERS.map(function(p){return statC('var(--b50)','&#128100;',p,fu(Math.round(totalByPartner[p]||0)));}).join('')+
+    '</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'+
+    '<div style="font-size:11px;color:var(--s400);">One-way investments into the clinic — not loans, never repaid, tracked separately from earnings.</div>'+
+    '<button class="btn btnsm btnp" onclick="openAddCapital()">+ Record contribution</button></div>';
+
+  if(!rows.length){
+    html+='<div style="text-align:center;padding:30px;color:var(--s400);">No capital contributions recorded yet</div>';
+  } else {
+    html+='<div class="vdc-card"><div class="vdc-card-body" style="padding:0;">'+
+      rows.map(function(c){
+        return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--s100);">'+
+          '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--s800);">'+c.partner_name+'</div>'+
+          '<div style="font-size:10px;color:var(--s400);">'+(c.date||'—')+(c.notes?' · '+c.notes:'')+'</div></div>'+
+          '<div style="font-size:14px;font-weight:800;color:var(--g700);">+'+fu(Number(c.amount||0))+'</div>'+
+          '<button class="btn btnr btnxs" onclick="deleteCapitalContribution(\''+c.id+'\')">&#128465;</button>'+
+          '</div>';
+      }).join('')+'</div></div>';
+  }
+  el.innerHTML=html;
+}
 async function buildFLoans(){
   var el=document.getElementById('fin-content');if(!el)return;
   el.innerHTML='<div class="loader"><div class="spinner"></div></div>';
@@ -7403,7 +7584,8 @@ async function buildFLoans(){
     statC('var(--g50)','&#10003;','Settled',settled.length)+
     '</div>'+
     '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">'+
-    '<button class="btn btnsm btnp" onclick="openNewLoanDialog()">+ Record loan</button></div>';
+    '<button class="btn btnsm btnp" onclick="openNewLoanDialog()">+ Record loan</button>'+
+    '<button class="btn btnsm" onclick="openFundValueWallet()" style="margin-left:8px;">&#128176; Fund Value Wallet (split 3 ways)</button></div>';
   if(!outstanding.length&&!settled.length){
     el.innerHTML=html+'<div style="text-align:center;padding:30px;color:var(--s400);">No internal loans recorded yet</div>';return;
   }
@@ -8445,7 +8627,11 @@ function getPayDistDual(pay, inv){
   var netRatio=feeIQD2>0?Math.max(0,(feeIQD2-labFeeIQD)/feeIQD2):1;
   var netIQD=iqd*netRatio,netUSD=usd*netRatio;
   var isP=PARTNERS.indexOf(t)>=0,refIsP=r&&PARTNERS.indexOf(r)>=0;
-  if(isP)return{treaterIQD:iqd,treaterUSD:usd,refIQD:0,refUSD:0,vIQD:0,vUSD:0,type:'partner',dentist:t};
+  // Partners keep 100% of NET revenue (after lab fee), never the raw gross payment.
+  // This was previously returning raw iqd/usd, which meant a partner's lab expenses
+  // never reduced their earnings anywhere — the exact bug that showed a 75,000 IQD
+  // expense sitting next to a payout that hadn't actually been reduced by it.
+  if(isP)return{treaterIQD:netIQD,treaterUSD:netUSD,refIQD:0,refUSD:0,vIQD:0,vUSD:0,type:'partner',dentist:t};
   if(refIsP){
     var rates=getDR(t),pct=rates.refPct/100;
     return{treaterIQD:netIQD*pct,treaterUSD:netUSD*pct,refIQD:netIQD*(1-pct),refUSD:netUSD*(1-pct),vIQD:0,vUSD:0,type:'referred',pct:rates.refPct,dentist:t,referrer:r};
